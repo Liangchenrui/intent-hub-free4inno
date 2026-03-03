@@ -14,8 +14,6 @@ services:
       - .env
     ports:
       - "8000:5000"
-    depends_on:
-      - qdrant
     networks:
       - intent-hub-net
 
@@ -36,24 +34,6 @@ services:
     networks:
       - intent-hub-net
 
-  qdrant:
-    image: ${QDRANT_IMAGE}
-    container_name: intent-hub-qdrant
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    volumes:
-      - qdrant_data:/qdrant/storage
-    networks:
-      - intent-hub-net
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-
 networks:
   intent-hub-net:
     driver: bridge
-
-volumes:
-  qdrant_data:

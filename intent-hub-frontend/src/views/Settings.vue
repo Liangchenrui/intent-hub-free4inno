@@ -42,33 +42,15 @@
           </el-form-item>
 
           <el-divider :content-position="'left'">{{ $t('settings.embeddingTitle') }}</el-divider>
-          <el-form-item :label="$t('settings.huggingfaceToken')">
+          <el-form-item :label="$t('settings.embeddingServiceUrl')">
             <el-input 
-              v-model="settings.HUGGINGFACE_ACCESS_TOKEN" 
-              type="password" 
-              show-password 
-              :placeholder="$t('settings.huggingfaceTokenPlaceholder')" 
+              v-model="settings.EMBEDDING_SERVICE_URL" 
+              :placeholder="$t('settings.embeddingServiceUrlPlaceholder')" 
             />
             <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-              {{ $t('settings.huggingfaceTokenHint') }}
+              {{ $t('settings.embeddingServiceUrlHint') }}
             </div>
           </el-form-item>
-          <el-form-item :label="$t('settings.huggingfaceProvider')">
-            <el-input 
-              v-model="settings.HUGGINGFACE_PROVIDER" 
-              :placeholder="$t('settings.huggingfaceProviderPlaceholder')" 
-            />
-            <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-              {{ $t('settings.huggingfaceProviderHint') }}
-            </div>
-          </el-form-item>
-          <el-row :gutter="20">
-            <el-col :span="16">
-              <el-form-item :label="$t('settings.modelName')">
-                <el-input v-model="settings.EMBEDDING_MODEL_NAME" :placeholder="$t('settings.modelNamePlaceholder')" />
-              </el-form-item>
-            </el-col>
-          </el-row>
 
           <el-divider :content-position="'left'">{{ $t('settings.llmTitle') }}</el-divider>
           <el-form-item :label="$t('settings.llmProvider')">
@@ -227,10 +209,7 @@ const settings = ref<Settings>({
   QDRANT_URL: '',
   QDRANT_COLLECTION: '',
   QDRANT_API_KEY: null,
-  HUGGINGFACE_ACCESS_TOKEN: null,
-  HUGGINGFACE_PROVIDER: null,
-  EMBEDDING_MODEL_NAME: '',
-  EMBEDDING_DEVICE: 'cpu',
+  EMBEDDING_SERVICE_URL: '',
   LLM_PROVIDER: 'deepseek',
   LLM_API_KEY: null,
   LLM_BASE_URL: null,
@@ -258,10 +237,7 @@ const fetchSettings = async (showResetMessage = false) => {
       QDRANT_URL: data.QDRANT_URL || '',
       QDRANT_COLLECTION: data.QDRANT_COLLECTION || '',
       QDRANT_API_KEY: data.QDRANT_API_KEY ?? null,
-      HUGGINGFACE_ACCESS_TOKEN: data.HUGGINGFACE_ACCESS_TOKEN ?? null,
-      HUGGINGFACE_PROVIDER: data.HUGGINGFACE_PROVIDER ?? null,
-      EMBEDDING_MODEL_NAME: data.EMBEDDING_MODEL_NAME || '',
-      EMBEDDING_DEVICE: data.EMBEDDING_DEVICE || 'cpu',
+      EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL || '',
       LLM_PROVIDER: data.LLM_PROVIDER || 'deepseek',
       LLM_API_KEY: data.LLM_API_KEY ?? null,
       LLM_BASE_URL: data.LLM_BASE_URL ?? null,
@@ -300,8 +276,6 @@ const prepareSettingsForSubmit = (data: Settings): Partial<Settings> => {
   // 将可选字段的空字符串转换为 null
   const nullableFields: (keyof Settings)[] = [
     'QDRANT_API_KEY',
-    'HUGGINGFACE_ACCESS_TOKEN',
-    'HUGGINGFACE_PROVIDER',
     'LLM_API_KEY',
     'LLM_BASE_URL',
     'LLM_MODEL',
@@ -333,10 +307,7 @@ const handleSave = async () => {
         QDRANT_URL: data.QDRANT_URL || '',
         QDRANT_COLLECTION: data.QDRANT_COLLECTION || '',
         QDRANT_API_KEY: data.QDRANT_API_KEY ?? null,
-        HUGGINGFACE_ACCESS_TOKEN: data.HUGGINGFACE_ACCESS_TOKEN ?? null,
-        HUGGINGFACE_PROVIDER: data.HUGGINGFACE_PROVIDER ?? null,
-        EMBEDDING_MODEL_NAME: data.EMBEDDING_MODEL_NAME || '',
-        EMBEDDING_DEVICE: data.EMBEDDING_DEVICE || 'cpu',
+        EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL || '',
         LLM_PROVIDER: data.LLM_PROVIDER || 'deepseek',
         LLM_API_KEY: data.LLM_API_KEY ?? null,
         LLM_BASE_URL: data.LLM_BASE_URL ?? null,

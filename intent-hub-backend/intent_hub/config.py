@@ -7,8 +7,27 @@ from typing import Any, Dict, Optional
 
 from intent_hub.utils.logger import logger
 
-# 获取项目根目录 (intenthub/)
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+def _env_str(key: str, default: Optional[str] = None) -> Optional[str]:
+    """读取环境变量并去除首尾空白及 \\r\\n，避免 Windows 换行导致 HTTP 头非法（Illegal header value b'\\r'）。"""
+    v = os.getenv(key, default)
+    if v is None or not isinstance(v, str):
+        return v
+    return v.strip().replace("\r", "").replace("\n", "").strip() or None
+
+
+# 获取项目根目录
+# 适配 Docker 环境 (/app/intent_hub/config.py -> /app) 和本地开发环境 (.../intent-hub-backend/intent_hub/config.py -> .../intent-hub)
+_current_file = Path(__file__).resolve()
+_backend_root = _current_file.parent.parent
+
+if _backend_root.name == "intent-hub-backend":
+    # 本地开发环境：回退到 intent-hub 根目录
+    PROJECT_ROOT = _backend_root.parent
+else:
+    # Docker 环境：使用当前 backend_root 作为根目录 (通常是 /app)
+    PROJECT_ROOT = _backend_root
+
 # 默认数据目录：优先使用环境变量，否则使用项目根目录下的 data 文件夹
 DATA_DIR = Path(os.getenv("INTENT_HUB_DATA_DIR", str(PROJECT_ROOT / "data")))
 
@@ -51,17 +70,20 @@ class Config:
         "yes",
     )
 
-    # Qdrant配置
-    QDRANT_URL: str = os.getenv("QDRANT_URL")
-    QDRANT_COLLECTION: str = os.getenv("QDRANT_COLLECTION")
-    QDRANT_API_KEY: Optional[str] = os.getenv("QDRANT_API_KEY")
+    # Qdrant配置（使用 _env_str 去除可能的 \r\n，避免 HTTP 头 Illegal header value）
+    QDRANT_URL: str = _env_str("QDRANT_URL") or ""
+    QDRANT_COLLECTION: str = _env_str("QDRANT_COLLECTION") or ""
+    QDRANT_API_KEY: Optional[str] = _env_str("QDRANT_API_KEY")
 
-    # Embedding模型配置
-    HUGGINGFACE_ACCESS_TOKEN: Optional[str] = os.getenv("HUGGINGFACE_ACCESS_TOKEN")
-    HUGGINGFACE_PROVIDER: Optional[str] = os.getenv("HUGGINGFACE_PROVIDER")
-    HUGGINGFACE_TIMEOUT: int = int(os.getenv("HUGGINGFACE_TIMEOUT", 60))
-    EMBEDDING_MODEL_NAME: str = os.getenv("EMBEDDING_MODEL_NAME")
-    EMBEDDING_DEVICE: str = os.getenv("EMBEDDING_DEVICE", "cpu")
+    # Embedding服务配置
+    EMBEDDING_SERVICE_URL: str = (
+        _env_str("EMBEDDING_SERVICE_URL", "http://192.168.33.1:30122")
+        or "http://192.168.33.1:30122"
+    )
+    EMBEDDING_MODEL_NAME: str = (
+        _env_str("EMBEDDING_MODEL_NAME", "Qwen/Qwen3-Embedding-0.6B")
+        or "Qwen/Qwen3-Embedding-0.6B"
+    )  # 仅用于元数据和版本控制
 
     # 默认路由配置
     DEFAULT_ROUTE_ID: int = 0
@@ -254,12 +276,9 @@ class Config:
             "QDRANT_URL": cls.QDRANT_URL,
             "QDRANT_COLLECTION": cls.QDRANT_COLLECTION,
             "QDRANT_API_KEY": cls.QDRANT_API_KEY,
-            # Embedding模型配置
-            "HUGGINGFACE_ACCESS_TOKEN": cls.HUGGINGFACE_ACCESS_TOKEN,
-            "HUGGINGFACE_PROVIDER": cls.HUGGINGFACE_PROVIDER,
-            "HUGGINGFACE_TIMEOUT": cls.HUGGINGFACE_TIMEOUT,
+            # Embedding服务配置
+            "EMBEDDING_SERVICE_URL": cls.EMBEDDING_SERVICE_URL,
             "EMBEDDING_MODEL_NAME": cls.EMBEDDING_MODEL_NAME,
-            "EMBEDDING_DEVICE": cls.EMBEDDING_DEVICE,
             # LLM配置（通用）
             "LLM_PROVIDER": cls.LLM_PROVIDER,
             "LLM_API_KEY": cls.LLM_API_KEY,

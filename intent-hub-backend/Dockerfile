@@ -23,14 +23,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --index-strategy unsafe-best-match --extra-index-url https://mirrors.aliyun.com/pytorch-wheels/cpu -r requirements.txt; \
     fi
 
+# 构建阶段完成，直接进入最终镜像构建
+# 移除了本地模型下载步骤，因为已改用外部 Embedding 服务
+
 FROM ${BASE_IMAGE}
 
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/opt/venv/bin:${PATH}" \
-    HF_HOME="/app/.cache/huggingface"
+    PATH="/opt/venv/bin:${PATH}"
 
 # 安装 gosu，供 entrypoint 切换用户
 RUN apt-get update && apt-get install -y --no-install-recommends gosu && \
@@ -44,8 +46,9 @@ COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 
 COPY --chown=appuser:appuser . .
 
-RUN mkdir -p /app/intent_hub/models /app/.cache/huggingface && \
-    chown -R appuser:appuser /app/intent_hub/models /app/.cache/huggingface
+# 创建必要的目录
+RUN mkdir -p /app/intent_hub/models /app/data && \
+    chown -R appuser:appuser /app/intent_hub/models /app/data
 
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh

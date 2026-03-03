@@ -20,7 +20,7 @@ api.interceptors.request.use((config) => {
   if (config.url === '/auth/login') {
     return config;
   }
-  
+
   // 预测接口鉴权处理
   if (config.url === '/predict') {
     const predictKey = localStorage.getItem('predict_auth_key');
@@ -29,7 +29,7 @@ api.interceptors.request.use((config) => {
       return config;
     }
   }
-  
+
   // 其他接口使用 API Key 认证
   const token = localStorage.getItem('api_key');
   if (token) {
@@ -133,17 +133,17 @@ export interface RepairSuggestion {
   rationalization: string;
 }
 
-export const getOverlaps = (refresh: boolean = false) => 
+export const getOverlaps = (refresh: boolean = false) =>
   api.get<DiagnosticResult[]>('/diagnostics/overlap', { params: { refresh } });
 export const getRouteOverlap = (routeId: number) => api.get<DiagnosticResult>(`/diagnostics/overlap/${routeId}`);
-export const getRepairSuggestions = (sourceRouteId: number, targetRouteId: number, includeNegativeSamples: boolean = false) => 
-  api.post<RepairSuggestion>('/diagnostics/repair', 
+export const getRepairSuggestions = (sourceRouteId: number, targetRouteId: number, includeNegativeSamples: boolean = false) =>
+  api.post<RepairSuggestion>('/diagnostics/repair',
     { source_route_id: sourceRouteId, target_route_id: targetRouteId, include_negative_samples: includeNegativeSamples },
     { timeout: 300000 } // 5分钟超时，LLM请求可能需要较长时间
   );
-export const applyRepair = (routeId: number, utterances: string[]) => 
+export const applyRepair = (routeId: number, utterances: string[]) =>
   api.post<{ success: boolean }>('/diagnostics/apply-repair', { route_id: routeId, utterances });
-export const syncRoutes = (routeIds: number[]) => 
+export const syncRoutes = (routeIds: number[]) =>
   api.post<{ message: string; results: any[] }>('/reindex/sync-route', { route_ids: routeIds });
 
 export interface UmapPoint2D {
@@ -182,39 +182,36 @@ export interface Settings {
   QDRANT_URL: string;
   QDRANT_COLLECTION: string;
   QDRANT_API_KEY?: string | null;
-  
+
   // Embedding模型配置
-  HUGGINGFACE_ACCESS_TOKEN?: string | null;
-  HUGGINGFACE_PROVIDER?: string | null;
-  EMBEDDING_MODEL_NAME: string;
-  EMBEDDING_DEVICE: 'cpu' | 'cuda' | 'mps';
-  
+  EMBEDDING_SERVICE_URL: string;
+
   // LLM配置（通用）
   LLM_PROVIDER: 'deepseek' | 'openrouter' | 'doubao' | 'qwen' | 'gemini';
   LLM_API_KEY?: string | null;
   LLM_BASE_URL?: string | null;
   LLM_MODEL?: string | null;
   LLM_TEMPERATURE: number;
-  
+
   // DeepSeek配置（向后兼容）
   DEEPSEEK_API_KEY?: string | null;
   DEEPSEEK_BASE_URL?: string;
   DEEPSEEK_MODEL?: string;
-  
+
   // 提示词配置
   UTTERANCE_GENERATION_PROMPT: string;
   AGENT_REPAIR_PROMPT: string;
-  
+
   // 认证配置
   PREDICT_AUTH_KEY?: string | null;
   DEFAULT_USERNAME?: string;
   DEFAULT_PASSWORD?: string;
-  
+
   // 其他配置
   BATCH_SIZE?: number;
   DEFAULT_ROUTE_ID?: number;
   DEFAULT_ROUTE_NAME?: string;
-  
+
   // 诊断阈值配置
   REGION_THRESHOLD_SIGNIFICANT?: number;
   INSTANCE_THRESHOLD_AMBIGUOUS?: number;

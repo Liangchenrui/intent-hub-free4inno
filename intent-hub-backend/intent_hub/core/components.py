@@ -30,14 +30,18 @@ class ComponentManager:
     def qdrant_client(self) -> IntentHubQdrantClient:
         """获取Qdrant客户端实例"""
         if self._qdrant_client is None:
-            raise RuntimeError("Qdrant client not initialized, call init_components() first")
+            raise RuntimeError(
+                "Qdrant client not initialized, call init_components() first"
+            )
         return self._qdrant_client
 
     @property
     def route_manager(self) -> RouteManager:
         """获取路由管理器实例"""
         if self._route_manager is None:
-            raise RuntimeError("Route manager not initialized, call init_components() first")
+            raise RuntimeError(
+                "Route manager not initialized, call init_components() first"
+            )
         return self._route_manager
 
     def is_ready(self) -> bool:
@@ -71,21 +75,15 @@ class ComponentManager:
             try:
                 logger.info("Initializing encoder...")
                 self._encoder = QwenEmbeddingEncoder(
-                    model_name=Config.EMBEDDING_MODEL_NAME,
-                    device=Config.EMBEDDING_DEVICE,
+                    service_url=Config.EMBEDDING_SERVICE_URL,
                     batch_size=Config.BATCH_SIZE,
-                    huggingface_token=Config.HUGGINGFACE_ACCESS_TOKEN,
-                    huggingface_provider=Config.HUGGINGFACE_PROVIDER,
-                    huggingface_timeout=Config.HUGGINGFACE_TIMEOUT,
                 )
                 # 触发初始化以获取维度
+                # 只有当成功获取到维度才算初始化成功
                 _ = self._encoder.dimensions
-                mode = (
-                    "HuggingFace Inference API"
-                    if self._encoder.is_remote
-                    else "local model"
+                logger.info(
+                    f"Encoder initialization complete, using service: {Config.EMBEDDING_SERVICE_URL}"
                 )
-                logger.info(f"Encoder initialization complete, mode: {mode}")
             except Exception as e:
                 logger.error(f"Encoder initialization failed: {e}")
                 self._encoder = None
@@ -120,50 +118,63 @@ class ComponentManager:
         if self._qdrant_client and self._encoder and self._route_manager:
             try:
                 logger.info("Checking Qdrant data sync status...")
-                
+
                 # 检查模型是否发生变化
                 current_model = Config.EMBEDDING_MODEL_NAME
                 stored_model = self._qdrant_client.get_collection_model_name()
-                
+
                 force_full_sync = False
                 if stored_model and stored_model != current_model:
-                    logger.warning(f"Embedding model changed: {stored_model} -> {current_model}, performing full reindex")
+                    logger.warning(
+                        f"Embedding model changed: {stored_model} -> {current_model}, performing full reindex"
+                    )
                     self._qdrant_client.delete_all()
                     force_full_sync = True
-                
+
                 # 获取本地所有路由及其哈希
                 local_routes = self._route_manager.get_all_routes()
-                local_route_hashes = {r.id: self._route_manager.compute_route_hash(r) for r in local_routes}
-                
+                local_route_hashes = {
+                    r.id: self._route_manager.compute_route_hash(r)
+                    for r in local_routes
+                }
+
                 # 获取 Qdrant 中已有的路由 ID 和哈希
-                qdrant_route_hashes = {} if force_full_sync else self._qdrant_client.get_existing_route_hashes()
-                
+                qdrant_route_hashes = (
+                    {}
+                    if force_full_sync
+                    else self._qdrant_client.get_existing_route_hashes()
+                )
+
                 # 1. 找出需要删除的路由 (Qdrant 有但本地没有)
                 qdrant_ids = set(qdrant_route_hashes.keys())
                 local_ids = set(local_route_hashes.keys())
                 ids_to_delete = qdrant_ids - local_ids
-                
+
                 if ids_to_delete:
-                    logger.info(f"Removing redundant routes from Qdrant: {ids_to_delete}")
+                    logger.info(
+                        f"Removing redundant routes from Qdrant: {ids_to_delete}"
+                    )
                     for rid in ids_to_delete:
                         self._qdrant_client.delete_route(rid)
-                
+
                 # 2. 找出需要更新或新增的路由
                 routes_to_sync = []
                 for route in local_routes:
                     local_hash = local_route_hashes[route.id]
                     qdrant_hash = qdrant_route_hashes.get(route.id)
-                    
+
                     if force_full_sync or local_hash != qdrant_hash:
                         routes_to_sync.append(route)
-                
+
                 if routes_to_sync:
-                    logger.info(f"Syncing/updating {len(routes_to_sync)} routes to Qdrant")
+                    logger.info(
+                        f"Syncing/updating {len(routes_to_sync)} routes to Qdrant"
+                    )
                     total_points = 0
                     for route in routes_to_sync:
                         # 先删除旧的向量点（防止 ID 重排导致冲突或残留）
                         self._qdrant_client.delete_route(route.id)
-                        
+
                         # 生成并上传新向量
                         embeddings = self._encoder.encode(route.utterances)
                         self._qdrant_client.upsert_route_utterances(
@@ -173,16 +184,18 @@ class ComponentManager:
                             embeddings=embeddings,
                             score_threshold=route.score_threshold,
                             route_hash=local_route_hashes[route.id],
-                            model_name=current_model
+                            model_name=current_model,
                         )
                         total_points += len(route.utterances)
-                    logger.info(f"Synced {len(routes_to_sync)} routes, {total_points} vectors")
+                    logger.info(
+                        f"Synced {len(routes_to_sync)} routes, {total_points} vectors"
+                    )
                 else:
                     if not ids_to_delete:
                         logger.info("Qdrant in sync with local config, skipping update")
                     else:
                         logger.info("Qdrant cleanup done, in sync")
-                        
+
             except Exception as e:
                 logger.error(f"Data sync error: {e}")
 

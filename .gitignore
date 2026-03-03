@@ -63,6 +63,7 @@ ENV/
 !.env.example
 !.env.china
 !.env.official
+!intent-hub-backend/.env
 
 # Frontend specific
 intent-hub-frontend/dist/

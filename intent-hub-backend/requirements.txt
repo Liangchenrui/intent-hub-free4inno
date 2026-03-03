@@ -1,6 +1,7 @@
 # Web Framework
 flask>=2.3.0
 flask-compress>=1.13
+requests>=2.31.0
 
 # Data Validation
 pydantic>=2.0.0
@@ -14,18 +15,7 @@ scipy>=1.10.0
 numba>=0.57.0
 umap-learn>=0.5.3
 
-# HuggingFace Remote API (推荐用于生产环境，镜像更小)
-huggingface-hub>=0.20.0
-
 # LLM Integration
 langchain-core>=0.2.0
 langchain-openai>=0.1.0
 langchain-google-genai>=0.1.0
-
-# ===========================================
-# 可选：本地模型支持（会显著增加镜像体积）
-# 如需启用，请取消下面注释
-# ===========================================
-torch
-transformers>=4.30.0
-sentencepiece>=0.1.99

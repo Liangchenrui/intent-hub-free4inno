@@ -1,35 +1,19 @@
 """配置管理模块"""
 
 import json
-import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from intent_hub.utils.logger import logger
 
 
-def _env_str(key: str, default: Optional[str] = None) -> Optional[str]:
-    """读取环境变量并去除首尾空白及 \\r\\n，避免 Windows 换行导致 HTTP 头非法（Illegal header value b'\\r'）。"""
-    v = os.getenv(key, default)
-    if v is None or not isinstance(v, str):
-        return v
-    return v.strip().replace("\r", "").replace("\n", "").strip() or None
-
-
-# 获取项目根目录
-# 适配 Docker 环境 (/app/intent_hub/config.py -> /app) 和本地开发环境 (.../intent-hub-backend/intent_hub/config.py -> .../intent-hub)
+# 获取后端根目录
 _current_file = Path(__file__).resolve()
 _backend_root = _current_file.parent.parent
 
-if _backend_root.name == "intent-hub-backend":
-    # 本地开发环境：回退到 intent-hub 根目录
-    PROJECT_ROOT = _backend_root.parent
-else:
-    # Docker 环境：使用当前 backend_root 作为根目录 (通常是 /app)
-    PROJECT_ROOT = _backend_root
-
-# 默认数据目录：优先使用环境变量，否则使用项目根目录下的 data 文件夹
-DATA_DIR = Path(os.getenv("INTENT_HUB_DATA_DIR", str(PROJECT_ROOT / "data")))
+# 统一使用后端目录下的 data 文件夹
+PROJECT_ROOT = _backend_root
+DATA_DIR = PROJECT_ROOT / "data"
 
 # 新创建 settings.json 时写入的默认提示词
 DEFAULT_UTTERANCE_GENERATION_PROMPT = """你是一个资深的用户意图分析专家。你的任务是为特定的 AI Agent 生成高质量的测试数据集（Utterances），用于后续的意图识别和路由分发系统训练。 ### Agent 背景信息 - **Agent 名称**: {name} - **功能描述**: {description} - **参考示例（请参照这些示例的风格和范围，生成新的句子，但绝对不能重复这些示例）**: {reference_utterances} ### 生成要求 你需要生成 {count} 条**全新的**用户提问（必须与参考示例不同），请严格遵守以下准则： 1. **分布控制**：    - **关键词/短语 (50%)**: 极其简短，如"查天气"、"翻译一下"、"写代码"。这类词对路由最关键。    - **简单指令 (50%)**: 直接的命令句，如"帮我写个请假条"、"帮我分析这行代码"。 2. **多样性与覆盖面**：    - 提取描述中的"核心动词" and "核心名词"，进行交叉组合。    - 包含同义词替换（例如：从"预定"扩展到"帮我订一个"、"我想约一个"）。    - 必须沿用参考示例的语气和专业深度，但不要重复原话。 3. **路由判别性**：    - 生成的提问必须与该 Agent 的核心功能高度相关，避免产生可能导致路由误判到其他通用 Agent 的极其模糊的句子。 4. **格式要求**：    - 仅输出生成的问题列表，不要包含任何解释性文字。 {format_instructions}"""
@@ -62,28 +46,19 @@ class Config:
     """应用配置类"""
 
     # Flask配置
-    FLASK_HOST: str = os.getenv("FLASK_HOST", "0.0.0.0")
-    FLASK_PORT: int = int(os.getenv("FLASK_PORT", 5000))
-    FLASK_DEBUG: bool = os.getenv("FLASK_DEBUG", "False").lower() in (
-        "true",
-        "1",
-        "yes",
-    )
+    FLASK_HOST: str = "0.0.0.0"
+    FLASK_PORT: int = 5000
+    FLASK_DEBUG: bool = False
 
-    # Qdrant配置（使用 _env_str 去除可能的 \r\n，避免 HTTP 头 Illegal header value）
-    QDRANT_URL: str = _env_str("QDRANT_URL") or ""
-    QDRANT_COLLECTION: str = _env_str("QDRANT_COLLECTION") or ""
-    QDRANT_API_KEY: Optional[str] = _env_str("QDRANT_API_KEY")
+    # Qdrant配置
+    QDRANT_URL: str = ""
+    QDRANT_COLLECTION: str = ""
+    QDRANT_API_KEY: Optional[str] = None
 
     # Embedding服务配置
-    EMBEDDING_SERVICE_URL: str = (
-        _env_str("EMBEDDING_SERVICE_URL", "http://192.168.33.1:30122")
-        or "http://192.168.33.1:30122"
-    )
-    EMBEDDING_MODEL_NAME: str = (
-        _env_str("EMBEDDING_MODEL_NAME", "Qwen/Qwen3-Embedding-0.6B")
-        or "Qwen/Qwen3-Embedding-0.6B"
-    )  # 仅用于元数据和版本控制
+    EMBEDDING_SERVICE_URL: str = "http://192.168.33.1:30122"
+    EMBEDDING_MODEL_NAME: str = "Qwen/Qwen3-Embedding-0.6B"  # 仅用于元数据和版本控制
+    EMBEDDING_DEVICE: str = "cpu"
 
     # 默认路由配置
     DEFAULT_ROUTE_ID: int = 0
@@ -93,17 +68,11 @@ class Config:
     BATCH_SIZE: int = 32
 
     # 路由配置文件路径
-    ROUTES_CONFIG_PATH: str = os.getenv(
-        "ROUTES_CONFIG_PATH", str(DATA_DIR / "routes_config.json")
-    )
+    ROUTES_CONFIG_PATH: str = str(DATA_DIR / "routes.json")
     # 系统设置文件路径
-    SETTINGS_FILE_PATH: str = os.getenv(
-        "SETTINGS_FILE_PATH", str(DATA_DIR / "settings.json")
-    )
+    SETTINGS_FILE_PATH: str = str(DATA_DIR / "settings.json")
     # 诊断缓存文件路径
-    DIAGNOSTICS_CACHE_PATH: str = os.getenv(
-        "DIAGNOSTICS_CACHE_PATH", str(DATA_DIR / "diagnostics_cache.json")
-    )
+    DIAGNOSTICS_CACHE_PATH: str = str(DATA_DIR / "diagnostics_cache.json")
 
     # 认证配置
     API_KEYS: Optional[str] = None
@@ -117,28 +86,24 @@ class Config:
     DEFAULT_PASSWORD: str = "123456"
 
     # LLM配置
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "deepseek")
-    LLM_API_KEY: Optional[str] = os.getenv("LLM_API_KEY")
-    LLM_BASE_URL: Optional[str] = os.getenv("LLM_BASE_URL")
-    LLM_MODEL: Optional[str] = os.getenv("LLM_MODEL")
-    LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", 0.7))
+    LLM_PROVIDER: str = "deepseek"
+    LLM_API_KEY: Optional[str] = None
+    LLM_BASE_URL: Optional[str] = None
+    LLM_MODEL: Optional[str] = None
+    LLM_TEMPERATURE: float = 0.7
 
     # DeepSeek LLM配置（向后兼容）
-    DEEPSEEK_API_KEY: Optional[str] = os.getenv("DEEPSEEK_API_KEY")
-    DEEPSEEK_BASE_URL: str = os.getenv("DEEPSEEK_BASE_URL")
-    DEEPSEEK_MODEL: str = os.getenv("DEEPSEEK_MODEL")
+    DEEPSEEK_API_KEY: Optional[str] = None
+    DEEPSEEK_BASE_URL: Optional[str] = None
+    DEEPSEEK_MODEL: Optional[str] = None
 
     # 提示词配置
-    UTTERANCE_GENERATION_PROMPT: str = os.getenv("UTTERANCE_GENERATION_PROMPT", "")
-    AGENT_REPAIR_PROMPT: str = os.getenv("AGENT_REPAIR_PROMPT", "")
+    UTTERANCE_GENERATION_PROMPT: str = ""
+    AGENT_REPAIR_PROMPT: str = ""
 
     # 诊断阈值配置
-    REGION_THRESHOLD_SIGNIFICANT: float = float(
-        os.getenv("REGION_THRESHOLD_SIGNIFICANT", 0.0)
-    )
-    INSTANCE_THRESHOLD_AMBIGUOUS: float = float(
-        os.getenv("INSTANCE_THRESHOLD_AMBIGUOUS", 0.0)
-    )
+    REGION_THRESHOLD_SIGNIFICANT: float = 0.0
+    INSTANCE_THRESHOLD_AMBIGUOUS: float = 0.0
 
     @classmethod
     def get_settings_path(cls) -> Path:
@@ -151,28 +116,9 @@ class Config:
 
         优先级顺序 (由低到高):
         1. 类属性默认值
-        2. 环境变量 (Level 2: 基础设施配置)
-        3. settings.json (Level 3: 用户真相 SSoT)
+        2. settings.json (Level 2: 用户真相 SSoT)
         """
-        # 1. 环境变量覆盖
-        for key in cls.to_dict().keys():
-            env_val = os.getenv(key)
-            if env_val is not None:
-                # 获取当前值的类型进行转换
-                curr_val = getattr(cls, key)
-                try:
-                    if isinstance(curr_val, bool):
-                        setattr(cls, key, env_val.lower() in ("true", "1", "yes"))
-                    elif isinstance(curr_val, int):
-                        setattr(cls, key, int(env_val))
-                    elif isinstance(curr_val, float):
-                        setattr(cls, key, float(env_val))
-                    else:
-                        setattr(cls, key, env_val)
-                except Exception as e:
-                    logger.error(f"转换环境变量 {key}={env_val} 失败: {e}")
-
-        # 2. 从 settings.json 加载 (最高优先级，覆盖环境变量)
+        # 1. 从 settings.json 加载 (最高优先级)
         path = cls.get_settings_path()
         # 确保数据目录存在
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -279,6 +225,7 @@ class Config:
             # Embedding服务配置
             "EMBEDDING_SERVICE_URL": cls.EMBEDDING_SERVICE_URL,
             "EMBEDDING_MODEL_NAME": cls.EMBEDDING_MODEL_NAME,
+            "EMBEDDING_DEVICE": cls.EMBEDDING_DEVICE,
             # LLM配置（通用）
             "LLM_PROVIDER": cls.LLM_PROVIDER,
             "LLM_API_KEY": cls.LLM_API_KEY,

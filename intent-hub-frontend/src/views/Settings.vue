@@ -51,6 +51,31 @@
               {{ $t('settings.embeddingServiceUrlHint') }}
             </div>
           </el-form-item>
+          <el-row :gutter="20">
+            <el-col :span="16">
+              <el-form-item :label="$t('settings.modelName')">
+                <el-input 
+                  v-model="settings.EMBEDDING_MODEL_NAME" 
+                  :placeholder="$t('settings.modelNamePlaceholder')" 
+                />
+                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                  {{ $t('settings.modelNameHint') }}
+                </div>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item :label="$t('settings.embeddingDevice')">
+                <el-select v-model="settings.EMBEDDING_DEVICE" style="width: 100%">
+                  <el-option label="CPU" value="cpu" />
+                  <el-option label="CUDA" value="cuda" />
+                  <el-option label="MPS" value="mps" />
+                </el-select>
+                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                  {{ $t('settings.embeddingDeviceHint') }}
+                </div>
+              </el-form-item>
+            </el-col>
+          </el-row>
 
           <el-divider :content-position="'left'">{{ $t('settings.llmTitle') }}</el-divider>
           <el-form-item :label="$t('settings.llmProvider')">
@@ -114,6 +139,27 @@
           </el-form-item>
 
           <el-divider :content-position="'left'">{{ $t('settings.policyTitle') }}</el-divider>
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item :label="$t('settings.authEnabled')">
+                <el-switch v-model="settings.AUTH_ENABLED" />
+                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                  {{ $t('settings.authEnabledHint') }}
+                </div>
+              </el-form-item>
+            </el-col>
+            <el-col :span="16">
+              <el-form-item v-if="settings.AUTH_ENABLED" :label="$t('settings.apiKeys')">
+                <el-input 
+                  v-model="settings.API_KEYS" 
+                  :placeholder="$t('settings.apiKeysPlaceholder')" 
+                />
+                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                  {{ $t('settings.apiKeysHint') }}
+                </div>
+              </el-form-item>
+            </el-col>
+          </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item :label="$t('settings.username')">
@@ -210,6 +256,8 @@ const settings = ref<Settings>({
   QDRANT_COLLECTION: '',
   QDRANT_API_KEY: null,
   EMBEDDING_SERVICE_URL: '',
+  EMBEDDING_MODEL_NAME: '',
+  EMBEDDING_DEVICE: 'cpu',
   LLM_PROVIDER: 'deepseek',
   LLM_API_KEY: null,
   LLM_BASE_URL: null,
@@ -217,6 +265,8 @@ const settings = ref<Settings>({
   LLM_TEMPERATURE: 0.7,
   UTTERANCE_GENERATION_PROMPT: '',
   AGENT_REPAIR_PROMPT: '',
+  AUTH_ENABLED: true,
+  API_KEYS: '',
   PREDICT_AUTH_KEY: null,
   DEFAULT_USERNAME: 'admin',
   DEFAULT_PASSWORD: '',
@@ -231,26 +281,30 @@ const fetchSettings = async (showResetMessage = false) => {
   loading.value = true;
   try {
     const response = await getSettings();
-    // 只提取我们关心的字段，忽略后端返回的其他字段
+    // 提取并填充所有已知字段
     const data = response.data as any;
     settings.value = {
-      QDRANT_URL: data.QDRANT_URL || '',
-      QDRANT_COLLECTION: data.QDRANT_COLLECTION || '',
+      QDRANT_URL: data.QDRANT_URL ?? '',
+      QDRANT_COLLECTION: data.QDRANT_COLLECTION ?? '',
       QDRANT_API_KEY: data.QDRANT_API_KEY ?? null,
-      EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL || '',
-      LLM_PROVIDER: data.LLM_PROVIDER || 'deepseek',
+      EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
+      EMBEDDING_MODEL_NAME: data.EMBEDDING_MODEL_NAME ?? '',
+      EMBEDDING_DEVICE: data.EMBEDDING_DEVICE ?? 'cpu',
+      LLM_PROVIDER: data.LLM_PROVIDER ?? 'deepseek',
       LLM_API_KEY: data.LLM_API_KEY ?? null,
       LLM_BASE_URL: data.LLM_BASE_URL ?? null,
       LLM_MODEL: data.LLM_MODEL ?? null,
-      LLM_TEMPERATURE: data.LLM_TEMPERATURE || 0.7,
-      UTTERANCE_GENERATION_PROMPT: data.UTTERANCE_GENERATION_PROMPT || '',
-      AGENT_REPAIR_PROMPT: data.AGENT_REPAIR_PROMPT || '',
+      LLM_TEMPERATURE: data.LLM_TEMPERATURE ?? 0.7,
+      UTTERANCE_GENERATION_PROMPT: data.UTTERANCE_GENERATION_PROMPT ?? '',
+      AGENT_REPAIR_PROMPT: data.AGENT_REPAIR_PROMPT ?? '',
+      AUTH_ENABLED: data.AUTH_ENABLED ?? true,
+      API_KEYS: data.API_KEYS ?? '',
       PREDICT_AUTH_KEY: data.PREDICT_AUTH_KEY ?? null,
-      DEFAULT_USERNAME: data.DEFAULT_USERNAME || 'admin',
-      DEFAULT_PASSWORD: data.DEFAULT_PASSWORD || '',
+      DEFAULT_USERNAME: data.DEFAULT_USERNAME ?? 'admin',
+      DEFAULT_PASSWORD: data.DEFAULT_PASSWORD ?? '',
       BATCH_SIZE: data.BATCH_SIZE ?? 32,
       DEFAULT_ROUTE_ID: data.DEFAULT_ROUTE_ID ?? 0,
-      DEFAULT_ROUTE_NAME: data.DEFAULT_ROUTE_NAME || 'none',
+      DEFAULT_ROUTE_NAME: data.DEFAULT_ROUTE_NAME ?? 'none',
       REGION_THRESHOLD_SIGNIFICANT: data.REGION_THRESHOLD_SIGNIFICANT ?? 0.85,
       INSTANCE_THRESHOLD_AMBIGUOUS: data.INSTANCE_THRESHOLD_AMBIGUOUS ?? 0.92
     };
@@ -300,27 +354,31 @@ const handleSave = async () => {
     const payload = prepareSettingsForSubmit(settings.value);
     const response = await updateSettings(payload);
     ElMessage.success(response.data.message || t('settings.saveSuccess'));
-    // 更新时只更新我们关心的字段
+    // 更新时只更新所有已知字段
     if (response.data.settings) {
       const data = response.data.settings as any;
       settings.value = {
-        QDRANT_URL: data.QDRANT_URL || '',
-        QDRANT_COLLECTION: data.QDRANT_COLLECTION || '',
+        QDRANT_URL: data.QDRANT_URL ?? '',
+        QDRANT_COLLECTION: data.QDRANT_COLLECTION ?? '',
         QDRANT_API_KEY: data.QDRANT_API_KEY ?? null,
-        EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL || '',
-        LLM_PROVIDER: data.LLM_PROVIDER || 'deepseek',
+        EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
+        EMBEDDING_MODEL_NAME: data.EMBEDDING_MODEL_NAME ?? '',
+        EMBEDDING_DEVICE: data.EMBEDDING_DEVICE ?? 'cpu',
+        LLM_PROVIDER: data.LLM_PROVIDER ?? 'deepseek',
         LLM_API_KEY: data.LLM_API_KEY ?? null,
         LLM_BASE_URL: data.LLM_BASE_URL ?? null,
         LLM_MODEL: data.LLM_MODEL ?? null,
-        LLM_TEMPERATURE: data.LLM_TEMPERATURE || 0.7,
-        UTTERANCE_GENERATION_PROMPT: data.UTTERANCE_GENERATION_PROMPT || '',
-        AGENT_REPAIR_PROMPT: data.AGENT_REPAIR_PROMPT || '',
+        LLM_TEMPERATURE: data.LLM_TEMPERATURE ?? 0.7,
+        UTTERANCE_GENERATION_PROMPT: data.UTTERANCE_GENERATION_PROMPT ?? '',
+        AGENT_REPAIR_PROMPT: data.AGENT_REPAIR_PROMPT ?? '',
+        AUTH_ENABLED: data.AUTH_ENABLED ?? true,
+        API_KEYS: data.API_KEYS ?? '',
         PREDICT_AUTH_KEY: data.PREDICT_AUTH_KEY ?? null,
-        DEFAULT_USERNAME: data.DEFAULT_USERNAME || 'admin',
-        DEFAULT_PASSWORD: data.DEFAULT_PASSWORD || '',
+        DEFAULT_USERNAME: data.DEFAULT_USERNAME ?? 'admin',
+        DEFAULT_PASSWORD: data.DEFAULT_PASSWORD ?? '',
         BATCH_SIZE: data.BATCH_SIZE ?? 32,
         DEFAULT_ROUTE_ID: data.DEFAULT_ROUTE_ID ?? 0,
-        DEFAULT_ROUTE_NAME: data.DEFAULT_ROUTE_NAME || 'none',
+        DEFAULT_ROUTE_NAME: data.DEFAULT_ROUTE_NAME ?? 'none',
         REGION_THRESHOLD_SIGNIFICANT: data.REGION_THRESHOLD_SIGNIFICANT ?? 0.85,
         INSTANCE_THRESHOLD_AMBIGUOUS: data.INSTANCE_THRESHOLD_AMBIGUOUS ?? 0.92
       };

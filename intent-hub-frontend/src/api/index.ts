@@ -185,6 +185,8 @@ export interface Settings {
 
   // Embedding模型配置
   EMBEDDING_SERVICE_URL: string;
+  EMBEDDING_MODEL_NAME?: string;
+  EMBEDDING_DEVICE?: string;
 
   // LLM配置（通用）
   LLM_PROVIDER: 'deepseek' | 'openrouter' | 'doubao' | 'qwen' | 'gemini';
@@ -203,6 +205,8 @@ export interface Settings {
   AGENT_REPAIR_PROMPT: string;
 
   // 认证配置
+  AUTH_ENABLED?: boolean;
+  API_KEYS?: string;
   PREDICT_AUTH_KEY?: string | null;
   DEFAULT_USERNAME?: string;
   DEFAULT_PASSWORD?: string;

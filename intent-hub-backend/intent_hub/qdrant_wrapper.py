@@ -88,6 +88,7 @@ class IntentHubQdrantClient:
                     )
                     clean_url = clean_url.replace(":6333", "")
 
+                logger.info(f"Initializing Qdrant client (URL mode) with: {clean_url}")
                 self.client = QdrantClient(url=clean_url, api_key=api_key, timeout=600)
                 logger.info(f"Qdrant initialized (URL mode): {clean_url}")
             else:
@@ -156,7 +157,9 @@ class IntentHubQdrantClient:
                     "already exists" not in str(e).lower()
                     and "duplicate" not in str(e).lower()
                 ):
-                    logger.warning(f"Warning creating index for {self.ROUTE_ID_KEY}: {e}")
+                    logger.warning(
+                        f"Warning creating index for {self.ROUTE_ID_KEY}: {e}"
+                    )
 
             # 为 is_negative 字段创建索引（用于负例向量过滤）
             try:
@@ -172,7 +175,9 @@ class IntentHubQdrantClient:
                     "already exists" not in str(e).lower()
                     and "duplicate" not in str(e).lower()
                 ):
-                    logger.warning(f"Warning creating index for {self.IS_NEGATIVE_KEY}: {e}")
+                    logger.warning(
+                        f"Warning creating index for {self.IS_NEGATIVE_KEY}: {e}"
+                    )
 
         except Exception as e:
             logger.error(f"Collection initialization failed: {e}", exc_info=True)
@@ -306,7 +311,9 @@ class IntentHubQdrantClient:
 
             return results
         except Exception as e:
-            logger.error(f"Failed to get vectors for route {route_id}: {e}", exc_info=True)
+            logger.error(
+                f"Failed to get vectors for route {route_id}: {e}", exc_info=True
+            )
             raise
 
     def search(self, query_vector: List[float], top_k: int = 1) -> List[Dict[str, Any]]:

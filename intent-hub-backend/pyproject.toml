@@ -60,9 +60,6 @@ full = [
 [tool.setuptools]
 packages = ["intent_hub"]
 
-[tool.setuptools.package-data]
-intent_hub = ["routes_config.json"]
-
 [tool.black]
 line-length = 100
 target-version = ['py38', 'py39', 'py310', 'py311']

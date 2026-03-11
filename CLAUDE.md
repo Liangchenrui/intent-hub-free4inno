@@ -12,7 +12,7 @@
 - Backend tests: `cd intent-hub-backend && pytest`
 
 ## Architecture
-- Backend: Python 3.9+, FastAPI, Qdrant
+- Backend: Python 3.9+, Flask, Qdrant
 - Frontend: Vue 3, Vite, Element Plus
 - Database: Qdrant (Vector DB)
 - LLM Integration: LangChain (DeepSeek, OpenAI, Qwen)

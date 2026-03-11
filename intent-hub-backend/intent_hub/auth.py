@@ -14,18 +14,12 @@ from intent_hub.models import ErrorResponse
 class AuthManager:
     """API Key认证管理器（内存存储，支持TTL和用户key管理）"""
 
-    # TTL设置为30分钟（秒）
     KEY_TTL: int = 30 * 60
 
     def __init__(self):
-        """初始化认证管理器"""
-        # 存储用户到key的映射: {username: {'key': str, 'created_at': float}}
         self._user_keys: Dict[str, Dict[str, Any]] = {}
-        # 存储key到用户的映射（用于快速验证）: {key: username}
         self._key_to_user: Dict[str, str] = {}
-        # 从环境变量或配置加载初始keys
         self._load_initial_keys()
-        # 启动时清理一次过期key
         self.cleanup_expired_keys()
 
     def verify_user(self, username: str, password: str) -> bool:
@@ -48,7 +42,6 @@ class AuthManager:
         """从配置加载初始API keys"""
         from intent_hub.config import Config
 
-        # 从配置类加载
         if hasattr(Config, "API_KEYS") and Config.API_KEYS:
             config_keys = [k.strip() for k in Config.API_KEYS.split(",") if k.strip()]
             for key in config_keys:
@@ -66,10 +59,8 @@ class AuthManager:
         Returns:
             str: API key（如果用户已有未过期的key，则返回该key；否则生成新的）
         """
-        # 清理过期key
         self.cleanup_expired_keys()
 
-        # 检查用户是否已有key
         if username in self._user_keys:
             user_key_info = self._user_keys[username]
             key = user_key_info["key"]
@@ -80,17 +71,14 @@ class AuthManager:
                 logger.info(f"User {username} using existing API key: {key[:8]}...")
                 return key
             else:
-                # key已过期，删除旧key
                 logger.info(f"User {username} API key expired, generating new key")
                 old_key = key
                 if old_key in self._key_to_user:
                     del self._key_to_user[old_key]
 
-        # 生成新的API key
         new_key = str(uuid.uuid4())
         current_time = time.time()
 
-        # 存储用户key信息
         self._user_keys[username] = {"key": new_key, "created_at": current_time}
         self._key_to_user[new_key] = username
 
@@ -113,7 +101,6 @@ class AuthManager:
         if not key:
             return False
 
-        # 从key到用户的映射中查找
         if key in self._key_to_user:
             username = self._key_to_user[key]
             # 如果是用户关联的key，也要从用户映射中删除
@@ -147,7 +134,6 @@ class AuthManager:
                 if time.time() - created_at < self.KEY_TTL:
                     return True
                 else:
-                    # key已过期，清理
                     self.cleanup_expired_keys()
                     return False
 
@@ -162,13 +148,11 @@ class AuthManager:
         current_time = time.time()
         expired_users = []
 
-        # 找出所有过期的用户key
         for username, key_info in self._user_keys.items():
             created_at = key_info["created_at"]
             if current_time - created_at >= self.KEY_TTL:
                 expired_users.append(username)
 
-        # 删除过期的key
         cleaned_count = 0
         for username in expired_users:
             key = self._user_keys[username]["key"]
@@ -185,14 +169,11 @@ class AuthManager:
 
     def get_all_keys(self) -> Set[str]:
         """获取所有有效的keys（用于调试，实际生产环境应谨慎使用）"""
-        # 清理过期key
         self.cleanup_expired_keys()
-        # 返回所有有效的key
         return set(self._key_to_user.keys())
 
     def count(self) -> int:
         """获取当前有效的key数量（不包括过期的）"""
-        # 清理过期key
         self.cleanup_expired_keys()
         return len(self._key_to_user)
 
@@ -217,7 +198,6 @@ class AuthManager:
         return None
 
 
-# 全局认证管理器实例
 _auth_manager: Optional[AuthManager] = None
 
 
@@ -257,16 +237,12 @@ def require_auth(f):
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 检查是否启用认证
         from intent_hub.config import Config
 
         if not Config.AUTH_ENABLED:
-            # 认证已禁用，直接执行
             return f(*args, **kwargs)
 
         auth_manager = get_auth_manager()
-
-        # 提取API key
         api_key = extract_api_key()
 
         if not api_key:
@@ -289,7 +265,6 @@ def require_auth(f):
                 ).dict()
             ), 401
 
-        # 认证通过，继续执行原函数
         return f(*args, **kwargs)
 
     return decorated_function
@@ -332,10 +307,7 @@ def require_telestar_auth(f):
             if api_key and auth_manager.is_valid(api_key):
                 return f(*args, **kwargs)
 
-        # 认证失败
         logger.warning(f"Predict auth failed: {request.path}")
-        
-        # Build error detail
         error_detail = "Invalid authorization."
         if predict_key:
             error_detail += f" Provide valid Predict Key in header (config: {predict_key[:2]}***)."

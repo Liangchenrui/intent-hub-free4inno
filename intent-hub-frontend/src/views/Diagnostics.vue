@@ -653,9 +653,7 @@ const currentSymbolSize = ref(10);
 const colorByRoute = ref<Record<number, string>>({});
 const routeNames = ref<Record<number, string>>({});
 
-// 诊断阈值
 const regionThreshold = ref(0.85);
-const instanceThreshold = ref(0.92);
 
 // 修复相关状态
 const repairDialogVisible = ref(false);
@@ -1198,19 +1196,8 @@ const applyRepairAction = async () => {
       await addNegativeSamples(currentSourceRoute.value.route_id, { negative_samples: updatedNegativeSamples });
     }
     
-    // 5. 不再自动同步向量数据库，等待用户点击“开始扫描”
-    /*
-    const routeIds = [
-      currentSourceRoute.value.route_id,
-      currentOverlap.value.target_route_id
-    ];
-    await syncRoutes(routeIds);
-    */
-    
     ElMessage.success(t('diagnostics.repairApplied'));
     repairDialogVisible.value = false;
-    // 不再自动刷新诊断结果
-    // runDiagnostics(); 
   } catch (error: any) {
     ElMessage.error(t('diagnostics.applyError'));
   } finally {
@@ -1777,7 +1764,6 @@ const fetchThresholds = async () => {
     const res = await getSettings();
     if (res.data) {
       regionThreshold.value = res.data.REGION_THRESHOLD_SIGNIFICANT ?? 0.85;
-      instanceThreshold.value = res.data.INSTANCE_THRESHOLD_AMBIGUOUS ?? 0.92;
     }
   } catch (err) {
     console.error('Failed to fetch settings thresholds:', err);
@@ -1876,12 +1862,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.view-label {
-  font-size: 14px;
-  color: #606266;
-  font-weight: 500;
 }
 
 .mode-tabs :deep(.el-tabs__header) {
@@ -2288,48 +2268,6 @@ onMounted(() => {
   border-radius: 8px;
 }
 
-.comparison-header {
-  display: flex;
-  background: #f5f7fa;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-weight: bold;
-  font-size: 13px;
-  margin-bottom: 8px;
-}
-
-.header-item {
-  flex: 1;
-  text-align: center;
-}
-
-.header-item.divider {
-  flex: 0 0 60px;
-}
-
-.comparison-list {
-  max-height: 300px;
-  overflow-y: auto;
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-}
-
-.comparison-row {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid #f0f0f0;
-  transition: background 0.2s;
-}
-
-.comparison-row:last-child {
-  border-bottom: none;
-}
-
-.comparison-row:hover {
-  background: #fdf6f6;
-}
-
 .comparison-container {
   display: flex;
   align-items: stretch;
@@ -2481,36 +2419,6 @@ onMounted(() => {
   font-size: 13px;
   word-break: break-all;
   user-select: none;
-}
-
-.comp-item.sim {
-  flex: 0 0 60px;
-  text-align: center;
-}
-
-.action-content {
-  background: #f8f9fa;
-  padding: 16px;
-  border-radius: 8px;
-}
-
-.action-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-}
-
-.group-label {
-  font-size: 13px;
-  color: #606266;
-  margin-right: 8px;
-}
-
-.mt-10 {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px dashed #dcdfe6;
 }
 
 .empty-text {

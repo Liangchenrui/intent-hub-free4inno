@@ -12,9 +12,7 @@ from intent_hub.api import (
     settings,
 )
 from intent_hub.auth import require_auth
-from intent_hub.config import Config
 from intent_hub.core.components import get_component_manager
-from intent_hub.utils.logger import suppress_health_check_logs
 
 app = Flask(__name__)
 Compress(app)
@@ -176,23 +174,3 @@ def init_app():
         logger.error(f"Failed to start diagnostics: {e}")
 
     return app
-
-
-if __name__ == "__main__":
-    suppress_health_check_logs()
-    component_manager = get_component_manager()
-    component_manager.init_components()
-
-    try:
-        from intent_hub.services.diagnostic_service import DiagnosticService
-        from intent_hub.utils.logger import logger
-
-        diagnostic_service = DiagnosticService(component_manager)
-        diagnostic_service.run_async_diagnostics("full")
-        logger.info("Manual startup: Async full diagnostics started")
-    except Exception as e:
-        from intent_hub.utils.logger import logger
-
-        logger.error(f"Manual startup: Failed to start diagnostics: {e}")
-
-    app.run(host=Config.FLASK_HOST, port=Config.FLASK_PORT, debug=Config.FLASK_DEBUG)

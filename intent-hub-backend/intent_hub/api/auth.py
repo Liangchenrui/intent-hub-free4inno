@@ -27,19 +27,10 @@ def login(login_req: LoginRequest):
             ErrorResponse(error="认证失败", detail="用户名或密码错误").dict()
         ), 401
 
-    # 验证通过，生成或获取API key（同一用户多次登录会返回同一个key）
-    # 检查用户是否已有未过期的key
-    existing_key = auth_manager.get_user_key(login_req.username)
     api_key = auth_manager.generate_key(login_req.username)
-
-    if existing_key and existing_key == api_key:
-        logger.info(
-            f"用户 {login_req.username} 登录成功，使用现有API key: {api_key[:8]}...，当前有效key数量: {auth_manager.count()}"
-        )
-    else:
-        logger.info(
-            f"用户 {login_req.username} 登录成功，生成新的API key: {api_key[:8]}...，当前有效key数量: {auth_manager.count()}"
-        )
+    logger.info(
+        f"用户 {login_req.username} 登录成功，API key: {api_key[:8]}...，当前有效key数量: {auth_manager.count()}"
+    )
 
     return jsonify(
         LoginResponse(

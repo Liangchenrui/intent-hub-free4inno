@@ -201,7 +201,7 @@ class RouteService:
         parser = PydanticOutputParser(pydantic_object=UtteranceList)
 
         reference_utterances_text = ""
-        if example_utterances and len(example_utterances) > 0:
+        if example_utterances:
             utterances_list = "\n".join([f"- {utt}" for utt in example_utterances])
             reference_utterances_text = f"\n参考示例（请参照这些示例的风格和范围，生成新的句子，但绝对不能重复这些示例）:\n{utterances_list}\n"
 

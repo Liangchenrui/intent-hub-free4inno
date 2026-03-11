@@ -16,7 +16,7 @@
 
 1. **准备环境配置**:
    ```shell
-   cp env.example .env
+   cp .env.example .env
    ```
    *编辑 `.env` 文件，填写你的 `LLM_API_KEY` (用于自动生成语料) 以及其他配置。*
 
@@ -51,7 +51,7 @@
 - `EMBEDDING_MODEL_NAME`: 使用的向量模型名称。
 - `QDRANT_URL`: 向量数据库连接地址。
 
-详见 `env.example` 文件中的注释说明。
+详见 `.env.example` 文件中的注释说明。
 
 ### 数据持久化
 所有用户配置和路由数据都存储在 `./data` 目录下：
@@ -73,8 +73,8 @@
 
 本项目采用前后端分离架构，通过向量检索实现毫秒级意图分发。
 
-### 🔹 后端 (Python / FastAPI)
-- **核心框架:** [Python 3.9+](https://www.python.org/) + [FastAPI](https://fastapi.tiangolo.com/)
+### 🔹 后端 (Python / Flask)
+- **核心框架:** [Python 3.9+](https://www.python.org/) + [Flask](https://flask.palletsprojects.com/)
 - **向量检索:** [Qdrant](https://qdrant.tech/) (高性能向量数据库)
 - **模型能力:** 
   - Embedding: Qwen-Embedding-0.6B (支持 HuggingFace / 本地加载)
@@ -93,7 +93,7 @@
 ```text
 intenthub/
 ├── data/                  # 持久化数据 (路由配置、系统设置)
-├── intent-hub-backend/    # 后端源代码 (Python/FastAPI)
+├── intent-hub-backend/    # 后端源代码 (Python/Flask)
 │   ├── intent_hub/        # 核心逻辑 (编码、检索、服务层)
 │   ├── tests/             # 单元测试
 │   └── run.py             # 服务启动入口
@@ -101,7 +101,7 @@ intenthub/
 │   ├── src/               # 页面、组件、状态管理
 │   └── vite.config.ts     # 构建配置
 ├── docker-compose.yml     # 全栈容器化编排
-├── env.example            # 环境变量配置模板
+├── .env.example           # 环境变量配置模板
 └── README.md              # 本说明文件 (项目导航)
 ```
 

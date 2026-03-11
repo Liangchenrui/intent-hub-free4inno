@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=swr.cn-north-4.myhuaweicloud.com/ddn-k8s/ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+ARG BASE_IMAGE=ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 FROM ${BASE_IMAGE} AS builder
 
 ARG PIP_INDEX_URL

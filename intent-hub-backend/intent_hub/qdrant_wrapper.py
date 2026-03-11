@@ -23,8 +23,8 @@ class IntentHubQdrantClient:
     ROUTE_ID_KEY = "route_id"
     ROUTE_NAME_KEY = "route_name"
     UTTERANCE_KEY = "utterance"
-    ROUTE_HASH_KEY = "route_hash"  # 新增：路由配置哈希值
-    MODEL_NAME_KEY = "model_name"  # 新增：模型名称标识
+    ROUTE_HASH_KEY = "route_hash"
+    MODEL_NAME_KEY = "model_name"
     SCORE_THRESHOLD_KEY = "score_threshold"
     IS_NEGATIVE_KEY = "is_negative"  # 标识是否为负例向量
     NEGATIVE_THRESHOLD_KEY = "negative_threshold"  # 负例阈值
@@ -54,7 +54,6 @@ class IntentHubQdrantClient:
             # 针对 Qdrant Cloud 环境，如果检测到 SSL 错误，尝试在代码层级绕过代理
             import os
 
-            # 内部使用的干净 URL
             clean_url = self.url
 
             # 如果是特定的外部地址，强制清理环境中的代理设置，防止 httpcore/httpx 走代理
@@ -67,7 +66,6 @@ class IntentHubQdrantClient:
                     .split(":")[0]
                 ).strip()
 
-                # 记录并打印以便调试
                 no_proxy = os.environ.get("NO_PROXY", "")
                 if host_only not in no_proxy:
                     os.environ["NO_PROXY"] = (
@@ -117,7 +115,6 @@ class IntentHubQdrantClient:
     def _ensure_collection(self):
         """确保Collection存在，不存在则创建"""
         try:
-            # 增加对 collection_exists 的异常处理，确保逻辑健壮
             try:
                 exists = self.client.collection_exists(self.collection_name)
             except Exception as e:
@@ -152,7 +149,6 @@ class IntentHubQdrantClient:
                 )
                 logger.info(f"Index for {self.ROUTE_ID_KEY} ensured")
             except Exception as e:
-                # 如果索引已存在，忽略错误
                 if (
                     "already exists" not in str(e).lower()
                     and "duplicate" not in str(e).lower()
@@ -161,7 +157,6 @@ class IntentHubQdrantClient:
                         f"Warning creating index for {self.ROUTE_ID_KEY}: {e}"
                     )
 
-            # 为 is_negative 字段创建索引（用于负例向量过滤）
             try:
                 self.client.create_payload_index(
                     collection_name=self.collection_name,
@@ -170,7 +165,6 @@ class IntentHubQdrantClient:
                 )
                 logger.info(f"Index for {self.IS_NEGATIVE_KEY} ensured")
             except Exception as e:
-                # 如果索引已存在，忽略错误
                 if (
                     "already exists" not in str(e).lower()
                     and "duplicate" not in str(e).lower()
@@ -404,17 +398,16 @@ class IntentHubQdrantClient:
 
                 points, next_offset = result
 
-                if not points:  # 没有更多点了
+                if not points:
                     break
 
-                # 从payload中提取route_id
                 for point in points:
                     route_id = point.payload.get(self.ROUTE_ID_KEY)
                     if route_id is not None:
                         route_ids.add(route_id)
 
                 offset = next_offset
-                if next_offset is None:  # 没有更多数据了
+                if next_offset is None:
                     break
 
             logger.info(

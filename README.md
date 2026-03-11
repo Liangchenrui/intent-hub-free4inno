@@ -16,7 +16,7 @@ The project is fully containerized and supports one-command deployment.
 
 1. **Prepare environment**:
    ```shell
-   cp env.example .env
+   cp .env.example .env
    ```
    *Edit `.env` and set your `LLM_API_KEY` (for auto corpus generation) and other options.*
 
@@ -52,7 +52,7 @@ Key options in the root `.env` file:
 - `EMBEDDING_MODEL_NAME`: Embedding model name.
 - `QDRANT_URL`: Qdrant connection URL.
 
-See comments in `env.example` for details.
+See comments in `.env.example` for details.
 
 ### Data persistence
 
@@ -74,8 +74,8 @@ In Docker, this directory is mounted as a volume so data survives container remo
 
 Frontend/backend split with vector search for fast intent routing.
 
-### 🔹 Backend (Python / FastAPI)
-- **Stack:** [Python 3.9+](https://www.python.org/) + [FastAPI](https://fastapi.tiangolo.com/)
+### 🔹 Backend (Python / Flask)
+- **Stack:** [Python 3.9+](https://www.python.org/) + [Flask](https://flask.palletsprojects.com/)
 - **Vector store:** [Qdrant](https://qdrant.tech/)
 - **Models:**
   - Embedding: Qwen-Embedding-0.6B (HuggingFace / local)
@@ -94,7 +94,7 @@ Frontend/backend split with vector search for fast intent routing.
 ```text
 intenthub/
 ├── data/                  # Persisted data (routes, settings)
-├── intent-hub-backend/    # Backend (Python/FastAPI)
+├── intent-hub-backend/    # Backend (Python/Flask)
 │   ├── intent_hub/        # Core (encoding, search, services)
 │   ├── tests/             # Unit tests
 │   └── run.py             # Entry point
@@ -102,7 +102,7 @@ intenthub/
 │   ├── src/               # Pages, components, state
 │   └── vite.config.ts    # Build config
 ├── docker-compose.yml     # Full-stack compose
-├── env.example            # Env template
+├── .env.example           # Env template
 └── README.md              # This file
 ```
 

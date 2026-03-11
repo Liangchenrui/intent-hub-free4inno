@@ -1,27 +1,17 @@
 import axios from 'axios';
 
-// 根据环境变量设置 API 基础地址
-// 开发环境使用 /api（通过 vite 代理）
-// 生产环境直接使用完整 URL
-const getBaseURL = () => {
-  return '/api'
-};
-
 const api = axios.create({
-  baseURL: getBaseURL(),
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// 请求拦截器：添加 API Key
 api.interceptors.request.use((config) => {
-  // 登录接口不需要携带 token
   if (config.url === '/auth/login') {
     return config;
   }
 
-  // 预测接口鉴权处理
   if (config.url === '/predict') {
     const predictKey = localStorage.getItem('predict_auth_key');
     if (predictKey) {
@@ -30,7 +20,6 @@ api.interceptors.request.use((config) => {
     }
   }
 
-  // 其他接口使用 API Key 认证
   const token = localStorage.getItem('api_key');
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
@@ -39,16 +28,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// 响应拦截器：处理 401 和超时错误
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // 如果是 401 且不是登录接口，则跳转到登录页
     if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
       localStorage.removeItem('api_key');
       window.location.href = '/login';
     }
-    // 处理超时错误（504 Gateway Timeout 或 timeout）
     if (error.response?.status === 504 || error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
       error.isTimeout = true;
     }
@@ -195,11 +181,6 @@ export interface Settings {
   LLM_MODEL?: string | null;
   LLM_TEMPERATURE: number;
 
-  // DeepSeek配置（向后兼容）
-  DEEPSEEK_API_KEY?: string | null;
-  DEEPSEEK_BASE_URL?: string;
-  DEEPSEEK_MODEL?: string;
-
   // 提示词配置
   UTTERANCE_GENERATION_PROMPT: string;
   AGENT_REPAIR_PROMPT: string;
@@ -224,7 +205,6 @@ export interface Settings {
 export const getSettings = () => api.get<Settings>('/settings');
 export const updateSettings = (data: Partial<Settings>) => api.post<{ message: string; settings: Settings }>('/settings', data);
 
-// 负例管理接口
 export interface AddNegativeSamplesRequest {
   negative_samples: string[];
   negative_threshold?: number;
@@ -234,11 +214,6 @@ export const addNegativeSamples = (routeId: number, data: AddNegativeSamplesRequ
   api.post<{ message: string; route_id: number; total_negative_samples: number }>(
     `/routes/${routeId}/negative-samples`,
     data
-  );
-
-export const deleteNegativeSamples = (routeId: number) =>
-  api.delete<{ message: string; route_id: number }>(
-    `/routes/${routeId}/negative-samples`
   );
 
 export default api;

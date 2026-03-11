@@ -21,36 +21,28 @@ class RouteManager:
         Args:
             config_path: 路由配置文件路径（绝对路径或相对于intent_hub包目录的路径）
         """
-        # 解析配置文件路径
         if config_path:
             raw_path = config_path
         else:
             raw_path = Config.ROUTES_CONFIG_PATH
 
-        # 获取当前文件所在目录（intent_hub包目录）
         current_file = Path(__file__).resolve()
         intent_hub_dir = current_file.parent
 
-        # 解析配置文件路径
         if os.path.isabs(raw_path):
-            # 如果是绝对路径，直接使用
             self.config_path = raw_path
         else:
-            # 如果是相对路径，相对于intent_hub包目录
             self.config_path = str(intent_hub_dir / raw_path)
 
         self._routes_cache: Dict[int, RouteConfig] = {}
         self._lock = Lock()
 
-        # 记录实际使用的配置文件路径
         logger.info(f"Routes config path: {self.config_path}")
 
-        # 确保配置文件目录存在
         config_dir = os.path.dirname(self.config_path)
         if config_dir:  # 如果路径包含目录
             os.makedirs(config_dir, exist_ok=True)
 
-        # 加载初始配置
         self._load_from_file()
 
     def _load_from_file(self):
@@ -246,7 +238,6 @@ class RouteManager:
         Returns:
             路由配置的MD5哈希值（十六进制字符串）
         """
-        # 创建一个包含路由所有关键信息的字典
         route_data = {
             "id": route.id,
             "name": route.name,
@@ -256,7 +247,6 @@ class RouteManager:
             "score_threshold": route.score_threshold,
             "negative_threshold": getattr(route, "negative_threshold", 0.95),
         }
-        # 转换为JSON字符串并计算哈希
         route_json = json.dumps(route_data, ensure_ascii=False, sort_keys=True)
         return hashlib.md5(route_json.encode("utf-8")).hexdigest()
 

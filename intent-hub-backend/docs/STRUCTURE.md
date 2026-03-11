@@ -9,16 +9,14 @@ intent-hub-backend/
 │   ├── app.py               # Flask应用主文件，定义所有API路由
 │   ├── config.py            # 配置管理，从环境变量和settings.json读取配置
 │   ├── models.py            # 数据模型定义（Pydantic模型）
-│   ├── encoder.py           # 编码器封装，处理文本向量化
-│   ├── qdrant_wrapper.py   # Qdrant客户端封装，处理向量存储和检索
+│   ├── encoder.py           # 编码器封装，调用远程文本向量化服务
+│   ├── qdrant_wrapper.py    # Qdrant客户端封装，处理向量存储和检索
 │   ├── route_manager.py     # 路由管理器，内存缓存和热加载
 │   ├── auth.py              # 认证模块，API Key管理
-│   ├── routes_config.json   # 路由配置文件
-│   ├── settings.json        # 系统设置文件
 │   ├── api/                 # API处理模块
 │   │   ├── __init__.py
 │   │   ├── auth.py          # 认证相关API
-│   │   ├── health.py        # 健康检查API
+│   │   ├── diagnostics.py   # 诊断相关API
 │   │   ├── prediction.py    # 路由预测API
 │   │   ├── routes.py        # 路由管理API
 │   │   ├── reindex.py       # 重新索引API
@@ -28,43 +26,51 @@ intent-hub-backend/
 │   │   └── components.py    # 组件管理器，统一管理所有组件的初始化
 │   ├── services/            # 业务逻辑服务层
 │   │   ├── __init__.py
-│   │   ├── route_service.py      # 路由服务，处理路由CRUD业务逻辑
-│   │   ├── prediction_service.py # 预测服务，处理路由预测业务逻辑
-│   │   ├── sync_service.py       # 同步服务，处理路由数据同步
-│   │   └── llm_factory.py        # LLM工厂，根据provider创建LLM实例
-│   ├── utils/               # 工具模块
-│   │   ├── __init__.py
-│   │   ├── error_handler.py # 错误处理工具
-│   │   └── logger.py        # 日志工具
-│   └── models/              # 模型文件目录
-│       └── Qwen_Qwen3-Embedding-0.6B/  # 本地模型文件
+│   │   ├── diagnostic_service.py  # 诊断服务，语义重叠检测
+│   │   ├── route_service.py       # 路由服务，处理路由CRUD业务逻辑
+│   │   ├── prediction_service.py  # 预测服务，处理路由预测业务逻辑
+│   │   ├── sync_service.py        # 同步服务，处理路由数据同步
+│   │   └── llm_factory.py         # LLM工厂，根据provider创建LLM实例
+│   └── utils/               # 工具模块
+│       ├── __init__.py
+│       ├── error_handler.py # 错误处理工具
+│       └── logger.py        # 日志工具
+├── data/                    # 运行时数据目录
+│   ├── routes.json          # 路由配置文件
+│   ├── settings.json        # 系统设置文件
+│   └── diagnostics_cache.json # 诊断缓存
 ├── tests/                   # 测试目录
 │   ├── __init__.py
-│   └── test_config.py      # 配置模块测试示例
+│   └── test_config.py       # 配置模块测试
 ├── docs/                    # 文档目录
-│   ├── API.md              # API接口文档
-│   ├── PRD_V1.0.md        # 需求规格说明书
-│   └── STRUCTURE.md        # 本文件
+│   ├── API.md               # API接口文档
+│   ├── EMBEDDING_SERVICE_API.md # 嵌入服务API文档
+│   └── STRUCTURE.md         # 本文件
 ├── requirements.txt         # Python依赖列表
-├── setup.py                 # setuptools安装配置
-├── Dockerfile              # Docker构建文件
-├── .gitignore              # Git忽略文件
-├── run.py                   # 应用启动脚本
-└── README.md               # 项目说明文档
+├── pyproject.toml           # 项目元数据和构建配置
+├── Dockerfile               # Docker构建文件
+├── docker-entrypoint.sh     # Docker入口脚本
+└── run.py                   # 应用启动脚本
 ```
 
 ## 模块说明
 
 ### intent_hub.app
 Flask应用主文件，定义所有API路由：
-- `/health` - 健康检查
 - `/auth/login` - 用户登录
 - `/predict` - 路由预测
 - `/routes` - 路由CRUD操作（GET, POST）
 - `/routes/search` - 搜索路由
 - `/routes/<id>` - 路由更新和删除（PUT, DELETE）
 - `/routes/generate-utterances` - 生成例句
+- `/routes/import` - 导入路由
+- `/routes/<id>/negative-samples` - 负例管理（POST, DELETE）
 - `/reindex` - 重新索引
+- `/reindex/sync-route` - 同步指定路由
+- `/diagnostics/overlap` - 诊断重叠分析
+- `/diagnostics/umap` - UMAP点云数据
+- `/diagnostics/repair` - LLM修复建议
+- `/diagnostics/apply-repair` - 应用修复
 - `/settings` - 系统设置（GET, POST）
 
 ### intent_hub.config
@@ -83,21 +89,22 @@ Flask应用主文件，定义所有API路由：
 - `ErrorResponse` - 错误响应模型
 - `LoginRequest/Response` - 登录请求/响应模型
 - `GenerateUtterancesRequest` - 生成例句请求模型
+- `DiagnosticResult` / `RouteOverlap` / `ConflictPoint` - 诊断相关模型
+- `RepairSuggestion` - 修复建议模型
 
 ### intent_hub.encoder
-编码器模块，封装Qwen3-Embedding模型：
-- 支持本地模型和远程模型下载
+编码器模块，封装远程文本嵌入服务：
+- 调用外部 Embedding 服务进行文本向量化
 - 批量编码和单文本编码
-- 延迟初始化，提高启动速度
 - 自动获取向量维度
 
 ### intent_hub.qdrant_wrapper
 Qdrant客户端封装：
 - Collection自动创建
 - 路由向量点的增删改查
+- 正例/负例向量管理
 - 相似度搜索
-- 路由ID集合获取
-- 数据存在性检查
+- 路由哈希变更检测
 
 ### intent_hub.route_manager
 路由管理器：
@@ -106,14 +113,14 @@ Qdrant客户端封装：
 - 支持热加载（reload）
 - 线程安全的CRUD操作
 - 路由搜索功能
+- 路由配置哈希计算
 
 ### intent_hub.auth
 认证模块：
-- API Key生成和验证
+- API Key生成和验证（带TTL）
 - 用户登录验证
-- 认证装饰器（require_auth）
+- 认证装饰器（require_auth, require_telestar_auth）
 - 支持Bearer Token和X-API-Key两种方式
-- 支持Telestar认证
 
 ### intent_hub.core.components
 组件管理器，统一管理所有核心组件的初始化：
@@ -125,6 +132,14 @@ Qdrant客户端封装：
 
 ### intent_hub.services
 业务逻辑服务层，封装核心业务逻辑：
+
+#### diagnostic_service.py
+诊断服务，处理语义重叠检测：
+- 路由级区域重叠分析（质心相似度）
+- 语料级向量冲突检测
+- UMAP降维可视化
+- LLM修复建议生成
+- 诊断结果缓存（增量/全量）
 
 #### route_service.py
 路由服务，处理路由的CRUD操作：
@@ -138,12 +153,12 @@ Qdrant客户端封装：
 预测服务，处理路由预测的核心业务逻辑：
 - 文本向量化
 - 相似度检索
-- 阈值过滤
+- 阈值过滤（含负例排除）
 - 结果排序和返回
 
 #### sync_service.py
 同步服务，处理路由数据同步：
-- 增量更新
+- 增量更新（基于哈希变更检测）
 - 全量重建
 
 #### llm_factory.py
@@ -155,7 +170,7 @@ LLM工厂，根据provider创建对应的LLM实例：
 ### intent_hub.api
 API处理模块，将HTTP请求路由到对应的服务层：
 - `auth.py` - 认证相关API处理
-- `health.py` - 健康检查API处理
+- `diagnostics.py` - 诊断相关API处理
 - `prediction.py` - 路由预测API处理
 - `routes.py` - 路由管理API处理
 - `reindex.py` - 重新索引API处理
@@ -170,7 +185,7 @@ API处理模块，将HTTP请求路由到对应的服务层：
 
 1. **启动流程**：
    - 通过`ComponentManager`统一初始化所有组件
-   - 初始化编码器（加载模型，获取向量维度）
+   - 初始化编码器（连接远程嵌入服务，获取向量维度）
    - 初始化Qdrant客户端（连接数据库，创建Collection）
    - 初始化路由管理器（从JSON文件加载路由配置）
    - 如果Qdrant为空，自动同步路由数据到Qdrant
@@ -180,6 +195,7 @@ API处理模块，将HTTP请求路由到对应的服务层：
    - 使用编码器生成向量
    - 在Qdrant中搜索Top-K最相似的向量
    - 按路由ID分组，取最高分
+   - 检查负例排除（如匹配到负例且超过阈值则排除）
    - 根据每个路由的阈值判断是否匹配
    - 返回所有满足阈值的路由（按分数降序），如果没有则返回默认路由
 
@@ -202,9 +218,16 @@ API处理模块，将HTTP请求路由到对应的服务层：
    - 过滤重复例句，返回指定数量的新例句
    - 更新路由配置（如果路由已存在）
 
+5. **诊断流程**：
+   - 遍历所有路由，计算两两之间的质心相似度（区域重叠）
+   - 计算语料级别的点对点相似度（向量冲突）
+   - 结果缓存到文件，支持增量更新
+   - 可通过LLM生成修复建议
+   - 支持UMAP降维可视化
+
 ## 配置文件
 
-### routes_config.json
+### data/routes.json
 路由配置文件，JSON格式：
 ```json
 [
@@ -213,16 +236,18 @@ API处理模块，将HTTP请求路由到对应的服务层：
     "name": "路由名称",
     "description": "路由描述信息",
     "utterances": ["示例1", "示例2"],
-    "score_threshold": 0.75
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95
   }
 ]
 ```
 
-### settings.json
+### data/settings.json
 系统设置文件，存储系统配置（可通过API动态更新）：
 ```json
 {
-  "QDRANT_URL": "http://192.168.33.1:31853",
+  "QDRANT_URL": "http://localhost:6333",
   "QDRANT_COLLECTION": "intent_hub_routes",
   "EMBEDDING_MODEL_NAME": "Qwen/Qwen3-Embedding-0.6B",
   "LLM_PROVIDER": "deepseek",
@@ -231,14 +256,6 @@ API处理模块，将HTTP请求路由到对应的服务层：
   "AUTH_ENABLED": true
 }
 ```
-
-### 环境变量
-部分配置可通过环境变量设置，优先级高于settings.json：
-- `FLASK_HOST` - Flask服务地址
-- `FLASK_PORT` - Flask服务端口
-- `FLASK_DEBUG` - 调试模式
-- `API_KEYS` - API密钥（多个用逗号分隔）
-- 其他配置详见`intent_hub/config.py`
 
 ## 扩展指南
 
@@ -260,10 +277,3 @@ API处理模块，将HTTP请求路由到对应的服务层：
 1. 在`tests`目录下创建测试文件
 2. 使用pytest编写测试用例
 3. 运行`pytest`执行测试
-
-### 添加文档
-1. 在`docs`目录下添加文档文件
-2. 更新`docs/API.md`中的接口文档（如添加新接口）
-3. 更新`docs/STRUCTURE.md`中的项目结构说明
-4. 更新README.md中的相关链接
-

@@ -1,7 +1,5 @@
 """编码器模块 - 封装远程文本嵌入服务"""
 
-import os
-import time
 from typing import List, Optional
 
 import numpy as np

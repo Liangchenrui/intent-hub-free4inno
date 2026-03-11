@@ -1,28 +1,7 @@
 {
   "1": {
     "route_id": 1,
-    "route_name": "product_stock",
-    "overlaps": [
-      {
-        "target_route_id": 2,
-        "target_route_name": "restock_request",
-        "region_similarity": 0.8718082914124359,
-        "instance_conflicts": [],
-        "total_conflicts": 0
-      }
-    ]
-  },
-  "2": {
-    "route_id": 2,
-    "route_name": "restock_request",
-    "overlaps": [
-      {
-        "target_route_id": 1,
-        "target_route_name": "product_stock",
-        "region_similarity": 0.8718082914124359,
-        "instance_conflicts": [],
-        "total_conflicts": 0
-      }
-    ]
+    "route_name": "天气服务",
+    "overlaps": []
   }
 }

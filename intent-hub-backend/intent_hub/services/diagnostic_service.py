@@ -168,7 +168,7 @@ class DiagnosticService:
                 v_curr = np.array(p_curr["vector"])
                 u_curr = p_curr["payload"].get("utterance", "")
 
-                for p_other in other_points:
+                for p_other in other_points_filtered:
                     v_other = np.array(p_other["vector"])
                     u_other = p_other["payload"].get("utterance", "")
 

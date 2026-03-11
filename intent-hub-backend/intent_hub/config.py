@@ -7,7 +7,6 @@ from typing import Any, Dict, Optional
 from intent_hub.utils.logger import logger
 
 
-# 获取后端根目录
 _current_file = Path(__file__).resolve()
 _backend_root = _current_file.parent.parent
 
@@ -34,7 +33,6 @@ json
     "负面约束例句 3"
   ],
   "rationalization": "简要说明本次修复如何强化 `{name_a}` 的判别特征，并与 `{name_b}` 拉开语义距离"
-  }
 }}
 
 注意：
@@ -120,7 +118,6 @@ class Config:
         """
         # 1. 从 settings.json 加载 (最高优先级)
         path = cls.get_settings_path()
-        # 确保数据目录存在
         path.parent.mkdir(parents=True, exist_ok=True)
 
         # 若 settings.json 不存在，则创建并写入默认配置（含默认提示词）

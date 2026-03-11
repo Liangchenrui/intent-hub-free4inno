@@ -4,8 +4,7 @@
   font-weight: 400;
 
   color-scheme: light;
-  
-  /* Element Plus 已经提供了大部分变量，这里做一些全局兜底 */
+
   --el-font-family: Inter, "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
 }
 
@@ -31,7 +30,6 @@ a:hover {
   color: var(--el-color-primary-light-3);
 }
 
-/* 统一滚动条样式 */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

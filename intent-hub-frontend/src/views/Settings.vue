@@ -79,7 +79,7 @@
 
           <el-divider :content-position="'left'">{{ $t('settings.llmTitle') }}</el-divider>
           <el-form-item :label="$t('settings.llmProvider')">
-            <el-select v-model="settings.LLM_PROVIDER" style="width: 100%" @change="handleProviderChange">
+            <el-select v-model="settings.LLM_PROVIDER" style="width: 100%">
               <el-option label="DeepSeek" value="deepseek" />
               <el-option label="OpenRouter" value="openrouter" />
               <el-option label="豆包 (Doubao)" value="doubao" />
@@ -281,7 +281,6 @@ const fetchSettings = async (showResetMessage = false) => {
   loading.value = true;
   try {
     const response = await getSettings();
-    // 提取并填充所有已知字段
     const data = response.data as any;
     settings.value = {
       QDRANT_URL: data.QDRANT_URL ?? '',
@@ -324,10 +323,8 @@ const fetchSettings = async (showResetMessage = false) => {
   }
 };
 
-// 将空字符串转换为 null，以符合 API 规范
 const prepareSettingsForSubmit = (data: Settings): Partial<Settings> => {
   const result: any = { ...data };
-  // 将可选字段的空字符串转换为 null
   const nullableFields: (keyof Settings)[] = [
     'QDRANT_API_KEY',
     'LLM_API_KEY',
@@ -412,11 +409,6 @@ const handleTabChange = (tabName: any) => {
   } else if (tabName === 'diagnostics') {
     router.push('/diagnostics');
   }
-};
-
-const handleProviderChange = () => {
-  // 当切换provider时，可以清空或设置默认值
-  // 这里保持用户已输入的配置，让用户自己决定是否修改
 };
 
 const getApiKeyPlaceholder = () => {

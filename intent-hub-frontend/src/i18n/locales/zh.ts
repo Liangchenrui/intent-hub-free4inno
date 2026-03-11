@@ -91,6 +91,7 @@ export default {
     syncFailed: '同步或重新检测失败',
     confirmMerge: '确认合并',
     mergedDescription: '合并自 "{source}" 和 "{target}"',
+    mergeRoutes: '合并路由',
   },
   login: {
     title: 'Intent Hub 登录',

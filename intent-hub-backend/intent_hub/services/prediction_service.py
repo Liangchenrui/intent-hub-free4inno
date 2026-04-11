@@ -77,6 +77,7 @@ class PredictionService:
                 PredictResponse(
                     id=Config.DEFAULT_ROUTE_ID,
                     name=Config.DEFAULT_ROUTE_NAME,
+                    route_key=Config.DEFAULT_ROUTE_KEY,
                     score=None,
                 )
             ]
@@ -90,6 +91,9 @@ class PredictionService:
             payload = result["payload"]
             route_id = payload[qdrant_client.ROUTE_ID_KEY]
             route_name = payload[qdrant_client.ROUTE_NAME_KEY]
+            route = route_manager.get_route(route_id)
+            route_key = route.route_key if route else f"route.{route_id}"
+            route_name = route.name if route else route_name
 
             # 跳过被负例排除的路由
             if route_id in excluded_route_ids:
@@ -111,7 +115,10 @@ class PredictionService:
                     or score > matched_routes[route_id].score
                 ):
                     matched_routes[route_id] = PredictResponse(
-                        id=route_id, name=route_name, score=float(score)
+                        id=route_id,
+                        name=route_name,
+                        route_key=route_key,
+                        score=float(score),
                     )
                     logger.debug(
                         f"Match: route_id={route_id}, score={score:.4f} >= threshold={threshold}"
@@ -135,6 +142,7 @@ class PredictionService:
                 PredictResponse(
                     id=Config.DEFAULT_ROUTE_ID,
                     name=Config.DEFAULT_ROUTE_NAME,
+                    route_key=Config.DEFAULT_ROUTE_KEY,
                     score=None,
                 )
             ]

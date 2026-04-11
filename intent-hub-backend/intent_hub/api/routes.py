@@ -6,7 +6,12 @@ from flask import jsonify, request
 from pydantic import BaseModel, Field, ValidationError
 
 from intent_hub.core.components import get_component_manager
-from intent_hub.models import ErrorResponse, GenerateUtterancesRequest, RouteConfig
+from intent_hub.models import (
+    ErrorResponse,
+    GenerateUtterancesRequest,
+    RouteConfig,
+    SkillRouteImportRequest,
+)
 from intent_hub.services.route_service import RouteService
 from intent_hub.utils.error_handler import handle_errors, validate_request
 from intent_hub.utils.logger import logger
@@ -47,7 +52,10 @@ def create_route(route: RouteConfig):
     component_manager.ensure_ready()
 
     route_service = RouteService(component_manager)
-    created_route = route_service.create_route(route)
+    try:
+        created_route = route_service.create_route(route)
+    except ValueError as e:
+        return jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()), 400
 
     return jsonify(created_route.dict()), 201
 
@@ -80,7 +88,9 @@ def update_route(route_id: int):
         updated_route = route_service.update_route(route_id, route)
         return jsonify(updated_route.dict()), 200
     except ValueError as e:
-        return jsonify(ErrorResponse(error="路由不存在", detail=str(e)).dict()), 404
+        error = "路由不存在" if "does not exist" in str(e) else "请求参数错误"
+        status = 404 if error == "路由不存在" else 400
+        return jsonify(ErrorResponse(error=error, detail=str(e)).dict()), status
 
 
 @handle_errors
@@ -112,6 +122,24 @@ def generate_utterances(req: GenerateUtterancesRequest):
         return jsonify(updated_route.dict()), 200
     except Exception as e:
         return jsonify(ErrorResponse(error="生成提问失败", detail=str(e)).dict()), 500
+
+
+@handle_errors
+@validate_request(SkillRouteImportRequest)
+def import_route_from_skill(req: SkillRouteImportRequest):
+    """根据 SKILL.md 内容生成路由草稿（不自动持久化）"""
+    component_manager = get_component_manager()
+    component_manager.ensure_ready()
+
+    route_service = RouteService(component_manager)
+
+    try:
+        draft = route_service.generate_route_from_skill(req)
+        return jsonify(draft.dict()), 200
+    except ValueError as e:
+        return jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()), 400
+    except Exception as e:
+        return jsonify(ErrorResponse(error="生成路由草稿失败", detail=str(e)).dict()), 500
 
 
 class ImportRoutesRequest(BaseModel):
@@ -185,14 +213,26 @@ def import_routes():
         # route.id==0: 走 RouteService 自动分配 ID
         if route.id == 0:
             route_service = RouteService(component_manager)
-            created_route = route_service.create_route(route)
+            try:
+                created_route = route_service.create_route(route)
+            except ValueError as e:
+                return (
+                    jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()),
+                    400,
+                )
             imported_ids.append(created_route.id)
             created += 1
             continue
 
         # route.id != 0: 如果存在则覆盖；不存在则作为“带指定ID的新建”导入
         is_update = route.id in existing_ids
-        route_manager.add_route(route)
+        try:
+            route_manager.add_route(route)
+        except ValueError as e:
+            return (
+                jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()),
+                400,
+            )
 
         imported_ids.append(route.id)
         if is_update:

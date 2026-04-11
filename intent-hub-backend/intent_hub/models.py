@@ -19,6 +19,7 @@ class RouteConfig(BaseModel):
 
     id: int = Field(..., description="路由ID")
     name: str = Field(..., description="路由名称")
+    route_key: str = Field(..., description="稳定的业务路由标识", min_length=1)
     description: str = Field(default="", description="路由描述")
     utterances: List[str] = Field(..., description="示例语句列表")
     negative_samples: List[str] = Field(
@@ -54,6 +55,7 @@ class PredictResponse(BaseModel):
 
     id: int = Field(..., description="匹配到的路由ID")
     name: str = Field(..., description="匹配到的路由名称")
+    route_key: str = Field(..., description="稳定的业务路由标识")
     score: Optional[float] = Field(None, description="相似度分数")
 
 
@@ -86,11 +88,27 @@ class GenerateUtterancesRequest(BaseModel):
 
     id: int = Field(..., description="Agent ID")
     name: str = Field(..., description="Agent 名称")
+    route_key: str = Field(..., description="业务路由标识", min_length=1)
     description: str = Field(default="", description="Agent 描述")
     count: int = Field(default=5, description="生成的提问数量", gt=0, le=50)
     utterances: Optional[List[str]] = Field(
         default=None, description="参考的utterances列表（可选）"
     )
+
+
+class SkillRouteImportRequest(BaseModel):
+    """通过 SKILL.md 生成路由草稿请求"""
+
+    skill_content: str = Field(..., description="SKILL.md 文件内容", min_length=1)
+
+
+class SkillRouteDraft(BaseModel):
+    """从 skill 生成的路由草稿"""
+
+    name: str = Field(..., description="路由名称")
+    route_key: str = Field(..., description="业务路由标识")
+    description: str = Field(default="", description="路由描述")
+    utterances: List[str] = Field(..., description="建议语料列表")
 
 
 class ConflictPoint(BaseModel):

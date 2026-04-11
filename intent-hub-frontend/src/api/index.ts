@@ -45,6 +45,7 @@ api.interceptors.response.use(
 export interface RouteConfig {
   id: number;
   name: string;
+  route_key: string;
   description: string;
   utterances: string[];
   negative_samples?: string[];
@@ -55,14 +56,27 @@ export interface RouteConfig {
 export interface GenerateUtterancesRequest {
   id: number;
   name: string;
+  route_key: string;
   description?: string;
   count?: number;
   utterances?: string[];
 }
 
+export interface ImportSkillRouteRequest {
+  skill_content: string;
+}
+
+export interface SkillRouteDraft {
+  name: string;
+  route_key: string;
+  description: string;
+  utterances: string[];
+}
+
 export interface PredictResult {
   id: number;
   name: string;
+  route_key: string;
   score?: number;
 }
 
@@ -72,6 +86,8 @@ export const createRoute = (data: RouteConfig) => api.post<RouteConfig>('/routes
 export const updateRoute = (id: number, data: Partial<RouteConfig>) => api.put<RouteConfig>(`/routes/${id}`, data);
 export const deleteRoute = (id: number) => api.delete<{ message: string }>(`/routes/${id}`);
 export const generateUtterances = (data: GenerateUtterancesRequest) => api.post<RouteConfig>('/routes/generate-utterances', data);
+export const importRouteFromSkill = (data: ImportSkillRouteRequest) =>
+  api.post<SkillRouteDraft>('/routes/import-skill', data, { timeout: 300000 });
 
 export interface ImportRoutesRequest {
   routes: RouteConfig[];
@@ -184,6 +200,7 @@ export interface Settings {
   // 提示词配置
   UTTERANCE_GENERATION_PROMPT: string;
   AGENT_REPAIR_PROMPT: string;
+  SKILL_ROUTE_IMPORT_PROMPT: string;
 
   // 认证配置
   AUTH_ENABLED?: boolean;
@@ -196,6 +213,7 @@ export interface Settings {
   BATCH_SIZE?: number;
   DEFAULT_ROUTE_ID?: number;
   DEFAULT_ROUTE_NAME?: string;
+  DEFAULT_ROUTE_KEY?: string;
 
   // 诊断阈值配置
   REGION_THRESHOLD_SIGNIFICANT?: number;
@@ -217,4 +235,3 @@ export const addNegativeSamples = (routeId: number, data: AddNegativeSamplesRequ
   );
 
 export default api;
-

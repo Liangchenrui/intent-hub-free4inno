@@ -74,6 +74,13 @@
           style="display: none"
           @change="handleImportFileChange"
         />
+        <input
+          ref="skillFileInput"
+          type="file"
+          accept=".md,text/markdown,text/plain"
+          style="display: none"
+          @change="handleSkillFileChange"
+        />
 
         <el-table 
           v-loading="loading"
@@ -87,6 +94,7 @@
             <template #default="{ row }">
               <div class="agent-info">
                 <div class="agent-name">{{ row.name }}</div>
+                <div class="agent-route-key">{{ row.route_key }}</div>
                 <div class="agent-description">{{ row.description || $t('agent.noDescription') }}</div>
               </div>
             </template>
@@ -194,9 +202,26 @@
       destroy-on-close
       class="custom-dialog"
     >
-      <el-form :model="editForm" label-position="top">
+        <el-form :model="editForm" label-position="top">
+        <div class="skill-import-bar">
+          <div class="skill-import-copy">
+            <div class="skill-import-title">{{ $t('agent.skillImportTitle') }}</div>
+            <div class="skill-import-desc">{{ $t('agent.skillImportDesc') }}</div>
+          </div>
+          <el-button
+            type="primary"
+            plain
+            :loading="importingSkill"
+            @click="triggerSkillImport"
+          >
+            {{ $t('agent.skillImportAction') }}
+          </el-button>
+        </div>
         <el-form-item :label="$t('agent.nameLabel')" required>
           <el-input v-model="editForm.name" :placeholder="$t('agent.namePlaceholder')" />
+        </el-form-item>
+        <el-form-item :label="$t('agent.routeKeyLabel')" required>
+          <el-input v-model="editForm.route_key" :placeholder="$t('agent.routeKeyPlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('agent.descLabel')">
           <el-input 
@@ -305,7 +330,19 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Search, Plus, Refresh, MagicStick } from '@element-plus/icons-vue';
-import { getRoutes, searchRoutes, deleteRoute, updateRoute, createRoute, generateUtterances, reindex, importRoutes, type RouteConfig, type GenerateUtterancesRequest } from '../api';
+import {
+  getRoutes,
+  searchRoutes,
+  deleteRoute,
+  updateRoute,
+  createRoute,
+  generateUtterances,
+  reindex,
+  importRoutes,
+  importRouteFromSkill,
+  type RouteConfig,
+  type GenerateUtterancesRequest
+} from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 
 const { t } = useI18n();
@@ -317,10 +354,12 @@ const saving = ref(false);
 const generating = ref(false);
 const reindexing = ref(false);
 const importing = ref(false);
+const importingSkill = ref(false);
 const genCount = ref(5);
 const searchQuery = ref('');
 const activeTab = ref('list');
 const importFileInput = ref<HTMLInputElement | null>(null);
+const skillFileInput = ref<HTMLInputElement | null>(null);
 
 const fetchAgents = async (query: string = '') => {
   loading.value = true;
@@ -366,9 +405,11 @@ const handleTabChange = (tabName: any) => {
 
 const showModal = ref(false);
 const isEdit = ref(false);
+const originalRouteKey = ref('');
 const editForm = ref<Partial<RouteConfig>>({
   id: 0,
   name: '',
+  route_key: '',
   description: '',
   score_threshold: 0.75,
   negative_threshold: 0.95,
@@ -381,14 +422,17 @@ const negativeSamplesText = ref('');
 const openModal = (agent?: RouteConfig) => {
   if (agent) {
     isEdit.value = true;
+    originalRouteKey.value = agent.route_key;
     editForm.value = { ...agent };
     utterancesText.value = agent.utterances.join('\n');
     negativeSamplesText.value = (agent.negative_samples || []).join('\n');
   } else {
     isEdit.value = false;
+    originalRouteKey.value = '';
     editForm.value = { 
       id: 0, 
       name: '', 
+      route_key: '',
       description: '', 
       score_threshold: 0.75, 
       negative_threshold: 0.95,
@@ -426,6 +470,13 @@ const triggerImport = () => {
     // reset，确保选择同一个文件也能触发 change
     importFileInput.value.value = '';
     importFileInput.value.click();
+  }
+};
+
+const triggerSkillImport = () => {
+  if (skillFileInput.value) {
+    skillFileInput.value.value = '';
+    skillFileInput.value.click();
   }
 };
 
@@ -467,6 +518,9 @@ const handleImportFileChange = async (evt: Event) => {
       if (!('name' in item) || typeof item.name !== 'string' || !item.name.trim()) {
         return ElMessage.error(t('agent.importInvalidFormat'));
       }
+      if (!('route_key' in item) || typeof item.route_key !== 'string' || !item.route_key.trim()) {
+        return ElMessage.error(t('agent.importInvalidFormat'));
+      }
       if (!('utterances' in item) || !Array.isArray(item.utterances) || item.utterances.length === 0) {
         return ElMessage.error(t('agent.importInvalidFormat'));
       }
@@ -490,14 +544,45 @@ const handleImportFileChange = async (evt: Event) => {
   }
 };
 
+const handleSkillFileChange = async (evt: Event) => {
+  const input = evt.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  importingSkill.value = true;
+  try {
+    const skillContent = await file.text();
+    if (!skillContent.trim()) {
+      return ElMessage.warning(t('agent.skillImportEmpty'));
+    }
+
+    const response = await importRouteFromSkill({ skill_content: skillContent });
+    const draft = response.data;
+
+    editForm.value.name = draft.name;
+    editForm.value.route_key = draft.route_key;
+    editForm.value.description = draft.description;
+    utterancesText.value = draft.utterances.join('\n');
+
+    ElMessage.success(t('agent.skillImportSuccess'));
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail || e?.message || '';
+    ElMessage.error(t('agent.skillImportError', { detail }));
+  } finally {
+    importingSkill.value = false;
+  }
+};
+
 const handleGenerateAI = async () => {
   if (!editForm.value.name) return ElMessage.warning(t('agent.inputNameWarning'));
+  if (!editForm.value.route_key?.trim()) return ElMessage.warning(t('agent.routeKeyRequired'));
   generating.value = true;
   try {
     const current = utterancesText.value.split('\n').filter(s => s.trim());
     const requestData: GenerateUtterancesRequest = {
       id: editForm.value.id || 0,
       name: editForm.value.name,
+      route_key: editForm.value.route_key.trim(),
       count: genCount.value,
       utterances: current
     };
@@ -516,10 +601,21 @@ const handleGenerateAI = async () => {
 
 const handleSave = async () => {
   if (!editForm.value.name) return ElMessage.warning(t('agent.nameRequired'));
+  if (!editForm.value.route_key?.trim()) return ElMessage.warning(t('agent.routeKeyRequired'));
   saving.value = true;
   try {
+    const trimmedRouteKey = editForm.value.route_key.trim();
+    if (isEdit.value && originalRouteKey.value && originalRouteKey.value !== trimmedRouteKey) {
+      await ElMessageBox.confirm(
+        t('agent.routeKeyChangeWarning'),
+        t('agent.routeKeyChangeTitle'),
+        { type: 'warning' }
+      );
+    }
+
     const data = {
       ...editForm.value,
+      route_key: trimmedRouteKey,
       utterances: utterancesText.value.split('\n').filter(s => s.trim()),
       negative_samples: negativeSamplesText.value.split('\n').filter(s => s.trim()),
       negative_threshold: editForm.value.negative_threshold || 0.95
@@ -535,7 +631,10 @@ const handleSave = async () => {
     ElMessage.success(t('agent.saveSuccess'));
     closeModal();
     fetchAgents();
-  } catch (e) { ElMessage.error(t('agent.saveError')); } finally { saving.value = false; }
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail;
+    ElMessage.error(detail || t('agent.saveError'));
+  } finally { saving.value = false; }
 };
 
 const handleDelete = async (id: number) => {
@@ -649,6 +748,12 @@ const handleDelete = async (id: number) => {
   line-height: 1.4;
 }
 
+.agent-route-key {
+  font-size: 12px;
+  color: #409eff;
+  font-family: 'Courier New', Courier, monospace;
+}
+
 .utterances-container {
   display: flex;
   flex-wrap: wrap;
@@ -702,6 +807,35 @@ const handleDelete = async (id: number) => {
   background: #f8f9fb;
   padding: 8px 16px;
   border-radius: 8px;
+}
+
+.skill-import-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: #f8f9fb;
+  border: 1px dashed #d7deea;
+  border-radius: 12px;
+}
+
+.skill-import-copy {
+  min-width: 0;
+}
+
+.skill-import-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.skill-import-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.5;
 }
 
 .label-row {

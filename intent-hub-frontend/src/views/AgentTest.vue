@@ -77,7 +77,7 @@
           <div class="results-list">
             <el-card 
               v-for="(result, index) in results" 
-              :key="result.id" 
+              :key="`${result.id}-${result.route_key}`" 
               class="result-item" 
               :class="{ 'top-match': index === 0 }"
               shadow="hover"
@@ -85,7 +85,10 @@
               <div class="result-info">
                 <div class="name-box">
                   <el-tag v-if="index === 0" size="small" type="success" effect="dark" class="match-badge">{{ $t('test.bestMatch') }}</el-tag>
-                  <span class="result-name">{{ result.name }}</span>
+                  <div class="result-title">
+                    <span class="result-name">{{ result.name }}</span>
+                    <span class="result-route-key">{{ result.route_key }}</span>
+                  </div>
                 </div>
                 <el-tag size="small" type="info" effect="plain">ID: {{ result.id }}</el-tag>
               </div>
@@ -311,6 +314,18 @@ const handleTest = async () => {
   font-weight: 700;
   color: #303133;
   font-size: 16px;
+}
+
+.result-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.result-route-key {
+  font-size: 12px;
+  color: #409eff;
+  font-family: 'Courier New', Courier, monospace;
 }
 
 .match-badge {

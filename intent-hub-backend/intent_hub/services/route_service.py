@@ -7,13 +7,25 @@ from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
 
 from intent_hub.core.components import ComponentManager
-from intent_hub.models import GenerateUtterancesRequest, RouteConfig
+from intent_hub.models import (
+    GenerateUtterancesRequest,
+    RouteConfig,
+    SkillRouteDraft,
+    SkillRouteImportRequest,
+)
 from intent_hub.services.llm_factory import LLMFactory
 from intent_hub.utils.logger import logger
 
 
 class UtteranceList(BaseModel):
     utterances: List[str] = Field(description="生成的提问列表")
+
+
+class SkillRouteDraftOutput(BaseModel):
+    name: str = Field(description="路由名称")
+    route_key: str = Field(description="业务路由标识")
+    description: str = Field(description="路由描述")
+    utterances: List[str] = Field(description="建议语料列表")
 
 
 class RouteService:
@@ -74,6 +86,7 @@ class RouteService:
         """
         self.component_manager.ensure_ready()
         route_manager = self.component_manager.route_manager
+        route.route_key = self._normalize_and_validate_route_key(route.route_key)
 
         if route.id == 0:
             routes = route_manager.get_all_routes()
@@ -85,6 +98,7 @@ class RouteService:
                 new_id = max(valid_ids) + 1
 
             route.id = new_id
+            self._ensure_route_key_unique(route.route_key)
             logger.info(
                 f"ID 0 detected, creating new route with ID: {route.id}"
             )
@@ -93,6 +107,7 @@ class RouteService:
                 raise ValueError(
                     f"Route ID {route.id} does not exist. Set ID to 0 to create new."
                 )
+            self._ensure_route_key_unique(route.route_key, exclude_route_id=route.id)
             logger.info(f"Updating route ID: {route.id}")
 
         route_manager.add_route(route)
@@ -115,6 +130,8 @@ class RouteService:
         """
         self.component_manager.ensure_ready()
         route_manager = self.component_manager.route_manager
+        route.route_key = self._normalize_and_validate_route_key(route.route_key)
+        self._ensure_route_key_unique(route.route_key, exclude_route_id=route_id)
 
         if not route_manager.update_route(route_id, route):
             raise ValueError(f"Route ID {route_id} does not exist")
@@ -165,6 +182,7 @@ class RouteService:
             return RouteConfig(
                 id=req.id,
                 name=req.name if req.name else existing_route.name,
+                route_key=req.route_key if req.route_key else existing_route.route_key,
                 description=req.description
                 if req.description
                 else existing_route.description,
@@ -177,12 +195,53 @@ class RouteService:
             return RouteConfig(
                 id=req.id,
                 name=req.name,
+                route_key=req.route_key,
                 description=req.description,
                 utterances=final_utterances,
                 negative_samples=[],
                 score_threshold=0.75,  # 默认阈值
                 negative_threshold=0.95,  # 默认负例阈值
             )
+
+    def generate_route_from_skill(self, req: SkillRouteImportRequest) -> SkillRouteDraft:
+        """根据 SKILL.md 内容生成路由草稿"""
+        skill_content = (req.skill_content or "").strip()
+        if not skill_content:
+            raise ValueError("skill_content is required")
+
+        llm = LLMFactory.create_llm()
+        parser = PydanticOutputParser(pydantic_object=SkillRouteDraftOutput)
+
+        from intent_hub.config import Config
+
+        prompt = PromptTemplate(
+            template=Config.SKILL_ROUTE_IMPORT_PROMPT,
+            input_variables=["skill_content"],
+            partial_variables={"format_instructions": parser.get_format_instructions()},
+        )
+
+        chain = prompt | llm | parser
+
+        try:
+            result = chain.invoke({"skill_content": skill_content})
+        except Exception as e:
+            logger.error(f"Skill route generation failed: {e}")
+            raise RuntimeError(f"Skill route generation failed: {str(e)}")
+
+        route_key = self._normalize_and_validate_route_key(
+            result.route_key or self._build_skill_route_key_candidate(result.name)
+        )
+
+        utterances = self._normalize_generated_utterances(result.utterances)
+        if not utterances:
+            raise RuntimeError("LLM did not return valid utterances")
+
+        return SkillRouteDraft(
+            name=(result.name or "").strip(),
+            route_key=route_key,
+            description=(result.description or "").strip(),
+            utterances=utterances,
+        )
 
     def _generate_utterances_with_llm(
         self, req: GenerateUtterancesRequest, example_utterances: List[str]
@@ -238,3 +297,40 @@ class RouteService:
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
             raise RuntimeError(f"LLM generation failed: {str(e)}")
+
+    def _normalize_and_validate_route_key(self, route_key: str) -> str:
+        """标准化并校验 route_key"""
+        normalized = self.component_manager.route_manager.normalize_route_key(route_key)
+        if not normalized:
+            raise ValueError("route_key is required")
+        return normalized
+
+    @staticmethod
+    def _build_skill_route_key_candidate(name: str) -> str:
+        """基于名称构造一个兜底 route_key"""
+        raw_name = (name or "").strip().lower()
+        normalized = ".".join(raw_name.split())
+        return normalized.strip(".") or "skill.imported"
+
+    @staticmethod
+    def _normalize_generated_utterances(utterances: List[str]) -> List[str]:
+        """清洗 LLM 生成的语料，去重并移除空值"""
+        normalized: List[str] = []
+        seen = set()
+        for utterance in utterances or []:
+            text = (utterance or "").strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            normalized.append(text)
+        return normalized
+
+    def _ensure_route_key_unique(
+        self, route_key: str, exclude_route_id: int | None = None
+    ) -> None:
+        """确保 route_key 在当前路由配置中唯一"""
+        route_manager = self.component_manager.route_manager
+        if not route_manager.is_route_key_unique(
+            route_key, exclude_route_id=exclude_route_id
+        ):
+            raise ValueError(f"route_key '{route_key}' already exists")

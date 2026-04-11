@@ -134,6 +134,9 @@
           <el-form-item :label="$t('settings.prompt')">
             <el-input v-model="settings.UTTERANCE_GENERATION_PROMPT" type="textarea" :rows="4" />
           </el-form-item>
+          <el-form-item :label="$t('settings.skillImportPrompt')">
+            <el-input v-model="settings.SKILL_ROUTE_IMPORT_PROMPT" type="textarea" :rows="6" />
+          </el-form-item>
           <el-form-item :label="$t('settings.repairPrompt')">
             <el-input v-model="settings.AGENT_REPAIR_PROMPT" type="textarea" :rows="4" />
           </el-form-item>
@@ -264,6 +267,7 @@ const settings = ref<Settings>({
   LLM_MODEL: null,
   LLM_TEMPERATURE: 0.7,
   UTTERANCE_GENERATION_PROMPT: '',
+  SKILL_ROUTE_IMPORT_PROMPT: '',
   AGENT_REPAIR_PROMPT: '',
   AUTH_ENABLED: true,
   API_KEYS: '',
@@ -295,6 +299,7 @@ const fetchSettings = async (showResetMessage = false) => {
       LLM_MODEL: data.LLM_MODEL ?? null,
       LLM_TEMPERATURE: data.LLM_TEMPERATURE ?? 0.7,
       UTTERANCE_GENERATION_PROMPT: data.UTTERANCE_GENERATION_PROMPT ?? '',
+      SKILL_ROUTE_IMPORT_PROMPT: data.SKILL_ROUTE_IMPORT_PROMPT ?? '',
       AGENT_REPAIR_PROMPT: data.AGENT_REPAIR_PROMPT ?? '',
       AUTH_ENABLED: data.AUTH_ENABLED ?? true,
       API_KEYS: data.API_KEYS ?? '',
@@ -367,6 +372,7 @@ const handleSave = async () => {
         LLM_MODEL: data.LLM_MODEL ?? null,
         LLM_TEMPERATURE: data.LLM_TEMPERATURE ?? 0.7,
         UTTERANCE_GENERATION_PROMPT: data.UTTERANCE_GENERATION_PROMPT ?? '',
+        SKILL_ROUTE_IMPORT_PROMPT: data.SKILL_ROUTE_IMPORT_PROMPT ?? '',
         AGENT_REPAIR_PROMPT: data.AGENT_REPAIR_PROMPT ?? '',
         AUTH_ENABLED: data.AUTH_ENABLED ?? true,
         API_KEYS: data.API_KEYS ?? '',

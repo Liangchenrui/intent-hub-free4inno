@@ -74,13 +74,13 @@ Flask应用主文件，定义所有API路由：
 - `/settings` - 系统设置（GET, POST）
 
 ### intent_hub.config
-配置管理模块，从环境变量和settings.json文件读取配置：
+配置管理模块，从默认值和 `settings.json` 文件读取配置：
 - Flask配置（host, port, debug）
 - Qdrant配置（url, collection, api_key）
-- Embedding模型配置（model_name, device）
+- Embedding服务配置（embedding_service_url, model_name, device）
 - LLM配置（provider, api_key, base_url, model, temperature）
-- 认证配置（auth_enabled, username, password, telestar_auth）
-- 其他配置（batch_size, default_route等）
+- 认证配置（auth_enabled, predict_auth_key, username, password）
+- 其他配置（batch_size, default_route_id/default_route_name/default_route_key 等）
 
 ### intent_hub.models
 数据模型定义，使用Pydantic进行验证：
@@ -113,6 +113,7 @@ Qdrant客户端封装：
 - 支持热加载（reload）
 - 线程安全的CRUD操作
 - 路由搜索功能
+- `route_key` 标准化、唯一性校验与缺失字段迁移
 - 路由配置哈希计算
 
 ### intent_hub.auth
@@ -145,8 +146,9 @@ Qdrant客户端封装：
 路由服务，处理路由的CRUD操作：
 - 获取所有路由
 - 搜索路由
-- 创建/更新路由（含向量生成）
+- 创建/更新路由
 - 删除路由
+- `route_key` 标准化与唯一性校验
 - 使用LLM生成例句
 
 #### prediction_service.py
@@ -154,7 +156,8 @@ Qdrant客户端封装：
 - 文本向量化
 - 相似度检索
 - 阈值过滤（含负例排除）
-- 结果排序和返回
+- 返回包含 `route_key` 的命中结果
+- 无命中时返回默认回退路由 `fallback.default`
 
 #### sync_service.py
 同步服务，处理路由数据同步：
@@ -197,26 +200,25 @@ API处理模块，将HTTP请求路由到对应的服务层：
    - 按路由ID分组，取最高分
    - 检查负例排除（如匹配到负例且超过阈值则排除）
    - 根据每个路由的阈值判断是否匹配
-   - 返回所有满足阈值的路由（按分数降序），如果没有则返回默认路由
+   - 返回所有满足阈值的路由（按分数降序，包含 `route_key`），如果没有则返回默认路由 `fallback.default`
 
 3. **路由管理流程**：
    - 从JSON文件加载路由配置到内存缓存
    - 通过`RouteService`处理CRUD操作
    - 创建/更新路由时：
-     - 更新内存缓存
-     - 生成向量并同步到Qdrant
+     - 校验并标准化 `route_key`
+     - 更新本地 `routes.json`
    - 删除路由时：
-     - 从内存缓存删除
-     - 从Qdrant删除对应向量点
-   - 支持热加载重新索引（增量或全量）
+     - 从内存缓存和本地 `routes.json` 删除
+   - 通过重建索引接口执行向量同步（增量或全量）
 
 4. **例句生成流程**：
-   - 接收生成请求（路由ID、名称、描述等）
+   - 接收生成请求（路由ID、名称、`route_key`、描述等）
    - 如果路由已存在，获取现有例句作为参考
    - 使用LLM工厂创建LLM实例
    - 通过LangChain调用LLM生成新例句
    - 过滤重复例句，返回指定数量的新例句
-   - 更新路由配置（如果路由已存在）
+   - 返回包含 `route_key` 的路由配置对象，由前端决定是否保存
 
 5. **诊断流程**：
    - 遍历所有路由，计算两两之间的质心相似度（区域重叠）
@@ -234,6 +236,7 @@ API处理模块，将HTTP请求路由到对应的服务层：
   {
     "id": 1,
     "name": "路由名称",
+    "route_key": "business.route.key",
     "description": "路由描述信息",
     "utterances": ["示例1", "示例2"],
     "negative_samples": [],
@@ -249,11 +252,14 @@ API处理模块，将HTTP请求路由到对应的服务层：
 {
   "QDRANT_URL": "http://localhost:6333",
   "QDRANT_COLLECTION": "intent_hub_routes",
+  "EMBEDDING_SERVICE_URL": "http://localhost:30122",
   "EMBEDDING_MODEL_NAME": "Qwen/Qwen3-Embedding-0.6B",
   "LLM_PROVIDER": "deepseek",
   "LLM_API_KEY": "sk-xxx",
   "LLM_MODEL": "deepseek-chat",
-  "AUTH_ENABLED": true
+  "AUTH_ENABLED": true,
+  "PREDICT_AUTH_KEY": "predict-secret",
+  "DEFAULT_ROUTE_KEY": "fallback.default"
 }
 ```
 

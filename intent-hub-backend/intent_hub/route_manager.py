@@ -3,8 +3,9 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
-from threading import Lock
+from threading import RLock
 from typing import Dict, List, Optional
 
 from intent_hub.config import Config
@@ -35,7 +36,7 @@ class RouteManager:
             self.config_path = str(intent_hub_dir / raw_path)
 
         self._routes_cache: Dict[int, RouteConfig] = {}
-        self._lock = Lock()
+        self._lock = RLock()
 
         logger.info(f"Routes config path: {self.config_path}")
 
@@ -52,11 +53,15 @@ class RouteManager:
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     routes_data = json.load(f)
                     logger.debug(f"Parsed {len(routes_data)} route entries from JSON")
+                    routes_data, migrated = self._migrate_route_keys(routes_data)
                     routes = [RouteConfig(**route) for route in routes_data]
                     self._routes_cache = {route.id: route for route in routes}
                 logger.info(
                     f"Loaded {len(self._routes_cache)} routes from file: {[r.name for r in routes]}"
                 )
+                if migrated:
+                    self._save_to_file()
+                    logger.info("Persisted migrated route_key values to routes config")
             except Exception as e:
                 logger.error(f"Failed to load routes config: {e}", exc_info=True)
                 logger.error(f"Config path: {self.config_path}")
@@ -75,7 +80,12 @@ class RouteManager:
     def _save_to_file(self):
         """保存路由配置到文件"""
         try:
-            routes_data = [route.dict() for route in self._routes_cache.values()]
+            routes_data = [
+                route.model_dump()
+                if hasattr(route, "model_dump")
+                else route.dict()
+                for route in self._routes_cache.values()
+            ]
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(routes_data, f, ensure_ascii=False, indent=2)
             logger.info(f"Routes config saved: {self.config_path}")
@@ -103,6 +113,26 @@ class RouteManager:
         """
         with self._lock:
             return list(self._routes_cache.values())
+
+    def get_route_by_key(self, route_key: str) -> Optional[RouteConfig]:
+        """按业务路由标识获取路由配置"""
+        with self._lock:
+            for route in self._routes_cache.values():
+                if route.route_key == route_key:
+                    return route
+        return None
+
+    def is_route_key_unique(
+        self, route_key: str, exclude_route_id: Optional[int] = None
+    ) -> bool:
+        """检查 route_key 是否唯一"""
+        with self._lock:
+            for route in self._routes_cache.values():
+                if exclude_route_id is not None and route.id == exclude_route_id:
+                    continue
+                if route.route_key == route_key:
+                    return False
+        return True
 
     def search_routes(self, query: str) -> List[RouteConfig]:
         """通过名称、描述或例句搜索路由
@@ -149,6 +179,11 @@ class RouteManager:
             是否成功添加
         """
         with self._lock:
+            route.route_key = self.normalize_route_key(route.route_key)
+            if not route.route_key:
+                raise ValueError("route_key is required")
+            if not self.is_route_key_unique(route.route_key, exclude_route_id=route.id):
+                raise ValueError(f"route_key '{route.route_key}' already exists")
             if route.id in self._routes_cache:
                 logger.warning(f"Route ID {route.id} already exists, updating")
             self._routes_cache[route.id] = route
@@ -172,6 +207,11 @@ class RouteManager:
                 return False
 
             # 确保ID一致
+            route.route_key = self.normalize_route_key(route.route_key)
+            if not route.route_key:
+                raise ValueError("route_key is required")
+            if not self.is_route_key_unique(route.route_key, exclude_route_id=route_id):
+                raise ValueError(f"route_key '{route.route_key}' already exists")
             route.id = route_id
             self._routes_cache[route_id] = route
             self._save_to_file()
@@ -241,6 +281,7 @@ class RouteManager:
         route_data = {
             "id": route.id,
             "name": route.name,
+            "route_key": route.route_key,
             "description": route.description,
             "utterances": sorted(route.utterances),  # 排序以确保一致性
             "negative_samples": sorted(getattr(route, "negative_samples", [])),
@@ -273,3 +314,65 @@ class RouteManager:
                 route_id: self.compute_route_hash(route)
                 for route_id, route in self._routes_cache.items()
             }
+
+    @staticmethod
+    def normalize_route_key(raw_value: str) -> str:
+        """标准化 route_key，保持规则宽松但去除明显无效字符"""
+        normalized = raw_value.strip().lower()
+        normalized = re.sub(r"\s+", ".", normalized)
+        normalized = re.sub(r"\.{2,}", ".", normalized)
+        return normalized.strip(".")
+
+    def _migrate_route_keys(self, routes_data: List[dict]) -> tuple[List[dict], bool]:
+        """为旧数据补齐 route_key，并在必要时修复空值或重复值"""
+        migrated = False
+        used_keys = set()
+
+        for route in routes_data:
+            current_key = str(route.get("route_key", "") or "")
+            normalized_key = self.normalize_route_key(current_key)
+
+            if not normalized_key:
+                normalized_key = self._build_route_key_candidate(
+                    route.get("name", ""), route.get("id", 0), used_keys
+                )
+                migrated = True
+                logger.warning(
+                    f"Route ID {route.get('id')} missing route_key, generated '{normalized_key}'"
+                )
+            elif normalized_key != current_key:
+                migrated = True
+
+            unique_key = self._dedupe_route_key(
+                normalized_key, route.get("id", 0), used_keys
+            )
+            if unique_key != normalized_key:
+                migrated = True
+                logger.warning(
+                    f"Route ID {route.get('id')} route_key duplicated, adjusted to '{unique_key}'"
+                )
+
+            route["route_key"] = unique_key
+            used_keys.add(unique_key)
+
+        return routes_data, migrated
+
+    def _build_route_key_candidate(
+        self, route_name: str, route_id: int, used_keys: set[str]
+    ) -> str:
+        """基于路由名称生成一个宽松可用的 route_key 候选值"""
+        normalized_name = self.normalize_route_key(route_name)
+        base_key = normalized_name or f"route.{route_id or len(used_keys) + 1}"
+        return self._dedupe_route_key(base_key, route_id, used_keys)
+
+    @staticmethod
+    def _dedupe_route_key(base_key: str, route_id: int, used_keys: set[str]) -> str:
+        """为 route_key 追加后缀以保证唯一性"""
+        candidate = base_key
+        suffix = route_id or 1
+
+        while candidate in used_keys:
+            candidate = f"{base_key}.{suffix}"
+            suffix += 1
+
+        return candidate

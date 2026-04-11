@@ -1,6 +1,6 @@
 # Intent Hub 🚀
 
-A static routing system based on vector similarity that dispatches user requests to the right AI Agent via semantic matching.
+Intent Hub is a static routing system based on vector similarity. It matches user input semantically and dispatches the request to the right downstream AI Agent.
 
 **[English](README.md)** | **[中文](README.zh-CN.md)**
 
@@ -8,106 +8,175 @@ A static routing system based on vector similarity that dispatches user requests
 
 ---
 
-## 🗺️ Navigation & Quick Start
+## Overview
 
-### ⚡ One-Click Run (Recommended)
+- This repository contains the admin frontend and the Flask backend.
+- Intent routing depends on an external embedding service and a reachable Qdrant instance.
+- Route data and system settings are persisted under `intent-hub-backend/data/`.
 
-The project is fully containerized and supports one-command deployment.
+---
 
-1. **Prepare environment**:
+## Quick Start
+
+### Prerequisites
+
+- Docker and Docker Compose
+- A reachable Qdrant service
+- A reachable embedding service
+- An LLM API key if you want utterance generation or diagnostics repair
+
+### Start with Docker Compose
+
+1. Optional: copy the template if you need custom build mirrors or image prefixes.
    ```shell
    cp .env.example .env
    ```
-   *Edit `.env` and set your `LLM_API_KEY` (for auto corpus generation) and other options.*
-
-2. **Start everything**:
+2. Start the frontend and backend containers.
    ```shell
-   docker compose up -d
+   docker compose up -d --build
    ```
-   Or with China mirror config:
+   For China mirror settings:
    ```shell
    docker compose --env-file .env.china up -d --build
    ```
+3. Open the admin UI and complete runtime settings, or write them directly into `intent-hub-backend/data/settings.json`.
 
 After startup:
-- **Admin UI (Frontend):** `http://localhost` (port 80 by default)
-- **API (Backend):** `http://localhost:8000`
-- **Vector DB (Qdrant):** `http://localhost:6333/dashboard`
 
-> **Note:**
-> - First run will pull/build images and download the Embedding model; ensure network access.
-> - A `data/` directory is created at the project root for persisting routes and settings.
+- Frontend: `http://localhost`
+- Backend API: `http://localhost:8000`
 
----
+Notes:
 
-## ⚙️ Configuration
-
-Configuration priority: **Environment variables > DB/JSON config > Defaults.**
-
-### Environment variables (.env)
-
-Key options in the root `.env` file:
-- `LLM_API_KEY`: LLM API key (required for corpus enhancement).
-- `LLM_PROVIDER`: Provider (e.g. `deepseek`, `qwen`, `openai`).
-- `EMBEDDING_MODEL_NAME`: Embedding model name.
-- `QDRANT_URL`: Qdrant connection URL.
-
-See comments in `.env.example` for details.
-
-### Data persistence
-
-User config and route data live under `./data`:
-- `data/routes_config.json`: Routes and corpus config.
-- `data/settings.json`: System settings.
-- `data/env.runtime`: **Auto-generated** runtime env file (updated when you save settings in the UI).
-
-> - Saving settings in the UI writes to `data/settings.json` and updates `data/env.runtime` so containers keep the same config after restart.
-> - Disable sync: set `INTENT_HUB_ENV_SYNC_ENABLED=false`.
-> - Custom sync path: `INTENT_HUB_ENV_SYNC_PATH=/app/data/env.runtime`.
-> - Custom sync keys: `INTENT_HUB_ENV_SYNC_KEYS=QDRANT_URL,LLM_PROVIDER,LLM_API_KEY`.
-
-In Docker, this directory is mounted as a volume so data survives container removal.
+- `docker-compose.yml` in this repository starts `intent-hub-frontend` and `intent-hub-backend`.
+- Qdrant and the embedding service are external dependencies for this repo and must already be reachable from the backend.
+- Runtime files are stored in `intent-hub-backend/data/`.
 
 ---
 
-## 🏗️ Architecture
+## Route Contract
 
-Frontend/backend split with vector search for fast intent routing.
+Each intent entity now includes a required `route_key`. This is the stable identifier that downstream systems should use for request routing.
 
-### 🔹 Backend (Python / Flask)
-- **Stack:** [Python 3.9+](https://www.python.org/) + [Flask](https://flask.palletsprojects.com/)
-- **Vector store:** [Qdrant](https://qdrant.tech/)
-- **Models:**
-  - Embedding: Qwen-Embedding-0.6B (HuggingFace / local)
-  - LLM: LangChain integration for DeepSeek, OpenAI, Qwen, etc.
-- **Responsibilities:** Intent recognition, vector sync, auto corpus generation, route management API.
+Rules and behavior:
 
-### 🔹 Frontend (Vue / Vite)
-- **Stack:** [Vue 3](https://vuejs.org/) + [Vite](https://vitejs.dev/)
-- **UI:** [Element Plus](https://element-plus.org/)
-- **Responsibilities:** Route CRUD UI, corpus generation, system config, vector match testing.
+- `route_key` is required on create, update, import, and utterance generation requests.
+- `route_key` must be unique across routes.
+- Normalization is intentionally loose: trim, lowercase, replace whitespace with `.`, collapse repeated dots, trim leading and trailing dots.
+- Changing `route_key` is allowed, but it should be treated as a routing contract change for downstream callers.
+- Legacy `routes.json` entries without `route_key` are migrated automatically on load and written back to disk.
+
+Example route config:
+
+```json
+{
+  "id": 1,
+  "name": "Weather Service",
+  "route_key": "weather.query",
+  "description": "Return weather information for a city",
+  "utterances": ["what is the weather in Beijing"],
+  "negative_samples": [],
+  "score_threshold": 0.85,
+  "negative_threshold": 0.95
+}
+```
+
+Example `/predict` response:
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Weather Service",
+    "route_key": "weather.query",
+    "score": 0.93
+  }
+]
+```
+
+If no route matches the threshold, the backend returns the fallback route with `route_key: "fallback.default"`.
 
 ---
 
-## 📂 Project layout
+## Configuration and Data
+
+Runtime state is stored in `intent-hub-backend/data/`:
+
+- `intent-hub-backend/data/routes.json`: route definitions
+- `intent-hub-backend/data/settings.json`: runtime system settings
+- `intent-hub-backend/data/diagnostics_cache.json`: cached diagnostics results
+
+Typical settings managed by the backend:
+
+- `QDRANT_URL`
+- `QDRANT_COLLECTION`
+- `EMBEDDING_SERVICE_URL`
+- `LLM_PROVIDER`
+- `LLM_API_KEY`
+- `PREDICT_AUTH_KEY`
+- `DEFAULT_USERNAME`
+- `DEFAULT_PASSWORD`
+
+`README` and the API docs assume the persisted settings file is the runtime source of truth.
+
+---
+
+## Production Deployment
+
+The production deployment described in `Intent Hub 部署文档.docx` uses these services on Hufu:
+
+- `intent-hub-frontend`
+- `intent-hub-backend`
+- `intent-hub-embedding`
+- `qdrant`
+
+### Upgrade Flow
+
+1. Before upgrading, enter the old Intent Hub instance and save or export the current route configuration.
+2. Build the frontend artifact:
+   ```shell
+   cd intent-hub-frontend
+   npm install
+   npm run build:prod
+   ```
+   This generates `dist.tar.gz`. Upload the updated mounted files for the Hufu frontend service:
+   `https://hf.free4inno.com/#/project/container/detail/732`
+3. Build and publish the backend image:
+   ```shell
+   cd intent-hub-backend
+   docker build -f Dockerfile .
+   docker tag intent-hub-backend:latest crpi-v8ss93lfn0gwwreg.cn-hangzhou.personal.cr.aliyuncs.com/free4inno-lcr/intent-hub:2.0.0
+   docker push crpi-v8ss93lfn0gwwreg.cn-hangzhou.personal.cr.aliyuncs.com/free4inno-lcr/intent-hub:2.0.0
+   ```
+   Then update the backend service image in Hufu:
+   `https://hf.free4inno.com/#/project/container/detail/720`
+4. If the embedding model or embedding logic changes, update the embedding project and then refresh the embedding service image:
+   - Repo: `https://gitee.com/free4inno-bupt/embedding-zpoint`
+   - Service: `https://hf.free4inno.com/#/project/container/detail/733`
+5. After rollout, verify frontend access, backend health, route import, and `/predict` responses including `route_key`.
+
+---
+
+## Project Layout
 
 ```text
-intenthub/
-├── data/                  # Persisted data (routes, settings)
-├── intent-hub-backend/    # Backend (Python/Flask)
-│   ├── intent_hub/        # Core (encoding, search, services)
-│   ├── tests/             # Unit tests
-│   └── run.py             # Entry point
-├── intent-hub-frontend/   # Frontend (Vue/Vite)
-│   ├── src/               # Pages, components, state
-│   └── vite.config.ts    # Build config
-├── docker-compose.yml     # Full-stack compose
-├── .env.example           # Env template
-└── README.md              # This file
+intent-hub/
+├── intent-hub-backend/       # Flask backend
+│   ├── intent_hub/           # Core application code
+│   ├── data/                 # Runtime data
+│   ├── docs/                 # Backend docs
+│   └── tests/                # Backend tests
+├── intent-hub-frontend/      # Vue 3 + Vite admin UI
+│   ├── src/                  # Frontend source
+│   └── dist/                 # Frontend build output
+├── docker-compose.yml        # Local frontend/backend compose
+├── .env.example              # Optional compose/build template
+├── README.md
+└── README.zh-CN.md
 ```
 
 ---
 
-## 📄 License
+## License
 
 Distributed under the MIT License. See `LICENSE` for details.

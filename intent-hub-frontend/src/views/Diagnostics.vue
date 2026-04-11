@@ -737,6 +737,8 @@ const processedRationalization = computed(() => {
   return text
     .replace(/(?:意图|Intent)\s*[A1]/gi, `“${nameA}”`)
     .replace(/(?:意图|Intent)\s*[B2]/gi, `“${nameB}”`)
+    .replace(/(?:意图实体|Intent\s+Entity)\s*[A1]/gi, `“${nameA}”`)
+    .replace(/(?:意图实体|Intent\s+Entity)\s*[B2]/gi, `“${nameB}”`)
     .replace(/Agent\s*[A1]/gi, `“${nameA}”`)
     .replace(/Agent\s*[B2]/gi, `“${nameB}”`)
     .replace(/Route\s*[A1]/gi, `“${nameA}”`)
@@ -1715,6 +1717,7 @@ const handleMergeRoutes = async () => {
     const newRoute = {
       id: 0, // 新建路由，id 由后端分配
       name: mergeForm.value.name.trim(),
+      route_key: `${sourceRoute.route_key}.${targetRoute.route_key}.merged`,
       description: mergeForm.value.description.trim() || '',
       utterances: mergeForm.value.utterances,
       negative_samples: mergeForm.value.negative_samples,

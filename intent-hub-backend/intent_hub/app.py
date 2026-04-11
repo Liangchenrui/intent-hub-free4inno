@@ -72,6 +72,13 @@ def generate_utterances():
     return routes.generate_utterances()
 
 
+@app.route("/routes/import-skill", methods=["POST"])
+@require_auth
+def import_route_from_skill():
+    """Generate route draft from SKILL.md content."""
+    return routes.import_route_from_skill()
+
+
 @app.route("/routes/import", methods=["POST"])
 @require_auth
 def import_routes():

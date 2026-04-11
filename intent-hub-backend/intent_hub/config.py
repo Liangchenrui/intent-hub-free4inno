@@ -39,6 +39,44 @@ json
 - 输出中不得包含任何除上述 JSON 以外的内容
 - 所有生成句子必须是全新且未出现过的"""
 
+DEFAULT_SKILL_ROUTE_IMPORT_PROMPT = """你是一个资深的意图路由设计专家。你的任务是读取用户上传的 `SKILL.md` 内容，为意图路由系统提炼一个新的路由实体草稿。
+
+## 目标
+基于 skill 文档内容，提炼并生成：
+1. `name`: 一个清晰、可读的路由实体名称
+2. `route_key`: 一个稳定、简洁、适合程序使用的路由标识
+3. `description`: 对该路由实体职责的简洁描述
+4. `utterances`: 一组高判别性的用户语料句
+
+## 生成要求
+1. `name`
+- 应准确表达 skill 的核心用途
+- 控制在 4 到 18 个字或对应的简短英文短语
+
+2. `route_key`
+- 使用小写字母、数字和点号
+- 采用类似 `domain.action` 或 `domain.subdomain.action` 的形式
+- 必须稳定、明确、不要使用过于泛化的词，如 `tool`, `misc`, `general`
+
+3. `description`
+- 用 1 到 3 句话概括该 skill 解决的问题、主要能力和适用场景
+- 要突出和其他通用能力的边界
+
+4. `utterances`
+- 生成 10 条高质量语料句
+- 语料必须围绕该 skill 的核心能力，具备较强判别性
+- 覆盖“关键词/短语”和“简单指令”两种形式
+- 不要重复，不要过度泛化，不要输出和 skill 无关的句子
+
+5. 约束
+- 如果 skill 信息有限，可以做保守推断，但不要编造明显不存在的能力
+- 仅输出结构化结果，不要附加解释
+
+## SKILL.md 内容
+{skill_content}
+
+{format_instructions}"""
+
 
 class Config:
     """应用配置类"""
@@ -61,6 +99,7 @@ class Config:
     # 默认路由配置
     DEFAULT_ROUTE_ID: int = 0
     DEFAULT_ROUTE_NAME: str = "none"
+    DEFAULT_ROUTE_KEY: str = "fallback.default"
 
     # 性能配置
     BATCH_SIZE: int = 32
@@ -98,6 +137,7 @@ class Config:
     # 提示词配置
     UTTERANCE_GENERATION_PROMPT: str = ""
     AGENT_REPAIR_PROMPT: str = ""
+    SKILL_ROUTE_IMPORT_PROMPT: str = ""
 
     # 诊断阈值配置
     REGION_THRESHOLD_SIGNIFICANT: float = 0.0
@@ -127,6 +167,7 @@ class Config:
                 DEFAULT_UTTERANCE_GENERATION_PROMPT
             )
             default_settings["AGENT_REPAIR_PROMPT"] = DEFAULT_AGENT_REPAIR_PROMPT
+            default_settings["SKILL_ROUTE_IMPORT_PROMPT"] = DEFAULT_SKILL_ROUTE_IMPORT_PROMPT
             try:
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(default_settings, f, indent=4, ensure_ascii=False)
@@ -146,6 +187,7 @@ class Config:
 
         # 处理向后兼容
         cls._apply_backward_compatibility()
+        cls._apply_prompt_defaults()
 
     @classmethod
     def _apply_backward_compatibility(cls):
@@ -157,6 +199,16 @@ class Config:
                 cls.LLM_BASE_URL = cls.DEEPSEEK_BASE_URL
             if cls.LLM_MODEL is None and cls.DEEPSEEK_MODEL:
                 cls.LLM_MODEL = cls.DEEPSEEK_MODEL
+
+    @classmethod
+    def _apply_prompt_defaults(cls):
+        """为缺失的提示词应用默认值，兼容旧版 settings.json"""
+        if not cls.UTTERANCE_GENERATION_PROMPT:
+            cls.UTTERANCE_GENERATION_PROMPT = DEFAULT_UTTERANCE_GENERATION_PROMPT
+        if not cls.AGENT_REPAIR_PROMPT:
+            cls.AGENT_REPAIR_PROMPT = DEFAULT_AGENT_REPAIR_PROMPT
+        if not cls.SKILL_ROUTE_IMPORT_PROMPT:
+            cls.SKILL_ROUTE_IMPORT_PROMPT = DEFAULT_SKILL_ROUTE_IMPORT_PROMPT
 
     @classmethod
     def save(cls, settings_dict: Dict[str, Any]) -> bool:
@@ -204,6 +256,7 @@ class Config:
                 json.dump(existing_settings, f, indent=4, ensure_ascii=False)
             # 保存后应用向后兼容性
             cls._apply_backward_compatibility()
+            cls._apply_prompt_defaults()
 
         except Exception as e:
             logger.error(f"保存配置文件失败: {e}")
@@ -236,6 +289,7 @@ class Config:
             # 提示词配置
             "UTTERANCE_GENERATION_PROMPT": cls.UTTERANCE_GENERATION_PROMPT,
             "AGENT_REPAIR_PROMPT": cls.AGENT_REPAIR_PROMPT,
+            "SKILL_ROUTE_IMPORT_PROMPT": cls.SKILL_ROUTE_IMPORT_PROMPT,
             # 认证配置
             "AUTH_ENABLED": cls.AUTH_ENABLED,
             "PREDICT_AUTH_KEY": cls.PREDICT_AUTH_KEY,
@@ -245,6 +299,7 @@ class Config:
             "BATCH_SIZE": cls.BATCH_SIZE,
             "DEFAULT_ROUTE_ID": cls.DEFAULT_ROUTE_ID,
             "DEFAULT_ROUTE_NAME": cls.DEFAULT_ROUTE_NAME,
+            "DEFAULT_ROUTE_KEY": cls.DEFAULT_ROUTE_KEY,
             # 诊断阈值配置
             "REGION_THRESHOLD_SIGNIFICANT": cls.REGION_THRESHOLD_SIGNIFICANT,
             "INSTANCE_THRESHOLD_AMBIGUOUS": cls.INSTANCE_THRESHOLD_AMBIGUOUS,

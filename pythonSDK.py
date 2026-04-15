@@ -1,0 +1,10 @@
+from intent_hub import IntentHubClient
+
+client = IntentHubClient(
+    endpoint="http://127.0.0.1:5000",
+    access_code="ih_live_team_alpha_xxx",
+)
+
+print(client.whoami())
+print(client.route("帮我整理 wiki"))
+print(client.dispatch("帮我整理 wiki"))

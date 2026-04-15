@@ -1,0 +1,38 @@
+{
+  "routes": [
+    {
+      "id": 0,
+      "name": "AI知识库构建器",
+      "route_key": "knowledgebase.wiki.build",
+      "description": "从原始材料(raw/)中提取信息，根据规则构建和更新结构化知识库(wiki/)。核心能力是进行主题聚类、提炼核心认知、建立知识连接，并生成可用于面试、项目或写作的结构化wiki文件，而非简单的笔记总结。",
+      "utterances": [
+        "构建知识库",
+        "更新wiki",
+        "整理raw材料",
+        "生成知识索引",
+        "创建主题wiki",
+        "帮我把raw文件夹里的资料整理成知识库",
+        "根据AGENT.md规则更新wiki知识库",
+        "扫描raw目录并生成结构化wiki",
+        "为这些原始材料做主题聚类并输出wiki",
+        "提炼核心概念并构建知识网络"
+      ],
+      "negative_samples": [],
+      "score_threshold": 0.75,
+      "negative_threshold": 0.95,
+      "source": {
+        "type": "json_import",
+        "source_id": null,
+        "import_origin": "skill_import",
+        "managed_fields": []
+      },
+      "sync": {
+        "status": "pending",
+        "last_synced_at": null,
+        "manual_overrides": []
+      },
+      "lifecycle_status": "active"
+    }
+  ],
+  "mode": "merge"
+}

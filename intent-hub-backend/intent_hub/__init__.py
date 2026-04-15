@@ -1,33 +1,34 @@
-"""Intent Hub - 基于向量相似度的静态路由系统"""
+"""Intent Hub package exports."""
+
+from importlib import import_module
 
 __version__ = "0.1.0"
 
-from intent_hub.config import Config
-from intent_hub.models import (
-    RouteConfig,
-    PredictRequest,
-    PredictResponse,
-    ErrorResponse,
-    LoginRequest,
-    LoginResponse
-)
-from intent_hub.encoder import QwenEmbeddingEncoder
-from intent_hub.qdrant_wrapper import IntentHubQdrantClient
-from intent_hub.route_manager import RouteManager
-from intent_hub.auth import get_auth_manager, require_auth
+_EXPORTS = {
+    "Config": ("intent_hub.config", "Config"),
+    "IntentHubClient": ("intent_hub.client", "IntentHubClient"),
+    "RouteConfig": ("intent_hub.models", "RouteConfig"),
+    "PredictRequest": ("intent_hub.models", "PredictRequest"),
+    "PredictResponse": ("intent_hub.models", "PredictResponse"),
+    "ErrorResponse": ("intent_hub.models", "ErrorResponse"),
+    "LoginRequest": ("intent_hub.models", "LoginRequest"),
+    "LoginResponse": ("intent_hub.models", "LoginResponse"),
+    "QwenEmbeddingEncoder": ("intent_hub.encoder", "QwenEmbeddingEncoder"),
+    "IntentHubQdrantClient": ("intent_hub.qdrant_wrapper", "IntentHubQdrantClient"),
+    "RouteManager": ("intent_hub.route_manager", "RouteManager"),
+    "get_auth_manager": ("intent_hub.auth", "get_auth_manager"),
+    "require_auth": ("intent_hub.auth", "require_auth"),
+}
 
-__all__ = [
-    "Config",
-    "RouteConfig",
-    "PredictRequest",
-    "PredictResponse",
-    "ErrorResponse",
-    "LoginRequest",
-    "LoginResponse",
-    "QwenEmbeddingEncoder",
-    "IntentHubQdrantClient",
-    "RouteManager",
-    "get_auth_manager",
-    "require_auth",
-]
+__all__ = list(_EXPORTS.keys())
 
+
+def __getattr__(name: str):
+    if name not in _EXPORTS:
+        raise AttributeError(f"module 'intent_hub' has no attribute {name!r}")
+
+    module_name, attr_name = _EXPORTS[name]
+    module = import_module(module_name)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value

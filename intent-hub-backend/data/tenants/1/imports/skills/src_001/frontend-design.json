@@ -1,0 +1,38 @@
+{
+  "routes": [
+    {
+      "id": 0,
+      "name": "前端界面创意设计",
+      "route_key": "frontend.design.create",
+      "description": "生成具有独特美学风格、生产级质量的前端界面代码，避免通用AI设计模式。专注于创造性的视觉表达，包括大胆的排版、色彩、动效和空间构图，产出令人难忘的界面实现。",
+      "utterances": [
+        "创意前端设计",
+        "设计独特界面",
+        "生成前端界面",
+        "帮我设计一个有艺术感的前端页面",
+        "创建一个具有复古未来主义风格的网页组件",
+        "设计一个极简但精致的登录界面",
+        "实现一个带有复杂动效的仪表盘",
+        "生成一个打破常规布局的网站首页",
+        "设计一个具有杂志编辑感的用户界面",
+        "创建一个带有有机自然元素的产品展示页"
+      ],
+      "negative_samples": [],
+      "score_threshold": 0.75,
+      "negative_threshold": 0.95,
+      "source": {
+        "type": "json_import",
+        "source_id": null,
+        "import_origin": "skill_import",
+        "managed_fields": []
+      },
+      "sync": {
+        "status": "pending",
+        "last_synced_at": null,
+        "manual_overrides": []
+      },
+      "lifecycle_status": "active"
+    }
+  ],
+  "mode": "merge"
+}

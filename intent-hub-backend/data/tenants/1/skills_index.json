@@ -1,0 +1,125 @@
+{
+  "items": [
+    {
+      "source_id": "src_001",
+      "skill_path": "C:\\Users\\hp\\.codex\\skills\\agent-browser\\SKILL.md",
+      "skill_hash": "fa3d6541eff88a523c94f5e33b2f266afb1de1e6ffbaeaa6f46c7810c5ba5b66",
+      "last_scanned_at": "2026-04-15T07:12:44Z",
+      "status": "draft",
+      "draft_file": "D:\\code\\intent-hub\\intent-hub-backend\\data\\tenants\\1\\imports\\skills\\src_001\\agent-browser.json",
+      "json_hash": "8ee3a77b79883fefcc1168dd8cdad272d242ab5f34bc4c599d5c3201f37a8161",
+      "last_synced_at": null,
+      "route_id": null
+    },
+    {
+      "source_id": "src_001",
+      "skill_path": "C:\\Users\\hp\\.codex\\skills\\frontend-design\\SKILL.md",
+      "skill_hash": "b19efbc330acb7e4d0650ad402a96adf2a45af614141d64ab50c97036e9ce05b",
+      "last_scanned_at": "2026-04-15T07:12:44Z",
+      "status": "draft",
+      "draft_file": "D:\\code\\intent-hub\\intent-hub-backend\\data\\tenants\\1\\imports\\skills\\src_001\\frontend-design.json",
+      "json_hash": "6a0d11dee67b01d48a1cd2e93223ea232204f7b13674bc5d335691d192951b2a",
+      "last_synced_at": null,
+      "route_id": null
+    },
+    {
+      "source_id": "src_001",
+      "skill_path": "C:\\Users\\hp\\.codex\\skills\\frontend-design-pro\\SKILL.md",
+      "skill_hash": "278b9c9f1e0da406a350ccbd0b7dea732dac53a4b7402e076ca3207d5abc793a",
+      "last_scanned_at": "2026-04-15T07:12:44Z",
+      "status": "draft",
+      "draft_file": "D:\\code\\intent-hub\\intent-hub-backend\\data\\tenants\\1\\imports\\skills\\src_001\\frontend-design-pro.json",
+      "json_hash": "6e2baccad30e207a6c3e116b39a09aaa55712b5dfa568aa54227d3d64c776349",
+      "last_synced_at": null,
+      "route_id": null
+    },
+    {
+      "source_id": "src_001",
+      "skill_path": "C:\\Users\\hp\\.codex\\skills\\obsidian-bases\\SKILL.md",
+      "skill_hash": "1785f37a2b00d900d259ed57faac6a3f9c589f9fb40ec5ccdeba83daa850452c",
+      "last_scanned_at": "2026-04-15T07:12:44Z",
+      "status": "draft",
+      "draft_file": "D:\\code\\intent-hub\\intent-hub-backend\\data\\tenants\\1\\imports\\skills\\src_001\\obsidian-bases.json",
+      "json_hash": "5024cea166ac43cc1984e15907ee6c5794f313346b74bdcc92ef46c2ee3207d9",
+      "last_synced_at": null,
+      "route_id": null
+    },
+    {
+      "source_id": "src_001",
+      "skill_path": "C:\\Users\\hp\\.codex\\skills\\obsidian-check-wiki\\SKILL.md",
+      "skill_hash": "b1a249eac9e8cbdce3839d530fef36e8b4d8877bac7a301b454a092ef98a5c4a",
+      "last_scanned_at": "2026-04-15T07:12:44Z",
+      "status": "draft",
+      "draft_file": "D:\\code\\intent-hub\\intent-hub-backend\\data\\tenants\\1\\imports\\skills\\src_001\\obsidian-check-wiki.json",
+      "json_hash": "1c23404db8b43de7df2773468fa40a286c3b794f3f2db967a53983d0e8f24fe9",
+      "last_synced_at": null,
+      "route_id": null
+    },
+    {
+      "source_id": "src_001",
+      "skill_path": "C:\\Users\\hp\\.codex\\skills\\obsidian-cli\\SKILL.md",
+      "skill_hash": "b54257cdc0e5d04488b35b0c797bfe427b24359f0848d3c73924dcacf8da6358",
+      "last_scanned_at": "2026-04-15T07:12:44Z",
+      "status": "draft",
+      "draft_file": "D:\\code\\intent-hub\\intent-hub-backend\\data\\tenants\\1\\imports\\skills\\src_001\\obsidian-cli.json",
+      "json_hash": "f6e95c2c60ae63793d3121b0eb63250b4330d15933a4868c3e48a7f779cfffe7",
+      "last_synced_at": null,
+      "route_id": null
+    },
+    {
+      "source_id": "src_001",
+      "skill_path": "C:\\Users\\hp\\.codex\\skills\\obsidian-markdown\\SKILL.md",
+      "skill_hash": "7ad72e1f0a9081ed325e76b6402ad5de50a00e63e2341fd403a92f147234a007",
+      "last_scanned_at": "2026-04-15T07:12:44Z",
+      "status": "draft",
+      "draft_file": "D:\\code\\intent-hub\\intent-hub-backend\\data\\tenants\\1\\imports\\skills\\src_001\\obsidian-markdown.json",
+      "json_hash": "f67c085e99e1f92580574ed75ac4e8e90de3472d19006129a74948433c95893a",
+      "last_synced_at": null,
+      "route_id": null
+    },
+    {
+      "source_id": "src_001",
+      "skill_path": "C:\\Users\\hp\\.codex\\skills\\obsidian-note-to-hexo-blog-publisher\\SKILL.md",
+      "skill_hash": "fe89f8878bf73f92f475f12655b14aa48db5bff7111db03e66b4f88856e3f62a",
+      "last_scanned_at": "2026-04-15T07:12:44Z",
+      "status": "draft",
+      "draft_file": "D:\\code\\intent-hub\\intent-hub-backend\\data\\tenants\\1\\imports\\skills\\src_001\\obsidian-note-to-hexo-blog-publisher.json",
+      "json_hash": "96f474635ff152aa19e3e7dc4d8124de0786492bd26e0441a2583fc2ac5af98d",
+      "last_synced_at": null,
+      "route_id": null
+    },
+    {
+      "source_id": "src_001",
+      "skill_path": "C:\\Users\\hp\\.codex\\skills\\obsidian-raw-to-wiki\\SKILL.md",
+      "skill_hash": "b0fbc43ae1a2e528905fdca2cc563e6ffbb57d4d9222e12b13c93b223fd1a66d",
+      "last_scanned_at": "2026-04-15T07:12:44Z",
+      "status": "draft",
+      "draft_file": "D:\\code\\intent-hub\\intent-hub-backend\\data\\tenants\\1\\imports\\skills\\src_001\\obsidian-raw-to-wiki.json",
+      "json_hash": "ddd29ddad05db9e519f13419011e13c24bc42d60d5df8b28acf892d4da173e32",
+      "last_synced_at": null,
+      "route_id": null
+    },
+    {
+      "source_id": "src_001",
+      "skill_path": "C:\\Users\\hp\\.codex\\skills\\vercel-sandbox\\SKILL.md",
+      "skill_hash": "15da32dca80c4c84e061f6c567dbfbde1c582c373445554a2d4662f4df8a6fe3",
+      "last_scanned_at": "2026-04-15T07:12:44Z",
+      "status": "draft",
+      "draft_file": "D:\\code\\intent-hub\\intent-hub-backend\\data\\tenants\\1\\imports\\skills\\src_001\\vercel-sandbox.json",
+      "json_hash": "5b0e9851d3d0011b2209ef312683f048e84dd24b5ce3af3dca985b51f8b5e4f1",
+      "last_synced_at": null,
+      "route_id": null
+    },
+    {
+      "source_id": "src_001",
+      "skill_path": "C:\\Users\\hp\\.codex\\skills\\windows-c-drive-safe-cleanup-advisor\\SKILL.md",
+      "skill_hash": "f3ac347581a1e94f96775bf008271a30e11a6c0ab0b3ada85337288b6acf60a2",
+      "last_scanned_at": "2026-04-15T07:12:44Z",
+      "status": "draft",
+      "draft_file": "D:\\code\\intent-hub\\intent-hub-backend\\data\\tenants\\1\\imports\\skills\\src_001\\windows-c-drive-safe-cleanup-advisor.json",
+      "json_hash": "f939ce69bb5a0531514adbc08b8b22b1e22abef5bcbca7b3633ad057f95251d6",
+      "last_synced_at": null,
+      "route_id": null
+    }
+  ]
+}

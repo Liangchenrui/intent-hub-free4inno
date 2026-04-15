@@ -6,6 +6,7 @@
           <img src="@/assets/logo.png" alt="Intent Hub" class="logo-img" />
         </div>
         <div class="user-info">
+          <ModeSwitcher />
           <LanguageSwitcher />
           <el-button type="danger" @click="handleLogout">{{ $t('common.logout') }}</el-button>
         </div>
@@ -19,6 +20,8 @@
           <el-tab-pane :label="$t('nav.test')" name="test"></el-tab-pane>
           <el-tab-pane :label="$t('nav.diagnostics')" name="diagnostics"></el-tab-pane>
           <el-tab-pane :label="$t('nav.settings')" name="settings"></el-tab-pane>
+          <el-tab-pane :label="$t('nav.skillSources')" name="skill-sources"></el-tab-pane>
+          <el-tab-pane :label="$t('nav.skillDrafts')" name="skill-drafts"></el-tab-pane>
         </el-tabs>
       </div>
 
@@ -102,6 +105,27 @@
           <el-table-column prop="score_threshold" :label="$t('agent.threshold')" width="100" align="center">
             <template #default="{ row }">
               <el-tag size="small" effect="light">{{ row.score_threshold }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('agent.sourceType')" width="120" align="center">
+            <template #default="{ row }">
+              <el-tag size="small" effect="plain" type="info">
+                {{ row.source?.type || '-' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('agent.syncStatus')" width="120" align="center">
+            <template #default="{ row }">
+              <el-tag size="small" effect="plain" :type="row.sync?.status === 'synced' ? 'success' : 'warning'">
+                {{ row.sync?.status || '-' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('agent.lifecycleStatus')" width="120" align="center">
+            <template #default="{ row }">
+              <el-tag size="small" effect="plain" type="info">
+                {{ row.lifecycle_status || '-' }}
+              </el-tag>
             </template>
           </el-table-column>
           <el-table-column :label="$t('agent.utterances')" min-width="400">
@@ -331,6 +355,8 @@ import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Search, Plus, Refresh, MagicStick } from '@element-plus/icons-vue';
 import {
+  clearTenantSession,
+  setActiveMode,
   getRoutes,
   searchRoutes,
   deleteRoute,
@@ -344,6 +370,7 @@ import {
   type GenerateUtterancesRequest
 } from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
+import ModeSwitcher from '../components/ModeSwitcher.vue';
 
 const { t } = useI18n();
 
@@ -387,8 +414,8 @@ onMounted(() => {
 const handleLogout = async () => {
   try {
     await ElMessageBox.confirm(t('agent.logoutConfirm'), t('agent.logoutTitle'), { type: 'warning' });
-    localStorage.removeItem('api_key');
-    localStorage.removeItem('predict_auth_key');
+    clearTenantSession();
+    setActiveMode('tenant');
     router.push('/login');
   } catch (e) {}
 };
@@ -400,6 +427,10 @@ const handleTabChange = (tabName: any) => {
     router.push('/diagnostics');
   } else if (tabName === 'settings') {
     router.push('/settings');
+  } else if (tabName === 'skill-sources') {
+    router.push('/skills/sources');
+  } else if (tabName === 'skill-drafts') {
+    router.push('/skills/drafts');
   }
 };
 

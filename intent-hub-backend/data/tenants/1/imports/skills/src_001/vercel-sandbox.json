@@ -1,0 +1,38 @@
+{
+  "routes": [
+    {
+      "id": 0,
+      "name": "Vercel沙盒浏览器自动化",
+      "route_key": "vercel.sandbox.browser_automation",
+      "description": "在Vercel沙盒微虚拟机中运行agent-browser和Chrome，为Vercel部署的应用提供浏览器自动化能力。适用于需要在Next.js、SvelteKit等Vercel托管应用中执行网页截图、无障碍快照、表单填写等自动化任务，并支持通过快照实现秒级启动和跨命令的持久会话。区别于通用的浏览器自动化，此路由专门服务于Vercel平台上的沙盒隔离环境。",
+      "utterances": [
+        "Vercel沙盒浏览器",
+        "microVM Chrome",
+        "agent-browser in sandbox",
+        "Vercel浏览器自动化",
+        "帮我用Vercel沙盒截个图",
+        "在Vercel应用里跑个浏览器自动化",
+        "用Vercel沙盒获取网页无障碍快照",
+        "在Vercel沙盒里自动填表单",
+        "启动一个带快照的Vercel浏览器沙盒",
+        "配置Vercel沙盒的浏览器环境"
+      ],
+      "negative_samples": [],
+      "score_threshold": 0.75,
+      "negative_threshold": 0.95,
+      "source": {
+        "type": "json_import",
+        "source_id": null,
+        "import_origin": "skill_import",
+        "managed_fields": []
+      },
+      "sync": {
+        "status": "pending",
+        "last_synced_at": null,
+        "manual_overrides": []
+      },
+      "lifecycle_status": "active"
+    }
+  ],
+  "mode": "merge"
+}

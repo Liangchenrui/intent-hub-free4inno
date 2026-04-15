@@ -61,8 +61,12 @@ class DiagnosticService:
 
     def __init__(self, component_manager: ComponentManager):
         self.component_manager = component_manager
-        # 获取配置中的缓存路径
-        self.cache_path = Config.DIAGNOSTICS_CACHE_PATH
+        tenant_context = getattr(component_manager, "context", None)
+        if tenant_context is not None and getattr(tenant_context, "diagnostics_cache_path", None):
+            self.cache_path = str(tenant_context.diagnostics_cache_path)
+        else:
+            # 兼容旧单租户入口
+            self.cache_path = Config.DIAGNOSTICS_CACHE_PATH
         # 确保目录存在
         os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
 

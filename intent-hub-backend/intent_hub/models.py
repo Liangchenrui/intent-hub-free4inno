@@ -1,6 +1,6 @@
 """数据模型定义"""
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,19 @@ class RoutePayload(BaseModel):
 
 class RouteConfig(BaseModel):
     """路由配置模型（用于CRUD操作）"""
+
+    class RouteSource(BaseModel):
+        type: Literal["web_manual", "json_import"] = Field(..., description="正式路由来源类型")
+        source_id: Optional[str] = Field(default=None, description="来源侧稳定 ID")
+        import_origin: Optional[str] = Field(default=None, description="导入来源标识")
+        managed_fields: List[str] = Field(default_factory=list, description="受来源托管的字段")
+
+    class RouteSync(BaseModel):
+        status: Literal["pending", "synced", "stale", "error"] = Field(
+            default="pending", description="同步状态"
+        )
+        last_synced_at: Optional[str] = Field(default=None, description="最近同步时间")
+        manual_overrides: List[str] = Field(default_factory=list, description="人工覆盖字段")
 
     id: int = Field(..., description="路由ID")
     name: str = Field(..., description="路由名称")
@@ -34,6 +47,11 @@ class RouteConfig(BaseModel):
         description="负例相似度阈值，当查询与负例向量相似度超过此值时排除该路由",
         ge=0.0,
         le=1.0,
+    )
+    source: Optional[RouteSource] = Field(default=None, description="来源元数据")
+    sync: Optional[RouteSync] = Field(default=None, description="同步元数据")
+    lifecycle_status: Literal["active", "draft", "stale", "disabled"] = Field(
+        default="active", description="生命周期状态"
     )
 
 
@@ -109,6 +127,13 @@ class SkillRouteDraft(BaseModel):
     route_key: str = Field(..., description="业务路由标识")
     description: str = Field(default="", description="路由描述")
     utterances: List[str] = Field(..., description="建议语料列表")
+
+
+class RouteImportDraft(BaseModel):
+    """标准 JSON 导入草稿"""
+
+    routes: List[RouteConfig] = Field(..., description="待导入路由列表")
+    mode: Literal["merge", "replace"] = Field(default="merge", description="导入模式")
 
 
 class ConflictPoint(BaseModel):

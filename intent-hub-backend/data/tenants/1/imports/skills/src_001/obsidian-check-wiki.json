@@ -1,0 +1,38 @@
+{
+  "routes": [
+    {
+      "id": 0,
+      "name": "Wiki内容审计与整合",
+      "route_key": "wiki.content.audit",
+      "description": "对Wiki文档目录进行系统性审计与内容整合，核心功能包括识别不同文章间的矛盾陈述、定位被引用但未正式解释的主题、合并重复或高度相似的文章。区别于通用文档处理，它专注于Wiki知识库的内部一致性、完整性与内容去重优化。",
+      "utterances": [
+        "wiki目录审查",
+        "矛盾检查",
+        "相似文章合并",
+        "帮我审计一下这个wiki知识库",
+        "检查这些wiki文章有没有互相矛盾的地方",
+        "找出所有被提到但没解释清楚的主题",
+        "把重复的wiki内容合并一下",
+        "wiki内容整理",
+        "分析wiki目录的逻辑一致性",
+        "整合高度相似的wiki文章"
+      ],
+      "negative_samples": [],
+      "score_threshold": 0.75,
+      "negative_threshold": 0.95,
+      "source": {
+        "type": "json_import",
+        "source_id": null,
+        "import_origin": "skill_import",
+        "managed_fields": []
+      },
+      "sync": {
+        "status": "pending",
+        "last_synced_at": null,
+        "manual_overrides": []
+      },
+      "lifecycle_status": "active"
+    }
+  ],
+  "mode": "merge"
+}

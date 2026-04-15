@@ -1,0 +1,38 @@
+{
+  "routes": [
+    {
+      "id": 0,
+      "name": "浏览器自动化",
+      "route_key": "browser.automation",
+      "description": "为AI代理提供浏览器自动化能力，包括网页导航、表单填写、元素点击、截图、数据提取和Web应用测试。区别于通用工具，它专注于通过命令行对浏览器进行程序化交互，处理需要模拟用户操作或与动态网页内容交互的任务。",
+      "utterances": [
+        "浏览器自动化",
+        "自动化网页操作",
+        "网页数据抓取",
+        "自动填表",
+        "网页截图",
+        "打开网站并点击按钮",
+        "帮我登录这个网站",
+        "自动测试这个Web应用",
+        "从网页上提取数据",
+        "模拟用户操作浏览网页"
+      ],
+      "negative_samples": [],
+      "score_threshold": 0.75,
+      "negative_threshold": 0.95,
+      "source": {
+        "type": "json_import",
+        "source_id": null,
+        "import_origin": "skill_import",
+        "managed_fields": []
+      },
+      "sync": {
+        "status": "pending",
+        "last_synced_at": null,
+        "manual_overrides": []
+      },
+      "lifecycle_status": "active"
+    }
+  ],
+  "mode": "merge"
+}

@@ -1,0 +1,38 @@
+{
+  "routes": [
+    {
+      "id": 0,
+      "name": "Obsidian笔记发布到Hexo博客",
+      "route_key": "blog.publish.obsidian_to_hexo",
+      "description": "将Obsidian笔记发布到Hexo博客的端到端流程，包括复制文件、重写Hexo前置元数据、生成摘要、本地构建、预览和部署。专注于将本地笔记转换为可发布的博客文章，区别于通用的博客管理或内容创作。",
+      "utterances": [
+        "发布笔记到博客",
+        "发布到Hexo",
+        "发布Obsidian笔记",
+        "把这篇笔记发布成博客文章",
+        "帮我把这个Obsidian笔记发布到Hexo",
+        "处理笔记并发布到博客",
+        "发布这篇Markdown到Hexo",
+        "生成博客文章并部署",
+        "发布笔记并预览",
+        "转换笔记为Hexo文章"
+      ],
+      "negative_samples": [],
+      "score_threshold": 0.75,
+      "negative_threshold": 0.95,
+      "source": {
+        "type": "json_import",
+        "source_id": null,
+        "import_origin": "skill_import",
+        "managed_fields": []
+      },
+      "sync": {
+        "status": "pending",
+        "last_synced_at": null,
+        "manual_overrides": []
+      },
+      "lifecycle_status": "active"
+    }
+  ],
+  "mode": "merge"
+}

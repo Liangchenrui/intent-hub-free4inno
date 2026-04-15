@@ -13,6 +13,7 @@ from intent_hub.models import (
     SkillRouteImportRequest,
 )
 from intent_hub.services.route_service import RouteService
+from intent_hub.services.import_service import ImportService
 from intent_hub.utils.error_handler import handle_errors, validate_request
 from intent_hub.utils.logger import logger
 
@@ -135,7 +136,7 @@ def import_route_from_skill(req: SkillRouteImportRequest):
 
     try:
         draft = route_service.generate_route_from_skill(req)
-        return jsonify(draft.dict()), 200
+        return jsonify(draft.model_dump() if hasattr(draft, "model_dump") else draft.dict()), 200
     except ValueError as e:
         return jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()), 400
     except Exception as e:
@@ -195,77 +196,18 @@ def import_routes():
     component_manager = get_component_manager()
     component_manager.ensure_ready()
 
-    route_manager = component_manager.route_manager
-
-    existing_routes = route_manager.get_all_routes()
-    existing_ids = {r.id for r in existing_routes}
-
-    imported_ids = []
-    created = 0
-    updated = 0
-
-    # 导入：逐条写入（仅更新本地 routes_config.json，不自动同步向量）
-    for route in req.routes:
-        # 允许导入文件中缺省 negative_threshold（前端类型是可选的）
-        if getattr(route, "negative_threshold", None) is None:
-            route.negative_threshold = 0.95
-
-        # route.id==0: 走 RouteService 自动分配 ID
-        if route.id == 0:
-            route_service = RouteService(component_manager)
-            try:
-                created_route = route_service.create_route(route)
-            except ValueError as e:
-                return (
-                    jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()),
-                    400,
-                )
-            imported_ids.append(created_route.id)
-            created += 1
-            continue
-
-        # route.id != 0: 如果存在则覆盖；不存在则作为“带指定ID的新建”导入
-        is_update = route.id in existing_ids
-        try:
-            route_manager.add_route(route)
-        except ValueError as e:
-            return (
-                jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()),
-                400,
-            )
-
-        imported_ids.append(route.id)
-        if is_update:
-            updated += 1
-        else:
-            created += 1
-            existing_ids.add(route.id)
-
-    # replace 模式：删除未出现在导入列表中的路由（仅更新本地文件，不自动同步向量）
-    removed = 0
-    if mode == "replace":
-        imported_set = set(imported_ids)
-        to_remove = [r.id for r in route_manager.get_all_routes() if r.id not in imported_set]
-        if to_remove:
-            route_service = RouteService(component_manager)
-            for rid in to_remove:
-                try:
-                    route_service.delete_route(rid)
-                    removed += 1
-                except Exception as e:
-                    logger.error(f"Failed to delete route in replace mode (route_id={rid}): {e}")
+    import_service = ImportService(component_manager)
+    try:
+        result = import_service.import_routes(
+            routes=req.routes,
+            mode=mode,
+            import_origin="api_import",
+        )
+    except ValueError as e:
+        return jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()), 400
 
     return (
-        jsonify(
-            {
-                "message": "导入成功",
-                "mode": mode,
-                "created": created,
-                "updated": updated,
-                "removed": removed,
-                "total": len(imported_ids),
-            }
-        ),
+        jsonify({"message": "导入成功", **result}),
         200,
     )
 

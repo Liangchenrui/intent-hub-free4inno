@@ -1,0 +1,38 @@
+{
+  "routes": [
+    {
+      "id": 0,
+      "name": "Windows C盘安全清理顾问",
+      "route_key": "windows.disk.safe_cleanup_analysis",
+      "description": "为Windows系统C盘提供磁盘空间分析和安全清理建议。该技能会扫描C盘路径，识别可安全清理的临时文件、需要用户复核的个人文件以及禁止删除的系统目录，并估算可释放空间和风险等级。它仅提供分析报告，不执行任何删除操作，严格区别于通用的磁盘清理工具或文件删除指令。",
+      "utterances": [
+        "C盘清理",
+        "Windows磁盘清理",
+        "C盘空间分析",
+        "安全清理建议",
+        "帮我分析一下C盘哪些文件可以安全删除",
+        "检查Windows C盘有什么可以清理的",
+        "评估一下C盘能释放多少空间",
+        "扫描C盘的安全清理目标",
+        "给我一份C盘清理的风险报告",
+        "看看C盘有哪些临时文件可以删"
+      ],
+      "negative_samples": [],
+      "score_threshold": 0.75,
+      "negative_threshold": 0.95,
+      "source": {
+        "type": "json_import",
+        "source_id": null,
+        "import_origin": "skill_import",
+        "managed_fields": []
+      },
+      "sync": {
+        "status": "pending",
+        "last_synced_at": null,
+        "manual_overrides": []
+      },
+      "lifecycle_status": "active"
+    }
+  ],
+  "mode": "merge"
+}

@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 from intent_hub.core.components import ComponentManager
 from intent_hub.models import (
     GenerateUtterancesRequest,
+    RouteImportDraft,
     RouteConfig,
-    SkillRouteDraft,
     SkillRouteImportRequest,
 )
 from intent_hub.services.llm_factory import LLMFactory
@@ -110,6 +110,8 @@ class RouteService:
             self._ensure_route_key_unique(route.route_key, exclude_route_id=route.id)
             logger.info(f"Updating route ID: {route.id}")
 
+        route.source = route.source or RouteConfig.RouteSource(type="web_manual")
+        route.sync = route.sync or RouteConfig.RouteSync(status="pending")
         route_manager.add_route(route)
         logger.info(f"Route saved: {route.name} (ID: {route.id})")
 
@@ -132,6 +134,8 @@ class RouteService:
         route_manager = self.component_manager.route_manager
         route.route_key = self._normalize_and_validate_route_key(route.route_key)
         self._ensure_route_key_unique(route.route_key, exclude_route_id=route_id)
+        route.source = route.source or RouteConfig.RouteSource(type="web_manual")
+        route.sync = route.sync or RouteConfig.RouteSync(status="pending")
 
         if not route_manager.update_route(route_id, route):
             raise ValueError(f"Route ID {route_id} does not exist")
@@ -203,12 +207,45 @@ class RouteService:
                 negative_threshold=0.95,  # 默认负例阈值
             )
 
-    def generate_route_from_skill(self, req: SkillRouteImportRequest) -> SkillRouteDraft:
-        """根据 SKILL.md 内容生成路由草稿"""
+    def generate_route_from_skill(self, req: SkillRouteImportRequest) -> RouteImportDraft:
+        """根据 SKILL.md 内容生成标准 JSON 导入草稿"""
         skill_content = (req.skill_content or "").strip()
         if not skill_content:
             raise ValueError("skill_content is required")
 
+        result = self._invoke_skill_route_generation(skill_content)
+
+        route_key = self._normalize_and_validate_route_key(
+            result.route_key or self._build_skill_route_key_candidate(result.name)
+        )
+
+        utterances = self._normalize_generated_utterances(result.utterances)
+        if not utterances:
+            raise RuntimeError("LLM did not return valid utterances")
+
+        return RouteImportDraft(
+            mode="merge",
+            routes=[
+                RouteConfig(
+                    id=0,
+                    name=(result.name or "").strip(),
+                    route_key=route_key,
+                    description=(result.description or "").strip(),
+                    utterances=utterances,
+                    negative_samples=[],
+                    score_threshold=0.75,
+                    negative_threshold=0.95,
+                    source=RouteConfig.RouteSource(
+                        type="json_import",
+                        import_origin="skill_import",
+                    ),
+                    sync=RouteConfig.RouteSync(status="pending"),
+                    lifecycle_status="active",
+                )
+            ],
+        )
+
+    def _invoke_skill_route_generation(self, skill_content: str) -> SkillRouteDraftOutput:
         llm = LLMFactory.create_llm()
         parser = PydanticOutputParser(pydantic_object=SkillRouteDraftOutput)
 
@@ -223,25 +260,14 @@ class RouteService:
         chain = prompt | llm | parser
 
         try:
-            result = chain.invoke({"skill_content": skill_content})
+            return chain.invoke({"skill_content": skill_content})
         except Exception as e:
             logger.error(f"Skill route generation failed: {e}")
             raise RuntimeError(f"Skill route generation failed: {str(e)}")
 
-        route_key = self._normalize_and_validate_route_key(
-            result.route_key or self._build_skill_route_key_candidate(result.name)
-        )
-
-        utterances = self._normalize_generated_utterances(result.utterances)
-        if not utterances:
-            raise RuntimeError("LLM did not return valid utterances")
-
-        return SkillRouteDraft(
-            name=(result.name or "").strip(),
-            route_key=route_key,
-            description=(result.description or "").strip(),
-            utterances=utterances,
-        )
+    @property
+    def _draft_output_model(self):
+        return SkillRouteDraftOutput
 
     def _generate_utterances_with_llm(
         self, req: GenerateUtterancesRequest, example_utterances: List[str]

@@ -13,6 +13,8 @@ _backend_root = _current_file.parent.parent
 # 统一使用后端目录下的 data 文件夹
 PROJECT_ROOT = _backend_root
 DATA_DIR = PROJECT_ROOT / "data"
+PLATFORM_DATA_DIR = DATA_DIR / "platform"
+TENANTS_DATA_DIR = DATA_DIR / "tenants"
 
 # 新创建 settings.json 时写入的默认提示词
 DEFAULT_UTTERANCE_GENERATION_PROMPT = """你是一个资深的用户意图分析专家。你的任务是为特定的 AI Agent 生成高质量的测试数据集（Utterances），用于后续的意图识别和路由分发系统训练。 ### Agent 背景信息 - **Agent 名称**: {name} - **功能描述**: {description} - **参考示例（请参照这些示例的风格和范围，生成新的句子，但绝对不能重复这些示例）**: {reference_utterances} ### 生成要求 你需要生成 {count} 条**全新的**用户提问（必须与参考示例不同），请严格遵守以下准则： 1. **分布控制**：    - **关键词/短语 (50%)**: 极其简短，如"查天气"、"翻译一下"、"写代码"。这类词对路由最关键。    - **简单指令 (50%)**: 直接的命令句，如"帮我写个请假条"、"帮我分析这行代码"。 2. **多样性与覆盖面**：    - 提取描述中的"核心动词" and "核心名词"，进行交叉组合。    - 包含同义词替换（例如：从"预定"扩展到"帮我订一个"、"我想约一个"）。    - 必须沿用参考示例的语气和专业深度，但不要重复原话。 3. **路由判别性**：    - 生成的提问必须与该 Agent 的核心功能高度相关，避免产生可能导致路由误判到其他通用 Agent 的极其模糊的句子。 4. **格式要求**：    - 仅输出生成的问题列表，不要包含任何解释性文字。 {format_instructions}"""
@@ -85,6 +87,12 @@ class Config:
     FLASK_HOST: str = "0.0.0.0"
     FLASK_PORT: int = 5000
     FLASK_DEBUG: bool = False
+
+    # 平台/租户数据目录
+    DATA_DIR: Path = DATA_DIR
+    PLATFORM_DATA_DIR: Path = PLATFORM_DATA_DIR
+    TENANTS_DATA_DIR: Path = TENANTS_DATA_DIR
+    DEFAULT_TENANT_ID: str = "default"
 
     # Qdrant配置
     QDRANT_URL: str = ""

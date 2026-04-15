@@ -54,8 +54,11 @@ full = [
     "intent-hub[local]",
 ]
 
-[tool.setuptools]
-packages = ["intent_hub"]
+[project.scripts]
+intent-hub = "intent_hub.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["intent_hub*"]
 
 [tool.black]
 line-length = 100

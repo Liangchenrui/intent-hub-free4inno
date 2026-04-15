@@ -6,6 +6,7 @@
           <img src="@/assets/logo.png" alt="Intent Hub" class="logo-img" />
         </div>
         <div class="user-info">
+          <ModeSwitcher />
           <LanguageSwitcher />
           <el-button type="danger" @click="handleLogout">{{ $t('common.logout') }}</el-button>
         </div>
@@ -19,6 +20,8 @@
           <el-tab-pane :label="$t('nav.test')" name="test"></el-tab-pane>
           <el-tab-pane :label="$t('nav.diagnostics')" name="diagnostics"></el-tab-pane>
           <el-tab-pane :label="$t('nav.settings')" name="settings"></el-tab-pane>
+          <el-tab-pane :label="$t('nav.skillSources')" name="skill-sources"></el-tab-pane>
+          <el-tab-pane :label="$t('nav.skillDrafts')" name="skill-drafts"></el-tab-pane>
         </el-tabs>
       </div>
 
@@ -121,8 +124,9 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { ChatLineRound } from '@element-plus/icons-vue';
-import { predict, reindex, type PredictResult } from '../api';
+import { clearTenantSession, predict, reindex, setActiveMode, type PredictResult } from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
+import ModeSwitcher from '../components/ModeSwitcher.vue';
 
 const { t } = useI18n();
 
@@ -140,8 +144,8 @@ const hasFullReindex = computed(() => {
 });
 
 const handleLogout = () => {
-  localStorage.removeItem('api_key');
-  localStorage.removeItem('predict_auth_key');
+  clearTenantSession();
+  setActiveMode('tenant');
   router.push('/login');
 };
 
@@ -152,6 +156,10 @@ const handleTabChange = (tabName: any) => {
     router.push('/diagnostics');
   } else if (tabName === 'settings') {
     router.push('/settings');
+  } else if (tabName === 'skill-sources') {
+    router.push('/skills/sources');
+  } else if (tabName === 'skill-drafts') {
+    router.push('/skills/drafts');
   }
 };
 

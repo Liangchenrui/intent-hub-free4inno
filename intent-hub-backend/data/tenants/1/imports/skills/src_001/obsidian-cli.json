@@ -1,0 +1,38 @@
+{
+  "routes": [
+    {
+      "id": 0,
+      "name": "Obsidian CLI 操作",
+      "route_key": "obsidian.cli",
+      "description": "通过命令行与 Obsidian 知识库进行交互，包括笔记的读取、创建、搜索、管理，以及插件和主题的开发调试。适用于用户需要直接操作 Obsidian 库内容或进行插件开发测试的场景，区别于通用的文件管理或笔记编辑。",
+      "utterances": [
+        "obsidian",
+        "obsidian cli",
+        "创建笔记",
+        "搜索笔记",
+        "读取笔记",
+        "帮我用 obsidian 命令创建一篇笔记",
+        "用 cli 搜索我的 obsidian 库",
+        "执行 obsidian 命令",
+        "运行 obsidian 插件开发命令",
+        "调试 obsidian 插件"
+      ],
+      "negative_samples": [],
+      "score_threshold": 0.75,
+      "negative_threshold": 0.95,
+      "source": {
+        "type": "json_import",
+        "source_id": null,
+        "import_origin": "skill_import",
+        "managed_fields": []
+      },
+      "sync": {
+        "status": "pending",
+        "last_synced_at": null,
+        "manual_overrides": []
+      },
+      "lifecycle_status": "active"
+    }
+  ],
+  "mode": "merge"
+}

@@ -6,37 +6,57 @@
           <img src="@/assets/logo.png" alt="Intent Hub" class="login-logo" />
         </div>
       </template>
-      <el-form :model="{ username, password }" @submit.prevent="handleLogin" label-position="top">
+
+      <el-tabs v-model="mode" stretch>
+        <el-tab-pane label="Tenant Access Code" name="tenant" />
+        <el-tab-pane label="Admin Login" name="admin" />
+      </el-tabs>
+
+      <el-form v-if="mode === 'tenant'" @submit.prevent="handleTenantLogin" label-position="top">
+        <el-form-item label="Access Code">
+          <el-input v-model="tenantCode" placeholder="ih_live_xxx" clearable />
+        </el-form-item>
+        <el-button
+          type="primary"
+          native-type="submit"
+          :loading="loading"
+          class="login-btn"
+          size="large"
+        >
+          {{ loading ? '验证中...' : '登录租户控制台' }}
+        </el-button>
+      </el-form>
+
+      <el-form v-else @submit.prevent="handleAdminLogin" label-position="top">
         <el-form-item :label="$t('login.username')">
-          <el-input 
-            v-model="username" 
-            :placeholder="$t('login.usernamePlaceholder')" 
+          <el-input
+            v-model="username"
+            :placeholder="$t('login.usernamePlaceholder')"
             clearable
           />
         </el-form-item>
         <el-form-item :label="$t('login.password')">
-          <el-input 
-            v-model="password" 
-            type="password" 
-            :placeholder="$t('login.passwordPlaceholder')" 
+          <el-input
+            v-model="password"
+            type="password"
+            :placeholder="$t('login.passwordPlaceholder')"
             show-password
           />
         </el-form-item>
-        
-        <div v-if="error" class="error-msg">
-          <el-alert :title="error" type="error" :closable="false" show-icon />
-        </div>
-
-        <el-button 
-          type="primary" 
-          native-type="submit" 
-          :loading="loading" 
+        <el-button
+          type="primary"
+          native-type="submit"
+          :loading="loading"
           class="login-btn"
           size="large"
         >
-          {{ loading ? $t('login.logging') : $t('login.login') }}
+          {{ loading ? $t('login.logging') : '登录管理员控制台' }}
         </el-button>
       </el-form>
+
+      <div v-if="error" class="error-msg">
+        <el-alert :title="error" type="error" :closable="false" show-icon />
+      </div>
     </el-card>
   </div>
 </template>
@@ -45,42 +65,56 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import api from '../api';
+import api, { clearAdminSession, clearTenantSession, setActiveMode } from '../api';
 
 const { t } = useI18n();
-
+const router = useRouter();
+const mode = ref<'tenant' | 'admin'>('tenant');
+const tenantCode = ref('');
 const username = ref('');
 const password = ref('');
 const loading = ref(false);
 const error = ref('');
-const router = useRouter();
 
-const handleLogin = async () => {
+const handleTenantLogin = async () => {
   loading.value = true;
   error.value = '';
-  
+  try {
+    await api.get('/v1/me', {
+      headers: {
+        Authorization: `Bearer ${tenantCode.value}`,
+        'X-API-Key': tenantCode.value,
+      },
+    });
+    clearTenantSession();
+    localStorage.setItem('tenant_access_code', tenantCode.value);
+    setActiveMode('tenant');
+    router.push('/');
+  } catch (err: any) {
+    error.value = err?.response?.data?.detail || 'Access code 无效';
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleAdminLogin = async () => {
+  loading.value = true;
+  error.value = '';
   try {
     const response = await api.post('/auth/login', {
       username: username.value,
       password: password.value,
     });
-    
-    const { api_key } = response.data;
-    if (api_key) {
-      localStorage.setItem('api_key', api_key);
-      localStorage.removeItem('predict_auth_key'); // 登录时先移除，等进入设置页面后再同步
-      router.push('/');
-    } else {
-      error.value = t('login.serverError');
+    const apiKey = response.data?.api_key;
+    if (!apiKey) {
+      throw new Error(t('login.serverError'));
     }
+    clearAdminSession();
+    localStorage.setItem('admin_token', apiKey);
+    setActiveMode('admin');
+    router.push('/admin/tenants');
   } catch (err: any) {
-    if (err.response) {
-      error.value = err.response.data?.detail || err.response.data?.error || t('login.loginFailed');
-    } else if (err.request) {
-      error.value = t('login.connectionError');
-    } else {
-      error.value = t('login.requestError');
-    }
+    error.value = err?.response?.data?.detail || err?.message || t('login.loginFailed');
   } finally {
     loading.value = false;
   }
@@ -98,7 +132,7 @@ const handleLogin = async () => {
 
 .login-card {
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
 }
 
 .login-header {
@@ -115,10 +149,10 @@ const handleLogin = async () => {
 
 .login-btn {
   width: 100%;
-  margin-top: 20px;
+  margin-top: 8px;
 }
 
 .error-msg {
-  margin-bottom: 20px;
+  margin-top: 16px;
 }
 </style>

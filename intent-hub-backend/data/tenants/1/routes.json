@@ -1,0 +1,365 @@
+[
+  {
+    "id": 1,
+    "name": "浏览器自动化",
+    "route_key": "browser.automation",
+    "description": "为AI代理提供浏览器自动化能力，包括网页导航、表单填写、元素点击、截图、数据提取和Web应用测试。区别于通用工具，它专注于通过命令行对浏览器进行程序化交互，处理需要模拟用户操作或与动态网页内容交互的任务。",
+    "utterances": [
+      "浏览器自动化",
+      "自动化网页操作",
+      "网页数据抓取",
+      "自动填表",
+      "网页截图",
+      "打开网站并点击按钮",
+      "帮我登录这个网站",
+      "自动测试这个Web应用",
+      "从网页上提取数据",
+      "模拟用户操作浏览网页"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 2,
+    "name": "前端界面创意设计",
+    "route_key": "frontend.design.create",
+    "description": "生成具有独特美学风格、生产级质量的前端界面代码，避免通用AI设计模式。专注于创造性的视觉表达，包括大胆的排版、色彩、动效和空间构图，产出令人难忘的界面实现。",
+    "utterances": [
+      "创意前端设计",
+      "设计独特界面",
+      "生成前端界面",
+      "帮我设计一个有艺术感的前端页面",
+      "创建一个具有复古未来主义风格的网页组件",
+      "设计一个极简但精致的登录界面",
+      "实现一个带有复杂动效的仪表盘",
+      "生成一个打破常规布局的网站首页",
+      "设计一个具有杂志编辑感的用户界面",
+      "创建一个带有有机自然元素的产品展示页"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 3,
+    "name": "前端设计审查与优化",
+    "route_key": "frontend.design.review",
+    "description": "依据专业设计规范（如字体、色彩、空间、动效）对UI/前端代码进行审查、优化和打磨。提供audit、polish、critique等具体命令，旨在提升设计质量，避免常见反模式，使输出摆脱通用模板感。",
+    "utterances": [
+      "审查UI设计",
+      "优化界面",
+      "/audit",
+      "/polish",
+      "检查设计质量",
+      "帮我审查一下这个组件的设计",
+      "让这个设计更专业",
+      "检查这段前端代码的设计问题",
+      "给这个界面添加有意义的动效",
+      "让这个设计看起来更沉稳"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 4,
+    "name": "创建或编辑 Obsidian Bases 文件",
+    "route_key": "obsidian.base.manage",
+    "description": "用于在 Obsidian 中创建和编辑 .base 文件，以构建数据库式的笔记视图。核心能力包括定义笔记筛选器（filters）、创建计算属性（formulas）、配置多种视图（table/cards/list/map）以及设置汇总（summaries）。区别于通用的笔记操作，专注于实现基于属性和公式的结构化数据视图。",
+    "utterances": [
+      "创建 base 文件",
+      "编辑 .base",
+      "Bases",
+      "Obsidian 表格视图",
+      "帮我建一个任务跟踪的 base",
+      "给这些笔记加个卡片视图",
+      "用 filters 筛选笔记",
+      "添加一个公式属性",
+      "配置一个 map 视图",
+      "设置 summaries 汇总数据"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 5,
+    "name": "Wiki内容审计与整合",
+    "route_key": "wiki.content.audit",
+    "description": "对Wiki文档目录进行系统性审计与内容整合，核心功能包括识别不同文章间的矛盾陈述、定位被引用但未正式解释的主题、合并重复或高度相似的文章。区别于通用文档处理，它专注于Wiki知识库的内部一致性、完整性与内容去重优化。",
+    "utterances": [
+      "wiki目录审查",
+      "矛盾检查",
+      "相似文章合并",
+      "帮我审计一下这个wiki知识库",
+      "检查这些wiki文章有没有互相矛盾的地方",
+      "找出所有被提到但没解释清楚的主题",
+      "把重复的wiki内容合并一下",
+      "wiki内容整理",
+      "分析wiki目录的逻辑一致性",
+      "整合高度相似的wiki文章"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 6,
+    "name": "Obsidian CLI 操作",
+    "route_key": "obsidian.cli",
+    "description": "通过命令行与 Obsidian 知识库进行交互，包括笔记的读取、创建、搜索、管理，以及插件和主题的开发调试。适用于用户需要直接操作 Obsidian 库内容或进行插件开发测试的场景，区别于通用的文件管理或笔记编辑。",
+    "utterances": [
+      "obsidian",
+      "obsidian cli",
+      "创建笔记",
+      "搜索笔记",
+      "读取笔记",
+      "帮我用 obsidian 命令创建一篇笔记",
+      "用 cli 搜索我的 obsidian 库",
+      "执行 obsidian 命令",
+      "运行 obsidian 插件开发命令",
+      "调试 obsidian 插件"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 7,
+    "name": "Obsidian 风格 Markdown 编辑",
+    "route_key": "markdown.obsidian.edit",
+    "description": "创建和编辑符合 Obsidian 笔记软件特有语法的 Markdown 内容，包括维基链接、嵌入块、标注框、前置属性、标签等。适用于在 Obsidian 环境中编写笔记或处理 .md 文件，区别于通用 Markdown 编辑。",
+    "utterances": [
+      "维基链接",
+      "嵌入块",
+      "标注框",
+      "帮我用 Obsidian 语法写个笔记",
+      "创建一个有前置属性的 Obsidian 笔记",
+      "添加一个维基链接",
+      "嵌入另一个笔记的内容",
+      "插入一个警告标注框",
+      "给这段文字加上 Obsidian 高亮语法",
+      "用 Obsidian 格式写个任务列表"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 8,
+    "name": "Obsidian笔记发布到Hexo博客",
+    "route_key": "blog.publish.obsidian_to_hexo",
+    "description": "将Obsidian笔记发布到Hexo博客的端到端流程，包括复制文件、重写Hexo前置元数据、生成摘要、本地构建、预览和部署。专注于将本地笔记转换为可发布的博客文章，区别于通用的博客管理或内容创作。",
+    "utterances": [
+      "发布笔记到博客",
+      "发布到Hexo",
+      "发布Obsidian笔记",
+      "把这篇笔记发布成博客文章",
+      "帮我把这个Obsidian笔记发布到Hexo",
+      "处理笔记并发布到博客",
+      "发布这篇Markdown到Hexo",
+      "生成博客文章并部署",
+      "发布笔记并预览",
+      "转换笔记为Hexo文章"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 9,
+    "name": "AI知识库构建器",
+    "route_key": "knowledgebase.wiki.build",
+    "description": "从原始材料(raw/)中提取信息，根据规则构建和更新结构化知识库(wiki/)。核心能力是进行主题聚类、提炼核心认知、建立知识连接，并生成可用于面试、项目或写作的结构化wiki文件，而非简单的笔记总结。",
+    "utterances": [
+      "构建知识库",
+      "更新wiki",
+      "整理raw材料",
+      "生成知识索引",
+      "创建主题wiki",
+      "帮我把raw文件夹里的资料整理成知识库",
+      "根据AGENT.md规则更新wiki知识库",
+      "扫描raw目录并生成结构化wiki",
+      "为这些原始材料做主题聚类并输出wiki",
+      "提炼核心概念并构建知识网络"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 10,
+    "name": "Vercel沙盒浏览器自动化",
+    "route_key": "vercel.sandbox.browser_automation",
+    "description": "在Vercel沙盒微虚拟机中运行agent-browser和Chrome，为Vercel部署的应用提供浏览器自动化能力。适用于需要在Next.js、SvelteKit等Vercel托管应用中执行网页截图、无障碍快照、表单填写等自动化任务，并支持通过快照实现秒级启动和跨命令的持久会话。区别于通用的浏览器自动化，此路由专门服务于Vercel平台上的沙盒隔离环境。",
+    "utterances": [
+      "Vercel沙盒浏览器",
+      "microVM Chrome",
+      "agent-browser in sandbox",
+      "Vercel浏览器自动化",
+      "帮我用Vercel沙盒截个图",
+      "在Vercel应用里跑个浏览器自动化",
+      "用Vercel沙盒获取网页无障碍快照",
+      "在Vercel沙盒里自动填表单",
+      "启动一个带快照的Vercel浏览器沙盒",
+      "配置Vercel沙盒的浏览器环境"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 11,
+    "name": "Windows C盘安全清理顾问",
+    "route_key": "windows.disk.safe_cleanup_analysis",
+    "description": "为Windows系统C盘提供磁盘空间分析和安全清理建议。该技能会扫描C盘路径，识别可安全清理的临时文件、需要用户复核的个人文件以及禁止删除的系统目录，并估算可释放空间和风险等级。它仅提供分析报告，不执行任何删除操作，严格区别于通用的磁盘清理工具或文件删除指令。",
+    "utterances": [
+      "C盘清理",
+      "Windows磁盘清理",
+      "C盘空间分析",
+      "安全清理建议",
+      "帮我分析一下C盘哪些文件可以安全删除",
+      "检查Windows C盘有什么可以清理的",
+      "评估一下C盘能释放多少空间",
+      "扫描C盘的安全清理目标",
+      "给我一份C盘清理的风险报告",
+      "看看C盘有哪些临时文件可以删"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  }
+]

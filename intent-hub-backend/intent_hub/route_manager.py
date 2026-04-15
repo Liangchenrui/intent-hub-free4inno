@@ -287,6 +287,17 @@ class RouteManager:
             "negative_samples": sorted(getattr(route, "negative_samples", [])),
             "score_threshold": route.score_threshold,
             "negative_threshold": getattr(route, "negative_threshold", 0.95),
+            "source": (
+                route.source.model_dump()
+                if getattr(route, "source", None) is not None
+                else None
+            ),
+            "sync": (
+                route.sync.model_dump()
+                if getattr(route, "sync", None) is not None
+                else None
+            ),
+            "lifecycle_status": getattr(route, "lifecycle_status", "active"),
         }
         route_json = json.dumps(route_data, ensure_ascii=False, sort_keys=True)
         return hashlib.md5(route_json.encode("utf-8")).hexdigest()

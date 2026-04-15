@@ -33,5 +33,10 @@
     "route_id": 7,
     "route_name": "新闻事实核查",
     "overlaps": []
+  },
+  "8": {
+    "route_id": 8,
+    "route_name": "办学研讨内容发散",
+    "overlaps": []
   }
 }

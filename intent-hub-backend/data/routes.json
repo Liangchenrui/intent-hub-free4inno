@@ -150,5 +150,26 @@
     "negative_samples": [],
     "score_threshold": 0.75,
     "negative_threshold": 0.95
+  },
+  {
+    "id": 8,
+    "name": "办学研讨内容发散",
+    "route_key": "seminar.content.divergence",
+    "description": "在办学研讨场景中，根据用户提出的讨论目标或方向，提供2-5个可讨论的角度、子问题或对立面，以帮助打开思路、激发思考。本能力仅做角度引导和思路启发，不主持讨论流程、不做结论，回复后即交回话语权。",
+    "utterances": [
+      "内容发散",
+      "发散一下",
+      "打开思路",
+      "多角度讨论",
+      "帮我发散一下这个话题",
+      "从不同角度分析这个问题",
+      "提出几个可讨论的子问题",
+      "有哪些对立面可以探讨",
+      "给几个讨论角度",
+      "帮我打开关于这个议题的思路"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95
   }
 ]

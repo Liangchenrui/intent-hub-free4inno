@@ -177,6 +177,28 @@ intent-hub/
 
 ---
 
+## Runtime Notes
+
+1. `POST /v1/route` returns only route matching results.
+2. `POST /v1/dispatch` returns route matching + dispatch suggestion payload.
+3. Current `dispatch` is suggestion-only (`status: not_executed`), no real tool execution yet.
+
+## Backend CLI Install
+
+```bash
+cd intent-hub-backend
+pip install -e .
+```
+
+After install, both commands are available:
+
+```bash
+intent-hub --help
+intenthub --help
+```
+
+---
+
 ## License
 
 Distributed under the MIT License. See `LICENSE` for details.

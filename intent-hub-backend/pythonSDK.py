@@ -2,7 +2,7 @@ from intent_hub import IntentHubClient
 
 client = IntentHubClient(
     endpoint="http://127.0.0.1:5000",
-    access_code="ih_live_team_alpha_xxx",
+    access_code="ih_live_1_5369278694ca9ac55f140d05",
 )
 
 print(client.whoami())

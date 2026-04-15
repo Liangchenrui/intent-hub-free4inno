@@ -24,59 +24,6 @@
 
       <el-card shadow="never" class="settings-card" v-loading="loading">
         <el-form :model="settings" label-position="top" class="settings-form">
-          <el-divider :content-position="'left'">{{ $t('settings.qdrantTitle') }}</el-divider>
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item :label="$t('settings.qdrantUrl')">
-                <el-input v-model="settings.QDRANT_URL" :placeholder="$t('settings.qdrantUrlPlaceholder')" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item :label="$t('settings.collection')">
-                <el-input v-model="settings.QDRANT_COLLECTION" />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-form-item :label="$t('settings.qdrantApiKey')">
-            <el-input v-model="settings.QDRANT_API_KEY" type="password" show-password :placeholder="$t('settings.qdrantApiKeyPlaceholder')" />
-          </el-form-item>
-
-          <el-divider :content-position="'left'">{{ $t('settings.embeddingTitle') }}</el-divider>
-          <el-form-item :label="$t('settings.embeddingServiceUrl')">
-            <el-input 
-              v-model="settings.EMBEDDING_SERVICE_URL" 
-              :placeholder="$t('settings.embeddingServiceUrlPlaceholder')" 
-            />
-            <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-              {{ $t('settings.embeddingServiceUrlHint') }}
-            </div>
-          </el-form-item>
-          <el-row :gutter="20">
-            <el-col :span="16">
-              <el-form-item :label="$t('settings.modelName')">
-                <el-input 
-                  v-model="settings.EMBEDDING_MODEL_NAME" 
-                  :placeholder="$t('settings.modelNamePlaceholder')" 
-                />
-                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-                  {{ $t('settings.modelNameHint') }}
-                </div>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item :label="$t('settings.embeddingDevice')">
-                <el-select v-model="settings.EMBEDDING_DEVICE" style="width: 100%">
-                  <el-option label="CPU" value="cpu" />
-                  <el-option label="CUDA" value="cuda" />
-                  <el-option label="MPS" value="mps" />
-                </el-select>
-                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-                  {{ $t('settings.embeddingDeviceHint') }}
-                </div>
-              </el-form-item>
-            </el-col>
-          </el-row>
-
           <el-divider :content-position="'left'">{{ $t('settings.llmTitle') }}</el-divider>
           <el-form-item :label="$t('settings.llmProvider')">
             <el-select v-model="settings.LLM_PROVIDER" style="width: 100%">
@@ -141,60 +88,6 @@
             <el-input v-model="settings.AGENT_REPAIR_PROMPT" type="textarea" :rows="4" />
           </el-form-item>
 
-          <el-divider :content-position="'left'">{{ $t('settings.policyTitle') }}</el-divider>
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <el-form-item :label="$t('settings.authEnabled')">
-                <el-switch v-model="settings.AUTH_ENABLED" />
-                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-                  {{ $t('settings.authEnabledHint') }}
-                </div>
-              </el-form-item>
-            </el-col>
-            <el-col :span="16">
-              <el-form-item v-if="settings.AUTH_ENABLED" :label="$t('settings.apiKeys')">
-                <el-input 
-                  v-model="settings.API_KEYS" 
-                  :placeholder="$t('settings.apiKeysPlaceholder')" 
-                />
-                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-                  {{ $t('settings.apiKeysHint') }}
-                </div>
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item :label="$t('settings.username')">
-                <el-input 
-                  v-model="settings.DEFAULT_USERNAME" 
-                  :placeholder="$t('settings.usernamePlaceholder')" 
-                />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item :label="$t('settings.password')">
-                <el-input 
-                  v-model="settings.DEFAULT_PASSWORD" 
-                  type="password" 
-                  show-password 
-                  :placeholder="$t('settings.passwordPlaceholder')" 
-                />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-form-item :label="$t('settings.predictAuthKey')">
-            <el-input 
-              v-model="settings.PREDICT_AUTH_KEY" 
-              type="password" 
-              show-password 
-              :placeholder="$t('settings.predictAuthKeyPlaceholder')" 
-            />
-            <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-              {{ $t('settings.predictAuthKeyHint') }}
-            </div>
-          </el-form-item>
-
           <el-divider :content-position="'left'">{{ $t('settings.diagnosticTitle') }}</el-divider>
           <el-row :gutter="20">
             <el-col :span="12">
@@ -229,6 +122,12 @@
             </el-col>
           </el-row>
 
+          <el-divider content-position="left">Skill Sources</el-divider>
+          <div class="skill-actions">
+            <el-button @click="goSkillSources">管理 Skill Sources</el-button>
+            <el-button @click="goSkillDrafts">查看扫描结果</el-button>
+          </div>
+
           <div class="form-actions">
             <el-button type="primary" :loading="saving" @click="handleSave">{{ $t('settings.save') }}</el-button>
             <el-button @click="fetchSettings(true)">{{ $t('settings.reset') }}</el-button>
@@ -244,7 +143,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getSettings, updateSettings, type Settings } from '../api';
+import { getSettings, updateSettings, type TenantSettings } from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 
 const { t } = useI18n();
@@ -254,10 +153,7 @@ const activeTab = ref('settings');
 const loading = ref(false);
 const saving = ref(false);
 
-const settings = ref<Settings>({
-  QDRANT_URL: '',
-  QDRANT_COLLECTION: '',
-  QDRANT_API_KEY: null,
+const settings = ref<TenantSettings>({
   EMBEDDING_SERVICE_URL: '',
   EMBEDDING_MODEL_NAME: '',
   EMBEDDING_DEVICE: 'cpu',
@@ -269,11 +165,6 @@ const settings = ref<Settings>({
   UTTERANCE_GENERATION_PROMPT: '',
   SKILL_ROUTE_IMPORT_PROMPT: '',
   AGENT_REPAIR_PROMPT: '',
-  AUTH_ENABLED: true,
-  API_KEYS: '',
-  PREDICT_AUTH_KEY: null,
-  DEFAULT_USERNAME: 'admin',
-  DEFAULT_PASSWORD: '',
   BATCH_SIZE: 32,
   DEFAULT_ROUTE_ID: 0,
   DEFAULT_ROUTE_NAME: 'none',
@@ -281,43 +172,30 @@ const settings = ref<Settings>({
   INSTANCE_THRESHOLD_AMBIGUOUS: 0.92
 });
 
+const normalizeTenantSettings = (data: any): TenantSettings => ({
+  EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
+  EMBEDDING_MODEL_NAME: data.EMBEDDING_MODEL_NAME ?? '',
+  EMBEDDING_DEVICE: data.EMBEDDING_DEVICE ?? 'cpu',
+  LLM_PROVIDER: data.LLM_PROVIDER ?? 'deepseek',
+  LLM_API_KEY: data.LLM_API_KEY ?? null,
+  LLM_BASE_URL: data.LLM_BASE_URL ?? null,
+  LLM_MODEL: data.LLM_MODEL ?? null,
+  LLM_TEMPERATURE: data.LLM_TEMPERATURE ?? 0.7,
+  UTTERANCE_GENERATION_PROMPT: data.UTTERANCE_GENERATION_PROMPT ?? '',
+  SKILL_ROUTE_IMPORT_PROMPT: data.SKILL_ROUTE_IMPORT_PROMPT ?? '',
+  AGENT_REPAIR_PROMPT: data.AGENT_REPAIR_PROMPT ?? '',
+  BATCH_SIZE: data.BATCH_SIZE ?? 32,
+  DEFAULT_ROUTE_ID: data.DEFAULT_ROUTE_ID ?? 0,
+  DEFAULT_ROUTE_NAME: data.DEFAULT_ROUTE_NAME ?? 'none',
+  REGION_THRESHOLD_SIGNIFICANT: data.REGION_THRESHOLD_SIGNIFICANT ?? 0.85,
+  INSTANCE_THRESHOLD_AMBIGUOUS: data.INSTANCE_THRESHOLD_AMBIGUOUS ?? 0.92
+});
+
 const fetchSettings = async (showResetMessage = false) => {
   loading.value = true;
   try {
     const response = await getSettings();
-    const data = response.data as any;
-    settings.value = {
-      QDRANT_URL: data.QDRANT_URL ?? '',
-      QDRANT_COLLECTION: data.QDRANT_COLLECTION ?? '',
-      QDRANT_API_KEY: data.QDRANT_API_KEY ?? null,
-      EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
-      EMBEDDING_MODEL_NAME: data.EMBEDDING_MODEL_NAME ?? '',
-      EMBEDDING_DEVICE: data.EMBEDDING_DEVICE ?? 'cpu',
-      LLM_PROVIDER: data.LLM_PROVIDER ?? 'deepseek',
-      LLM_API_KEY: data.LLM_API_KEY ?? null,
-      LLM_BASE_URL: data.LLM_BASE_URL ?? null,
-      LLM_MODEL: data.LLM_MODEL ?? null,
-      LLM_TEMPERATURE: data.LLM_TEMPERATURE ?? 0.7,
-      UTTERANCE_GENERATION_PROMPT: data.UTTERANCE_GENERATION_PROMPT ?? '',
-      SKILL_ROUTE_IMPORT_PROMPT: data.SKILL_ROUTE_IMPORT_PROMPT ?? '',
-      AGENT_REPAIR_PROMPT: data.AGENT_REPAIR_PROMPT ?? '',
-      AUTH_ENABLED: data.AUTH_ENABLED ?? true,
-      API_KEYS: data.API_KEYS ?? '',
-      PREDICT_AUTH_KEY: data.PREDICT_AUTH_KEY ?? null,
-      DEFAULT_USERNAME: data.DEFAULT_USERNAME ?? 'admin',
-      DEFAULT_PASSWORD: data.DEFAULT_PASSWORD ?? '',
-      BATCH_SIZE: data.BATCH_SIZE ?? 32,
-      DEFAULT_ROUTE_ID: data.DEFAULT_ROUTE_ID ?? 0,
-      DEFAULT_ROUTE_NAME: data.DEFAULT_ROUTE_NAME ?? 'none',
-      REGION_THRESHOLD_SIGNIFICANT: data.REGION_THRESHOLD_SIGNIFICANT ?? 0.85,
-      INSTANCE_THRESHOLD_AMBIGUOUS: data.INSTANCE_THRESHOLD_AMBIGUOUS ?? 0.92
-    };
-    // 将 Predict Key 保存到本地存储，供测试页面使用
-    if (data.PREDICT_AUTH_KEY) {
-      localStorage.setItem('predict_auth_key', data.PREDICT_AUTH_KEY);
-    } else {
-      localStorage.removeItem('predict_auth_key');
-    }
+    settings.value = normalizeTenantSettings(response.data as any);
     if (showResetMessage) {
       ElMessage.success(t('settings.resetSuccess'));
     }
@@ -328,14 +206,12 @@ const fetchSettings = async (showResetMessage = false) => {
   }
 };
 
-const prepareSettingsForSubmit = (data: Settings): Partial<Settings> => {
+const prepareSettingsForSubmit = (data: TenantSettings): Partial<TenantSettings> => {
   const result: any = { ...data };
-  const nullableFields: (keyof Settings)[] = [
-    'QDRANT_API_KEY',
+  const nullableFields: (keyof TenantSettings)[] = [
     'LLM_API_KEY',
     'LLM_BASE_URL',
-    'LLM_MODEL',
-    'PREDICT_AUTH_KEY'
+    'LLM_MODEL'
   ];
   nullableFields.forEach(field => {
     if (result[field] === '') {
@@ -358,39 +234,7 @@ const handleSave = async () => {
     ElMessage.success(response.data.message || t('settings.saveSuccess'));
     // 更新时只更新所有已知字段
     if (response.data.settings) {
-      const data = response.data.settings as any;
-      settings.value = {
-        QDRANT_URL: data.QDRANT_URL ?? '',
-        QDRANT_COLLECTION: data.QDRANT_COLLECTION ?? '',
-        QDRANT_API_KEY: data.QDRANT_API_KEY ?? null,
-        EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
-        EMBEDDING_MODEL_NAME: data.EMBEDDING_MODEL_NAME ?? '',
-        EMBEDDING_DEVICE: data.EMBEDDING_DEVICE ?? 'cpu',
-        LLM_PROVIDER: data.LLM_PROVIDER ?? 'deepseek',
-        LLM_API_KEY: data.LLM_API_KEY ?? null,
-        LLM_BASE_URL: data.LLM_BASE_URL ?? null,
-        LLM_MODEL: data.LLM_MODEL ?? null,
-        LLM_TEMPERATURE: data.LLM_TEMPERATURE ?? 0.7,
-        UTTERANCE_GENERATION_PROMPT: data.UTTERANCE_GENERATION_PROMPT ?? '',
-        SKILL_ROUTE_IMPORT_PROMPT: data.SKILL_ROUTE_IMPORT_PROMPT ?? '',
-        AGENT_REPAIR_PROMPT: data.AGENT_REPAIR_PROMPT ?? '',
-        AUTH_ENABLED: data.AUTH_ENABLED ?? true,
-        API_KEYS: data.API_KEYS ?? '',
-        PREDICT_AUTH_KEY: data.PREDICT_AUTH_KEY ?? null,
-        DEFAULT_USERNAME: data.DEFAULT_USERNAME ?? 'admin',
-        DEFAULT_PASSWORD: data.DEFAULT_PASSWORD ?? '',
-        BATCH_SIZE: data.BATCH_SIZE ?? 32,
-        DEFAULT_ROUTE_ID: data.DEFAULT_ROUTE_ID ?? 0,
-        DEFAULT_ROUTE_NAME: data.DEFAULT_ROUTE_NAME ?? 'none',
-        REGION_THRESHOLD_SIGNIFICANT: data.REGION_THRESHOLD_SIGNIFICANT ?? 0.85,
-        INSTANCE_THRESHOLD_AMBIGUOUS: data.INSTANCE_THRESHOLD_AMBIGUOUS ?? 0.92
-      };
-      // 将 Predict Key 保存到本地存储，供测试页面使用
-      if (data.PREDICT_AUTH_KEY) {
-        localStorage.setItem('predict_auth_key', data.PREDICT_AUTH_KEY);
-      } else {
-        localStorage.removeItem('predict_auth_key');
-      }
+      settings.value = normalizeTenantSettings(response.data.settings as any);
     }
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -415,6 +259,14 @@ const handleTabChange = (tabName: any) => {
   } else if (tabName === 'diagnostics') {
     router.push('/diagnostics');
   }
+};
+
+const goSkillSources = () => {
+  router.push('/skills/sources');
+};
+
+const goSkillDrafts = () => {
+  router.push('/skills/drafts');
 };
 
 const getApiKeyPlaceholder = () => {
@@ -532,6 +384,11 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   gap: 20px;
+}
+
+.skill-actions {
+  display: flex;
+  gap: 12px;
 }
 
 :deep(.el-divider__text) {

@@ -54,12 +54,27 @@ def build_skill_draft_applier(component_manager):
 
     def applier(draft_payload: dict, source, skill_file: Path) -> dict:
         draft = RouteImportDraft.model_validate(draft_payload)
+        route_key = draft.routes[0].route_key if draft.routes else ""
+        existing_route = route_manager.get_route_by_key(route_key) if route_key else None
+        if existing_route is not None:
+            return {
+                "result": {
+                    "mode": "merge",
+                    "created": 0,
+                    "updated": 0,
+                    "removed": 0,
+                    "total": 0,
+                    "conflicts": [],
+                    "skipped": 1,
+                },
+                "route_id": existing_route.id,
+                "skipped": True,
+            }
         result = import_service.import_routes(
             routes=[RouteConfig.model_validate(route.model_dump()) for route in draft.routes],
             mode=draft.mode,
             import_origin="skill_scan",
         )
-        route_key = draft.routes[0].route_key if draft.routes else ""
         route = route_manager.get_route_by_key(route_key) if route_key else None
         return {"result": result, "route_id": route.id if route else None}
 
@@ -223,7 +238,7 @@ def create_skill_source():
     _, source = get_tenant_registry().create_skill_source(
         tenant_id=g.tenant_context.tenant_id,
         path=data.get("path", ""),
-        sync_mode=data.get("sync_mode", "draft"),
+        sync_mode=data.get("sync_mode", "apply"),
         enabled=data.get("enabled", True),
     )
     return jsonify({"item": source.model_dump(mode="json")}), 201
@@ -361,10 +376,6 @@ def generate_utterances():
     from intent_hub.services.route_service import RouteService
 
     data = request.get_json() or {}
-    try:
-        req = PredictRequest.model_validate(data) if "text" in data else None
-    except Exception:
-        req = None
     component_manager = _tenant_component_manager()
     component_manager.ensure_ready()
     route_service = RouteService(component_manager)

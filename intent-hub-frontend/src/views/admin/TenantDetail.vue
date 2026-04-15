@@ -17,6 +17,12 @@
           <el-table-column prop="label" label="Label" />
           <el-table-column prop="status" label="Status" width="120" />
           <el-table-column prop="created_at" label="Created At" />
+          <el-table-column label="API Key" min-width="220">
+            <template #default="{ row }">
+              <el-text v-if="latestCodeById[row.code_id]" type="primary">{{ latestCodeById[row.code_id] }}</el-text>
+              <el-text v-else type="info">-</el-text>
+            </template>
+          </el-table-column>
           <el-table-column label="操作" width="220">
             <template #default="{ row }">
               <el-button link type="primary" @click="rotateCode(row.code_id)">Rotate</el-button>
@@ -41,11 +47,13 @@ import {
   setActiveMode,
 } from '../../api';
 import ModeSwitcher from '../../components/ModeSwitcher.vue';
+import { loadAdminAccessCodeCache, rememberLatestAccessCode } from '../../utils/adminAccessCodeCache';
 
 const route = useRoute();
 const router = useRouter();
 const loading = ref(false);
 const codes = ref<any[]>([]);
+const latestCodeById = ref<Record<string, string>>({});
 const tenantId = computed(() => String(route.params.tenantId || ''));
 
 const fetchDetail = async () => {
@@ -64,6 +72,12 @@ const fetchDetail = async () => {
 const rotateCode = async (codeId: string) => {
   try {
     const response = await rotateAccessCode(tenantId.value, codeId);
+    const cache = rememberLatestAccessCode({
+      tenantId: tenantId.value,
+      codeId,
+      accessCode: response.data.access_code.access_code,
+    });
+    latestCodeById.value = { ...cache.byCodeId };
     ElMessage.success(`新 code: ${response.data.access_code.access_code}`);
     await fetchDetail();
   } catch (error: any) {
@@ -90,6 +104,7 @@ const logout = () => {
 };
 
 onMounted(() => {
+  latestCodeById.value = loadAdminAccessCodeCache().byCodeId;
   fetchDetail();
 });
 </script>

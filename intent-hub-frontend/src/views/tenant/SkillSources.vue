@@ -36,7 +36,6 @@
       </el-form-item>
       <el-form-item label="Sync Mode">
         <el-select v-model="createForm.sync_mode" style="width: 100%">
-          <el-option value="draft" label="draft" />
           <el-option value="apply" label="apply" />
         </el-select>
       </el-form-item>
@@ -71,7 +70,7 @@ const showCreate = ref(false);
 const items = ref<SkillSourceRecord[]>([]);
 const createForm = ref({
   path: '',
-  sync_mode: 'draft' as 'draft' | 'apply',
+  sync_mode: 'apply' as 'apply',
 });
 
 const fetchSources = async () => {
@@ -87,7 +86,7 @@ const fetchSources = async () => {
 };
 
 const openCreate = () => {
-  createForm.value = { path: '', sync_mode: 'draft' };
+  createForm.value = { path: '', sync_mode: 'apply' };
   showCreate.value = true;
 };
 

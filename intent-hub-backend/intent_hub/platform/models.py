@@ -25,7 +25,7 @@ class SkillSourceRecord(BaseModel):
     source_id: str = Field(..., description="Stable source ID")
     path: str = Field(..., description="Skills root directory")
     enabled: bool = Field(default=True, description="Whether source is active")
-    sync_mode: Literal["scan", "draft", "apply"] = Field(
+    sync_mode: Literal["scan", "apply"] = Field(
         default="scan", description="Skill source sync mode"
     )
 

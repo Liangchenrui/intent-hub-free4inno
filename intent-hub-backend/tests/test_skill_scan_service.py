@@ -72,7 +72,7 @@ def test_skill_scan_discovers_skills_and_generates_drafts(test_dir):
 
     result = service.scan_sources(
         [
-            SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="draft")
+            SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="scan")
         ]
     )
 
@@ -92,13 +92,13 @@ def test_skill_scan_updates_changed_skill_only(test_dir):
 
     context = make_context(test_dir)
     service = SkillScanService(context, draft_generator=draft_generator)
-    service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="draft")])
+    service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="scan")])
 
     first_index = json.loads(context.skills_index_path.read_text(encoding="utf-8"))
     first_hash = first_index["items"][0]["skill_hash"]
 
     skill_file.write_text("# Wiki Builder\nbuild better wiki", encoding="utf-8")
-    service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="draft")])
+    service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="scan")])
 
     second_index = json.loads(context.skills_index_path.read_text(encoding="utf-8"))
     second_hash = second_index["items"][0]["skill_hash"]
@@ -114,10 +114,10 @@ def test_skill_scan_marks_deleted_skill_as_stale(test_dir):
 
     context = make_context(test_dir)
     service = SkillScanService(context, draft_generator=draft_generator)
-    service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="draft")])
+    service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="scan")])
 
     skill_file.unlink()
-    result = service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="draft")])
+    result = service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="scan")])
 
     assert result["stale"] == 1
     index = json.loads(context.skills_index_path.read_text(encoding="utf-8"))
@@ -150,3 +150,30 @@ def test_skill_scan_apply_mode_calls_applier_and_marks_synced(test_dir):
     assert item["status"] == "synced"
     assert item["route_id"] == 42
     assert item["last_synced_at"]
+
+
+def test_skill_scan_apply_mode_marks_skipped_when_route_exists(test_dir):
+    skills_root = test_dir / "skills"
+    skill_dir = skills_root / "wiki_builder"
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / "SKILL.md").write_text("# Wiki Builder\nbuild wiki", encoding="utf-8")
+
+    context = make_context(test_dir)
+
+    def applier(draft_payload, source, skill_file):
+        return {"route_id": 7, "skipped": True}
+
+    service = SkillScanService(
+        context,
+        draft_generator=draft_generator,
+        draft_applier=applier,
+    )
+    result = service.scan_sources(
+        [SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="apply")]
+    )
+
+    assert result["applied"] == 1
+    index = json.loads(context.skills_index_path.read_text(encoding="utf-8"))
+    item = index["items"][0]
+    assert item["status"] == "skipped"
+    assert item["route_id"] == 7

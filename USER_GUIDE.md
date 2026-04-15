@@ -76,26 +76,7 @@ npm run build
 1. 使用租户 `access_code`。  
 2. 调用 `/v1/*` 与 `/tenant/*` 时带 `Authorization: Bearer <access_code>`。  
 
-## 5. 操作指南（重点：10 分钟跑通）
-
-本节按“安装后端包 -> 登录 -> 创建租户 -> 路由/分发 -> skills 扫描”的顺序给出最短可执行路径。
-
-### 5.0 安装后端包并启用 `intenthub` 命令
-
-在 `intent-hub-backend` 下执行：
-
-```bash
-pip install -e .
-```
-
-验证命令是否可用：
-
-```bash
-intent-hub --help
-intenthub --help
-```
-
-若两个命令都能输出帮助信息，说明安装成功。
+## 5. 快速上手流程（推荐）
 
 ### 5.1 管理员登录
 
@@ -118,7 +99,7 @@ curl -X POST http://127.0.0.1:5000/admin/tenants \
 
 返回包含初始明文 `access_code`（只在创建/轮换时可见）。
 
-### 5.3 用租户 `access_code` 验证身份
+### 5.3 用租户 code 验证身份
 
 ```bash
 curl http://127.0.0.1:5000/v1/me \
@@ -150,17 +131,6 @@ curl -X POST http://127.0.0.1:5000/v1/dispatch \
 ```
 
 说明：当前只返回 `dispatch.suggestion`，不执行外部工具。
-
-### 5.7 使用 CLI 跑通同样流程
-
-```bash
-intent-hub login --endpoint http://127.0.0.1:5000 --code <access_code>
-intent-hub whoami
-intenthub route "帮我整理 wiki" --json
-intenthub dispatch "帮我整理 wiki" --json
-```
-
-若 `whoami` 返回当前租户信息、`route/dispatch` 返回 JSON 结果，则操作链路已跑通。
 
 ## 6. API 使用说明
 
@@ -203,7 +173,16 @@ intenthub dispatch "帮我整理 wiki" --json
 
 ## 8. CLI 使用
 
-先安装后端包（确保有 `intent-hub` / `intenthub` 命令），然后：
+先安装后端包（确保有 `intent-hub` 命令）：
+在 intent-hub-backend 目录执行：
+```bash
+python -m venv .venv
+. .\.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+pip install -e .
+```
+
+然后：
 
 ```bash
 cd intent-hub-backend

@@ -20,8 +20,6 @@
           <el-tab-pane :label="$t('nav.test')" name="test"></el-tab-pane>
           <el-tab-pane :label="$t('nav.diagnostics')" name="diagnostics"></el-tab-pane>
           <el-tab-pane :label="$t('nav.settings')" name="settings"></el-tab-pane>
-          <el-tab-pane :label="$t('nav.skillSources')" name="skill-sources"></el-tab-pane>
-          <el-tab-pane :label="$t('nav.skillDrafts')" name="skill-drafts"></el-tab-pane>
         </el-tabs>
       </div>
 
@@ -427,10 +425,6 @@ const handleTabChange = (tabName: any) => {
     router.push('/diagnostics');
   } else if (tabName === 'settings') {
     router.push('/settings');
-  } else if (tabName === 'skill-sources') {
-    router.push('/skills/sources');
-  } else if (tabName === 'skill-drafts') {
-    router.push('/skills/drafts');
   }
 };
 

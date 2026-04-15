@@ -267,16 +267,10 @@ export const reindex = (forceFull: boolean = false) =>
 
 export const predict = (text: string) => api.post<PredictResult[]>('/predict', { text });
 
-export interface Settings {
-  QDRANT_URL?: string;
-  QDRANT_COLLECTION?: string;
-  QDRANT_API_KEY?: string | null;
+export type LlmProvider = 'deepseek' | 'openrouter' | 'doubao' | 'qwen' | 'gemini';
 
-  EMBEDDING_SERVICE_URL: string;
-  EMBEDDING_MODEL_NAME?: string;
-  EMBEDDING_DEVICE?: string;
-
-  LLM_PROVIDER: 'deepseek' | 'openrouter' | 'doubao' | 'qwen' | 'gemini';
+export interface SharedLlmSettings {
+  LLM_PROVIDER: LlmProvider;
   LLM_API_KEY?: string | null;
   LLM_BASE_URL?: string | null;
   LLM_MODEL?: string | null;
@@ -286,10 +280,31 @@ export interface Settings {
   AGENT_REPAIR_PROMPT: string;
   SKILL_ROUTE_IMPORT_PROMPT: string;
 
-  BATCH_SIZE?: number;
-
   REGION_THRESHOLD_SIGNIFICANT?: number;
   INSTANCE_THRESHOLD_AMBIGUOUS?: number;
+}
+
+export interface TenantSettings extends SharedLlmSettings {
+  EMBEDDING_SERVICE_URL: string;
+  EMBEDDING_MODEL_NAME?: string;
+  EMBEDDING_DEVICE?: string;
+
+  BATCH_SIZE?: number;
+  DEFAULT_ROUTE_ID?: number;
+  DEFAULT_ROUTE_NAME?: string;
+  DEFAULT_ROUTE_KEY?: string;
+}
+
+export interface SystemSettings extends SharedLlmSettings {
+  QDRANT_URL?: string;
+  QDRANT_COLLECTION?: string;
+  QDRANT_API_KEY?: string | null;
+
+  EMBEDDING_SERVICE_URL: string;
+  EMBEDDING_MODEL_NAME?: string;
+  EMBEDDING_DEVICE?: string;
+
+  BATCH_SIZE?: number;
 
   AUTH_ENABLED?: boolean;
   API_KEYS?: string | null;
@@ -301,9 +316,12 @@ export interface Settings {
   DEFAULT_ROUTE_KEY?: string;
 }
 
-export const getSettings = () => api.get<Settings>('/tenant/settings');
-export const updateSettings = (data: Partial<Settings>) =>
-  api.post<{ message: string; settings: Settings }>('/tenant/settings', data);
+export const getSettings = () => api.get<TenantSettings>('/tenant/settings');
+export const updateSettings = (data: Partial<TenantSettings>) =>
+  api.post<{ message: string; settings: TenantSettings }>('/tenant/settings', data);
+export const getSystemSettings = () => api.get<SystemSettings>('/settings');
+export const updateSystemSettings = (data: Partial<SystemSettings>) =>
+  api.post<{ message: string; settings: SystemSettings }>('/settings', data);
 
 export interface AddNegativeSamplesRequest {
   negative_samples: string[];
@@ -329,7 +347,7 @@ export interface SkillSourceRecord {
   source_id: string;
   path: string;
   enabled: boolean;
-  sync_mode: 'draft' | 'apply';
+  sync_mode: 'scan' | 'apply';
   last_scanned_at?: string | null;
 }
 
@@ -374,7 +392,7 @@ export interface SkillSourceResponse {
 
 export interface SkillSourceCreateRequest {
   path: string;
-  sync_mode?: 'draft' | 'apply';
+  sync_mode?: 'scan' | 'apply';
   enabled?: boolean;
 }
 

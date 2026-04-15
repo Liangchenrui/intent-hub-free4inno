@@ -177,6 +177,29 @@ intent-hub/
 
 ---
 
+## 多租户运行时说明（更新）
+
+1. `POST /v1/route`：只返回路由匹配结果。  
+2. `POST /v1/dispatch`：返回路由匹配 + 分发建议（当前不执行真实工具）。  
+3. Skill 扫描支持 `scan/apply`，`apply` 模式下同 `route_key` 会跳过，不会覆盖。  
+
+## 后端包安装与命令
+
+在 `intent-hub-backend` 目录执行：
+
+```bash
+pip install -e .
+```
+
+安装后可用命令：
+
+```bash
+intent-hub --help
+intenthub --help
+```
+
+---
+
 ## License
 
 Distributed under the MIT License. See `LICENSE` for more information.

@@ -25,9 +25,9 @@
               <el-button
                 link
                 type="primary"
-                @click="applyDraft(row.draft_file)"
-                :disabled="row.status !== 'draft'"
-              >
+                  @click="applyDraft(row.draft_file)"
+                  :disabled="row.status !== 'pending'"
+                >
                 Apply
               </el-button>
             </template>

@@ -39,7 +39,7 @@ class SkillScanService:
                 item["skill_path"] = key
                 item["skill_hash"] = skill_hash
                 item["last_scanned_at"] = now
-                item["status"] = "draft"
+                item["status"] = "pending"
 
                 if existing is None or existing.get("skill_hash") != skill_hash:
                     draft_payload = self._generate_draft(skill_file, content)
@@ -61,7 +61,10 @@ class SkillScanService:
                             source=source,
                             skill_file=skill_file,
                         )
-                        item["status"] = "synced"
+                        if isinstance(apply_result, dict) and apply_result.get("skipped"):
+                            item["status"] = "skipped"
+                        else:
+                            item["status"] = "synced"
                         item["last_synced_at"] = now
                         if isinstance(apply_result, dict):
                             route_id = apply_result.get("route_id")

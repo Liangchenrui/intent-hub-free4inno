@@ -8,27 +8,20 @@
       {
         "code_id": "ac_001",
         "label": "default",
-        "code_hash": "sha256:43198cb4240f3657fd4b4d3c799d852bb7cf6fe884973080e5438241e4b9d295",
+        "code_hash": "sha256:f7166bfbe32f52f77769ef2a72001a8fbc661d4620e9d1ecaeaab660828313da",
         "status": "active",
-        "created_at": "2026-04-15T06:38:05Z",
+        "created_at": "2026-04-15T09:26:03Z",
         "last_used_at": null
       },
       {
         "code_id": "ac_002",
         "label": "default",
-        "code_hash": "sha256:91ba40485f3cbc2804702c7d29803857e0fec76518e91db08c4fd6aea09282bc",
+        "code_hash": "sha256:03c170214ea8b70436568788962e22cf0107523446f3b92fcc09100c7a8f3e29",
         "status": "active",
-        "created_at": "2026-04-15T06:38:18Z",
+        "created_at": "2026-04-15T09:27:36Z",
         "last_used_at": null
       }
     ],
-    "skill_sources": [
-      {
-        "source_id": "src_001",
-        "path": "C:\\Users\\hp\\.codex\\skills",
-        "enabled": true,
-        "sync_mode": "draft"
-      }
-    ]
+    "skill_sources": []
   }
 ]

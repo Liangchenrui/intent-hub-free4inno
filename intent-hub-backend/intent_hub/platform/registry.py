@@ -191,7 +191,7 @@ class TenantRegistry:
         self,
         tenant_id: str,
         path: str,
-        sync_mode: str = "draft",
+        sync_mode: str = "apply",
         enabled: bool = True,
     ) -> tuple[TenantRecord, SkillSourceRecord]:
         tenant = self.get_tenant(tenant_id)

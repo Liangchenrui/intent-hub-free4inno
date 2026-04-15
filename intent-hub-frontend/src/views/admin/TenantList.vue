@@ -4,6 +4,7 @@
       <div class="title">Tenants</div>
       <div class="actions">
         <ModeSwitcher />
+        <el-button @click="openGlobalSettings">通用配置</el-button>
         <el-button @click="openCreate">新建租户</el-button>
         <el-button type="danger" @click="logout">退出</el-button>
       </div>
@@ -17,6 +18,12 @@
           <el-table-column label="Codes" width="220">
             <template #default="{ row }">
               <span>{{ row.access_codes.length }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="Latest API Key" min-width="220">
+            <template #default="{ row }">
+              <el-text v-if="latestCodes[row.tenant_id]" type="primary">{{ latestCodes[row.tenant_id] }}</el-text>
+              <el-text v-else type="info">-</el-text>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="220">
@@ -62,12 +69,14 @@ import {
   type TenantRecord,
 } from '../../api';
 import ModeSwitcher from '../../components/ModeSwitcher.vue';
+import { loadAdminAccessCodeCache, rememberLatestAccessCode } from '../../utils/adminAccessCodeCache';
 
 const router = useRouter();
 const loading = ref(false);
 const creating = ref(false);
 const showCreate = ref(false);
 const tenants = ref<TenantRecord[]>([]);
+const latestCodes = ref<Record<string, string>>({});
 const createForm = ref({
   tenant_id: '',
   name: '',
@@ -99,6 +108,12 @@ const submitCreate = async () => {
       name: createForm.value.name,
       qdrant_collection: createForm.value.qdrant_collection || undefined,
     });
+    const cache = rememberLatestAccessCode({
+      tenantId: response.data.tenant.tenant_id,
+      codeId: response.data.access_code.code_id,
+      accessCode: response.data.access_code.access_code,
+    });
+    latestCodes.value = { ...cache.byTenant };
     ElMessage.success(`创建成功，初始 access code: ${response.data.access_code.access_code}`);
     showCreate.value = false;
     await fetchTenants();
@@ -112,6 +127,12 @@ const submitCreate = async () => {
 const createCode = async (tenantId: string) => {
   try {
     const response = await createAccessCode(tenantId, 'default');
+    const cache = rememberLatestAccessCode({
+      tenantId,
+      codeId: response.data.access_code.code_id,
+      accessCode: response.data.access_code.access_code,
+    });
+    latestCodes.value = { ...cache.byTenant };
     ElMessage.success(`新 code: ${response.data.access_code.access_code}`);
     await fetchTenants();
   } catch (error: any) {
@@ -123,6 +144,10 @@ const openDetail = (tenantId: string) => {
   router.push(`/admin/tenants/${tenantId}`);
 };
 
+const openGlobalSettings = () => {
+  router.push('/admin/settings');
+};
+
 const logout = () => {
   clearAdminSession();
   setActiveMode('tenant');
@@ -130,6 +155,7 @@ const logout = () => {
 };
 
 onMounted(() => {
+  latestCodes.value = loadAdminAccessCodeCache().byTenant;
   fetchTenants();
 });
 </script>

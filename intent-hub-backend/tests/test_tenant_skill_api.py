@@ -76,7 +76,7 @@ def test_tenant_skill_source_create_and_list(test_dir, monkeypatch):
     create_response = client.post(
         "/tenant/skill-sources",
         headers={"Authorization": "Bearer ih_live_team_alpha"},
-        json={"path": str(test_dir / "skills"), "sync_mode": "draft"},
+        json={"path": str(test_dir / "skills"), "sync_mode": "apply"},
     )
     assert create_response.status_code == 201
     created = create_response.get_json()
@@ -98,7 +98,7 @@ def test_tenant_skill_scan_and_list_drafts(test_dir, monkeypatch):
     (skills_root / "wiki_builder" / "SKILL.md").write_text("# Wiki Builder\nbuild wiki", encoding="utf-8")
     tenant_record = registry.update_skill_source(
         "team_alpha",
-        SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="draft"),
+        SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="apply"),
     )
 
     monkeypatch.setattr("intent_hub.auth.get_tenant_auth_service", lambda: DummyTenantAuthService(context, tenant_record))
@@ -134,6 +134,10 @@ def test_tenant_skill_scan_and_list_drafts(test_dir, monkeypatch):
         "intent_hub.api.tenant.get_tenant_component_registry",
         lambda: DummyTenantComponentRegistry(context),
     )
+    monkeypatch.setattr(
+        "intent_hub.api.tenant.build_skill_draft_applier",
+        lambda component_manager: (lambda draft_payload, source, skill_file: {"route_id": 1}),
+    )
 
     client = app.test_client()
 
@@ -150,7 +154,7 @@ def test_tenant_skill_scan_and_list_drafts(test_dir, monkeypatch):
     )
     assert drafts_response.status_code == 200
     payload = drafts_response.get_json()
-    assert payload["items"][0]["status"] == "draft"
+    assert payload["items"][0]["status"] == "synced"
     assert payload["items"][0]["draft_file"].endswith(".json")
 
 

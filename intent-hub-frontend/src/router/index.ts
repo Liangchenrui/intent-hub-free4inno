@@ -6,6 +6,7 @@ import Diagnostics from '../views/Diagnostics.vue';
 import Settings from '../views/Settings.vue';
 import TenantList from '../views/admin/TenantList.vue';
 import TenantDetail from '../views/admin/TenantDetail.vue';
+import AdminSettings from '../views/admin/AdminSettings.vue';
 import SkillSources from '../views/tenant/SkillSources.vue';
 import SkillDrafts from '../views/tenant/SkillDrafts.vue';
 
@@ -55,6 +56,11 @@ const routes = [
     path: '/admin/tenants/:tenantId',
     name: 'TenantDetail',
     component: TenantDetail,
+  },
+  {
+    path: '/admin/settings',
+    name: 'AdminSettings',
+    component: AdminSettings,
   },
 ];
 

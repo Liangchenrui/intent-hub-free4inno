@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "intent-hub-cli"
+version = "0.1.0"
+description = "Lightweight CLI and SDK for remote Intent Hub APIs"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = [
+    "requests>=2.31.0",
+]
+
+[project.scripts]
+intent-hub = "intent_hub_cli.cli:main"
+intenthub = "intent_hub_cli.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["intent_hub_cli*"]

@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from intent_hub_cli.client import IntentHubClient
+from intent_hub_cli.skill_collector import collect_skills
 
 
 def get_config_path() -> Path:
@@ -51,7 +52,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     skills_parser = subparsers.add_parser("skills")
     skills_subparsers = skills_parser.add_subparsers(dest="skills_command", required=True)
-    skills_subparsers.add_parser("scan")
+    scan_parser = skills_subparsers.add_parser("scan")
+    scan_parser.add_argument("--source-path", required=True)
+    scan_parser.add_argument("--source-label")
+    scan_parser.add_argument("--source-id")
     apply_parser = skills_subparsers.add_parser("apply")
     apply_parser.add_argument("--draft-file", required=True)
 
@@ -90,7 +94,16 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "skills" and args.skills_command == "scan":
-            print(json.dumps(client.skills_scan(), ensure_ascii=False))
+            resolved_root, skills, errors = collect_skills(args.source_path)
+            payload = client.skills_scan_uploaded(
+                source_id=args.source_id,
+                source_label=args.source_label,
+                client_path_hint=resolved_root,
+                skills=skills,
+            )
+            if errors:
+                payload["errors"] = list(payload.get("errors", [])) + errors
+            print(json.dumps(payload, ensure_ascii=False))
             return 0
 
         if args.command == "skills" and args.skills_command == "apply":

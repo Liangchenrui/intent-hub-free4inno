@@ -8,12 +8,15 @@ def test_root_docs_reference_standalone_cli_package():
     user_guide = (repo_root / "USER_GUIDE.md").read_text(encoding="utf-8")
 
     assert "intent-hub-cli" in readme
-    assert "pip install ./intent-hub-cli" in readme
+    assert "pip install intent-hub-cli==0.1.0" in readme
     assert "intent-hub-cli" in readme_zh
-    assert "pip install ./intent-hub-cli" in readme_zh
+    assert "pip install intent-hub-cli==0.1.0" in readme_zh
     assert "intent-hub-cli" in user_guide
     assert "python -m build" in user_guide
-    assert "pip install dist/" in user_guide
+    assert "pip install intent-hub-cli==0.1.0" in user_guide
+    assert "--source-path ./skills" in readme
+    assert "浏览器目录选择器" in user_guide
+    assert "用户本地" in readme_zh
 
 
 def test_package_readme_describes_wheel_install_flow():
@@ -24,7 +27,9 @@ def test_package_readme_describes_wheel_install_flow():
     assert "pip install dist/" in package_readme
     assert "pip install -e ." in package_readme
     assert "twine upload" in package_readme
-    assert "pip install intent-hub-cli" in package_readme
+    assert "pip install intent-hub-cli==0.1.0" in package_readme
+    assert "--source-path ./skills" in package_readme
+    assert "skills_scan_uploaded" in package_readme
 
 
 def test_publish_assets_exist_and_describe_pypi_release():

@@ -4,18 +4,20 @@ Lightweight CLI and Python SDK for remote Intent Hub deployments.
 
 ## Install
 
+If you want to use the published CLI or Python SDK, install the released package:
+
+```bash
+pip install intent-hub-cli==0.1.0
+```
+
+Editable install for package development:
+
 ```bash
 cd intent-hub-cli
 pip install -e .
 ```
 
-Alternatively, install from the repository root:
-
-```bash
-pip install ./intent-hub-cli
-```
-
-To build a distributable wheel and install it like a regular pip package:
+Build and install a wheel:
 
 ```bash
 cd intent-hub-cli
@@ -24,15 +26,15 @@ python -m build
 pip install dist/intent_hub_cli-0.1.0-py3-none-any.whl
 ```
 
-This produces both:
+This produces:
 
 - `dist/intent_hub_cli-0.1.0-py3-none-any.whl`
 - `dist/intent_hub_cli-0.1.0.tar.gz`
 
-After the package is published to PyPI later, installation becomes:
+After publishing:
 
 ```bash
-pip install intent-hub-cli
+pip install intent-hub-cli==0.1.0
 ```
 
 ## Publishing
@@ -63,75 +65,57 @@ python -m twine upload \
   dist/*
 ```
 
-The repository also includes a GitHub Actions workflow for tag-based and manual publishing.
-See `PUBLISH.md` for the full release flow.
+See `PUBLISH.md` for the full release flow. The repository also contains the GitHub Actions workflow for tag-based publishing.
 
 ## Usage
 
 ### CLI
 
-First, login to your remote Intent Hub instance:
-
 ```bash
 intent-hub login --endpoint https://api.example.com --code <access_code>
-```
-
-Available commands:
-
-```bash
-# Check your identity
 intent-hub whoami
-
-# Route text to find the best matching intent
-intent-hub route "帮我整理 wiki"
-intent-hub route "帮我整理 wiki" --json
-
-# Dispatch text (returns route + dispatch suggestions)
-intent-hub dispatch "帮我整理 wiki"
-intent-hub dispatch "帮我整理 wiki" --json
-
-# Scan for skills
-intent-hub skills scan
-
-# Apply a skill draft
+intent-hub route "help me organize a wiki"
+intent-hub route "help me organize a wiki" --json
+intent-hub dispatch "help me organize a wiki"
+intent-hub dispatch "help me organize a wiki" --json
+intent-hub skills scan --source-path ./skills
+intent-hub skills scan --source-path D:/skills --source-label team-skills
 intent-hub skills apply --draft-file /path/to/draft.json
 ```
 
-The `intenthub` command is also available as an alias.
+`intenthub` is available as an alias.
 
 ### Python SDK
 
 ```python
 from intent_hub_cli import IntentHubClient
 
-# Initialize client
 client = IntentHubClient(
     endpoint="https://api.example.com",
     access_code="ih_live_team_alpha_xxx",
 )
 
-# Check identity
 print(client.whoami())
-
-# Route text
-result = client.route("帮我整理 wiki")
-print(result)
-
-# Dispatch text
-dispatch_result = client.dispatch("帮我整理 wiki")
-print(dispatch_result)
-
-# Scan skills
-skills = client.skills_scan()
-print(skills)
-
-# Apply skill draft
-client.skills_apply("draft.json")
+print(client.route("help me organize a wiki"))
+print(client.dispatch("help me organize a wiki"))
+scan_result = client.skills_scan_uploaded(
+    source_id=None,
+    source_label="team-skills",
+    client_path_hint="./skills",
+    skills=[
+        {
+            "relative_path": "wiki-builder/SKILL.md",
+            "content": "# wiki-builder\n...",
+        }
+    ],
+)
+print(scan_result)
+print(client.skills_apply("draft.json"))
 ```
 
 ## Configuration
 
-The CLI stores login configuration at `~/.intent-hub/config.json`:
+The CLI stores credentials at `~/.intent-hub/config.json`:
 
 ```json
 {
@@ -140,44 +124,9 @@ The CLI stores login configuration at `~/.intent-hub/config.json`:
 }
 ```
 
-## Development
-
-### Running tests
-
-```bash
-cd intent-hub-cli
-pytest tests/ -v
-```
-
-### Building distributions
-
-```bash
-cd intent-hub-cli
-python -m pip install -e .[dev]
-python -m build
-python -m twine check dist/*
-```
-
-### Project structure
-
-```text
-intent-hub-cli/
-├── pyproject.toml
-├── README.md
-├── intent_hub_cli/
-│   ├── __init__.py
-│   ├── cli.py
-│   └── client.py
-└── tests/
-    ├── test_cli.py
-    ├── test_client.py
-    ├── test_package_layout.py
-    └── test_docs.py
-```
-
 ## Notes
 
-- This package only depends on `requests>=2.31.0`
-- It does not include backend server dependencies (Flask, Qdrant, NumPy, etc.)
-- Use this package when you only need to interact with a remote Intent Hub API
-- For local development or deployment, use the full `intent-hub-backend` package
+- Dependency footprint is intentionally small: `requests>=2.31.0`
+- This package does not ship backend dependencies such as Flask or Qdrant client
+- Use this package for remote access; use `intent-hub-backend` when you are running or developing the server itself
+- Skill scanning runs against the user's local directories and uploads `SKILL.md` content to the backend

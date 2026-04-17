@@ -1,230 +1,120 @@
-# Intent Hub 🚀
+# Intent Hub
 
-Intent Hub 是一个基于向量相似度的静态路由系统，通过语义匹配将用户请求分发到正确的下游 AI Agent。
+Intent Hub 是一个多租户意图路由服务仓库，包含 Flask 后端、Vue 管理前端，以及用于远程访问的独立 CLI/SDK 包。
 
 **[English](README.md)** | **[中文](README.zh-CN.md)**
 
-📹 **视频演示：** [在 YouTube 观看](https://youtu.be/bWHMFci6Pkc?si=z7W_GVkbC3i0_Udp)
+## 仓库包含内容
 
----
+- `intent-hub-backend/`：后端服务包
+- `intent-hub-frontend/`：管理控制台
+- `intent-hub-cli/`：独立分发的 CLI 和 Python SDK
+- `docs/`：项目共享文档
 
-## 项目概览
+当前后端主要暴露三层接口：
 
-- 本仓库包含管理后台前端和 Flask 后端。
-- 意图路由依赖外部 Embedding 服务和可访问的 Qdrant。
-- 路由数据与系统设置持久化在 `intent-hub-backend/data/`。
+- 租户运行时接口：`/v1/me`、`/v1/route`、`/v1/dispatch`
+- 租户控制面接口：`/tenant/*`
+- 平台管理员接口：`/admin/*`
 
----
+旧单租户接口如 `/routes`、`/settings`、`/diagnostics/*`、`/reindex`、`/predict` 仍保留兼容能力，但当前项目文档以多租户 API 为主。
 
 ## 快速开始
 
-### 前置条件
+对于普通用户，直接访问线上服务：
 
-- 已安装 Docker 与 Docker Compose
-- 可访问的 Qdrant 服务
-- 可访问的 Embedding 服务
-- 如果需要例句生成或诊断修复，还需要可用的 LLM API Key
+- Web 入口：`http://intenthub.free4inno.com/`
 
-### 使用 Docker Compose 启动
+如果你需要远程 CLI 或 Python SDK，请安装：
 
-1. 如需自定义构建镜像源或镜像前缀，可先复制模板：
-   ```shell
-   cp .env.example .env
-   ```
-2. 启动前后端容器：
-   ```shell
-   docker compose up -d --build
-   ```
-   国内镜像配置可使用：
-   ```shell
-   docker compose --env-file .env.china up -d --build
-   ```
-3. 启动后，在管理后台中补充运行时配置，或者直接编辑 `intent-hub-backend/data/settings.json`。
-
-启动后访问：
-
-- 前端管理后台：`http://localhost`
-- 后端 API：`http://localhost:8000`
-
-说明：
-
-- 当前仓库中的 `docker-compose.yml` 只启动 `intent-hub-frontend` 和 `intent-hub-backend`。
-- Qdrant 与 Embedding 服务是外部依赖，需要由后端能够访问。
-- 运行时文件保存在 `intent-hub-backend/data/`。
-
----
-
-## 路由契约
-
-现在每个意图实体都包含必填的 `route_key`，它是提供给下游系统使用的稳定路由标识。
-
-当前规则与行为：
-
-- 创建、更新、导入、生成例句时都必须提供 `route_key`。
-- `route_key` 在全局范围内必须唯一。
-- 标准化规则保持宽松：去首尾空格、转小写、空白替换为 `.`、连续 `.` 折叠、移除首尾 `.`。
-- 允许修改 `route_key`，但应视为下游路由契约变更。
-- 旧版 `routes.json` 中缺失 `route_key` 的路由会在加载时自动补齐并回写。
-
-路由配置示例：
-
-```json
-{
-  "id": 1,
-  "name": "天气服务",
-  "route_key": "weather.query",
-  "description": "返回城市的天气信息",
-  "utterances": ["北京现在天气如何"],
-  "negative_samples": [],
-  "score_threshold": 0.85,
-  "negative_threshold": 0.95
-}
+```bash
+pip install intent-hub-cli==0.1.0
 ```
 
-`/predict` 返回示例：
+面向终端用户的 skill 扫描已经改为客户端本地目录模式：
 
-```json
-[
-  {
-    "id": 1,
-    "name": "天气服务",
-    "route_key": "weather.query",
-    "score": 0.93
-  }
-]
+1. CLI 和 Python SDK 扫描用户机器上的绝对路径或相对路径，收集 `SKILL.md` 后上传到后端。
+2. Web 租户页通过浏览器目录选择器读取用户本地目录中的 `SKILL.md` 并上传。
+3. 后端不再假设普通租户可以直接指定部署机器上的目录做日常扫描。
+
+## 本地开发
+
+### 后端
+
+```bash
+cd intent-hub-backend
+pip install -e .[dev]
+python run.py
 ```
 
-如果没有命中任何路由，后端会返回默认回退路由，`route_key` 为 `fallback.default`。
+### 前端
 
----
+```bash
+cd intent-hub-frontend
+npm install
+npm run dev
+```
 
-## 配置与数据
+### 独立 CLI 包
 
-运行时状态保存在 `intent-hub-backend/data/`：
+如果你只需要调用远程 Intent Hub 服务，请安装独立包：
 
-- `intent-hub-backend/data/routes.json`：路由定义
-- `intent-hub-backend/data/settings.json`：运行时系统配置
-- `intent-hub-backend/data/diagnostics_cache.json`：诊断缓存结果
+```bash
+pip install intent-hub-cli==0.1.0
+```
 
-后端重点配置项包括：
+CLI 扫描示例：
 
-- `QDRANT_URL`
-- `QDRANT_COLLECTION`
-- `EMBEDDING_SERVICE_URL`
-- `LLM_PROVIDER`
-- `LLM_API_KEY`
-- `PREDICT_AUTH_KEY`
-- `DEFAULT_USERNAME`
-- `DEFAULT_PASSWORD`
+```bash
+intent-hub skills scan --source-path ./skills
+intent-hub skills scan --source-path D:/skills --source-label team-skills
+```
 
-当前 README 与接口文档都以持久化的 `settings.json` 作为运行时配置真相源。
+## 运行时数据布局
 
----
+后端运行时数据位于 `intent-hub-backend/data/`。
 
-## 生产部署
+关键路径：
 
-`Intent Hub 部署文档.docx` 中描述的 Hufu 生产部署包含以下服务：
+- `platform/tenants.json`：租户元数据与 access code 记录
+- `platform/admin_settings.json`：平台管理员设置
+- `tenants/<tenant_id>/routes.json`：租户路由
+- `tenants/<tenant_id>/settings.json`：租户配置
+- `tenants/<tenant_id>/diagnostics_cache.json`：诊断缓存
+- `tenants/<tenant_id>/skills_index.json`：skills 扫描索引
+- `tenants/<tenant_id>/imports/`：导入草稿
 
-- `intent-hub-frontend`
-- `intent-hub-backend`
-- `intent-hub-embedding`
-- `qdrant`
+旧的单租户文件如 `routes.json`、`settings.json` 可能仍存在于仓库中用于兼容或迁移，但当前事实上的数据来源是租户目录。
 
-### 升级流程
+## 主要文档
 
-1. 升级前先进入旧版 Intent Hub，保存或导出当前路由配置。
-2. 构建前端发布产物：
-   ```shell
-   cd intent-hub-frontend
-   npm install
-   npm run build:prod
-   ```
-   该命令会生成 `dist.tar.gz`，然后将新的挂载文件更新到 Hufu 前端服务：
-   `https://hf.free4inno.com/#/project/container/detail/732`
-3. 构建并推送后端镜像：
-   ```shell
-   cd intent-hub-backend
-   docker build -f Dockerfile .
-   docker tag intent-hub-backend:latest crpi-v8ss93lfn0gwwreg.cn-hangzhou.personal.cr.aliyuncs.com/free4inno-lcr/intent-hub:2.0.0
-   docker push crpi-v8ss93lfn0gwwreg.cn-hangzhou.personal.cr.aliyuncs.com/free4inno-lcr/intent-hub:2.0.0
-   ```
-   随后在 Hufu 中更新后端服务镜像地址：
-   `https://hf.free4inno.com/#/project/container/detail/720`
-4. 如果 Embedding 模型或 Embedding 逻辑发生变化，需要同步更新 Embedding 项目并刷新服务镜像：
-   - 仓库：`https://gitee.com/free4inno-bupt/embedding-zpoint`
-   - 服务：`https://hf.free4inno.com/#/project/container/detail/733`
-5. 发布完成后，检查前端访问、后端健康状态、路由导入，以及 `/predict` 返回中的 `route_key` 是否正确。
-
----
+- `USER_GUIDE.md`：面向使用者的操作说明
+- `docs/API.md`：接口与鉴权说明
+- `docs/ARCHITECTURE.md`：架构、目录与兼容层说明
+- `intent-hub-cli/README.md`：CLI/SDK 包使用说明
+- `intent-hub-cli/PUBLISH.md`：独立包发布流程
 
 ## 目录结构
 
 ```text
 intent-hub/
-├── intent-hub-backend/       # Flask 后端
-│   ├── intent_hub/           # 核心应用代码
-│   ├── data/                 # 运行时数据
-│   ├── docs/                 # 后端文档
-│   └── tests/                # 后端测试
-├── intent-hub-frontend/      # Vue 3 + Vite 管理后台
-│   ├── src/                  # 前端源码
-│   └── dist/                 # 前端构建产物
-├── docker-compose.yml        # 本地前后端编排
-├── .env.example              # 可选的 compose/build 模板
+├── docs/
+├── intent-hub-backend/
+│   ├── intent_hub/
+│   ├── data/
+│   └── tests/
+├── intent-hub-cli/
+│   ├── intent_hub_cli/
+│   └── tests/
+├── intent-hub-frontend/
+│   ├── public/
+│   └── src/
+├── AGENT.md
 ├── README.md
-└── README.zh-CN.md
+├── README.zh-CN.md
+└── USER_GUIDE.md
 ```
 
----
+## 许可证
 
-## 多租户运行时说明（更新）
-
-1. `POST /v1/route`：只返回路由匹配结果。  
-2. `POST /v1/dispatch`：返回路由匹配 + 分发建议（当前不执行真实工具）。  
-3. Skill 扫描支持 `scan/apply`，`apply` 模式下同 `route_key` 会跳过，不会覆盖。  
-
-## 后端包安装与命令
-
-在 `intent-hub-backend` 目录执行：
-
-```bash
-pip install -e .
-```
-
-安装后可用命令：
-
-```bash
-intent-hub --help
-intenthub --help
-```
-
----
-
-## 独立 CLI 包
-
-如果用户只需要连接远程部署的 Intent Hub 服务，应安装独立的 intent-hub-cli 包，而不是后端服务包。
-
-当前可直接本地按 pip 包方式安装：
-
-```bash
-pip install ./intent-hub-cli
-```
-
-如果希望先打包再安装：
-
-```bash
-cd intent-hub-cli
-python -m pip install -U build
-python -m build
-pip install dist/intent_hub_cli-0.1.0-py3-none-any.whl
-```
-
-后续发布到 PyPI 后，目标安装方式为：
-
-```bash
-pip install intent-hub-cli
-```
-
-## License
-
-Distributed under the MIT License. See `LICENSE` for more information.
+MIT，详见 `LICENSE`。

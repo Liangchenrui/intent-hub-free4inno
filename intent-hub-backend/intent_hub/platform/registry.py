@@ -191,20 +191,27 @@ class TenantRegistry:
         self,
         tenant_id: str,
         path: str,
+        source_label: str | None = None,
         sync_mode: str = "apply",
         enabled: bool = True,
     ) -> tuple[TenantRecord, SkillSourceRecord]:
         tenant = self.get_tenant(tenant_id)
         if tenant is None:
             raise ValueError(f"Tenant not found: {tenant_id}")
+        normalized_path = (path or "").strip()
+        if not normalized_path:
+            raise ValueError("path is required")
+        label = (source_label or "").strip()
+        if not label:
+            label = Path(normalized_path).name or self._next_source_id(tenant)
         source = SkillSourceRecord(
             source_id=self._next_source_id(tenant),
-            path=(path or "").strip(),
+            path=normalized_path,
             enabled=enabled,
             sync_mode=sync_mode,
+            source_label=label,
+            client_path_hint=normalized_path,
         )
-        if not source.path:
-            raise ValueError("path is required")
         tenant.skill_sources.append(source)
         self._save_tenants()
         return tenant, source

@@ -22,8 +22,17 @@ class DummyClient:
     def dispatch(self, text: str):
         return {"route_key": "wiki.builder", "dispatch": {"status": "not_executed"}}
 
-    def skills_scan(self):
-        return {"discovered": 2}
+    def skills_scan_uploaded(self, **kwargs):
+        return {
+            "source_id": kwargs.get("source_id") or "src_001",
+            "discovered": len(kwargs["skills"]),
+            "uploaded": len(kwargs["skills"]),
+            "updated": 1,
+            "stale": 0,
+            "applied": 0,
+            "skipped": 0,
+            "errors": [],
+        }
 
     def skills_apply(self, draft_file: str):
         return {"created": 1, "draft_file": draft_file}
@@ -78,6 +87,9 @@ def test_dispatch_and_skills_commands_print_json(test_dir, monkeypatch, capsys):
     config_path.write_text(json.dumps({"endpoint": "https://api.example.com", "access_code": "ih_live_team_alpha"}), encoding="utf-8")
     monkeypatch.setattr("intent_hub_cli.cli.get_config_path", lambda: config_path)
     monkeypatch.setattr("intent_hub_cli.cli.IntentHubClient", DummyClient)
+    skills_root = test_dir / "skills"
+    (skills_root / "wiki_builder").mkdir(parents=True, exist_ok=True)
+    (skills_root / "wiki_builder" / "SKILL.md").write_text("# Wiki Builder\nbuild wiki", encoding="utf-8")
 
     dispatch_exit_code = cli.main(["dispatch", "整理 wiki", "--json"])
     assert dispatch_exit_code == 0
@@ -85,10 +97,11 @@ def test_dispatch_and_skills_commands_print_json(test_dir, monkeypatch, capsys):
     assert dispatch_payload["route_key"] == "wiki.builder"
     assert dispatch_payload["dispatch"]["status"] == "not_executed"
 
-    scan_exit_code = cli.main(["skills", "scan"])
+    scan_exit_code = cli.main(["skills", "scan", "--source-path", str(skills_root), "--source-label", "My Local Skills"])
     assert scan_exit_code == 0
     scan_payload = json.loads(capsys.readouterr().out)
-    assert scan_payload["discovered"] == 2
+    assert scan_payload["discovered"] == 1
+    assert scan_payload["source_id"] == "src_001"
 
     apply_exit_code = cli.main(["skills", "apply", "--draft-file", "draft.json"])
     assert apply_exit_code == 0

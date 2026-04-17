@@ -1,259 +1,238 @@
-# Intent Hub 多租户系统使用说明
+# Intent Hub User Guide
 
-## 1. 系统概述
+本文档说明当前仓库中的多租户 Intent Hub 如何启动、登录、管理租户、调用运行时接口，以及如何使用独立 `intent-hub-cli` 包。
 
-Intent Hub 当前提供两类能力：
+## 1. 系统组成
 
-1. 控制面：租户、路由、设置、诊断、skills 扫描与草稿导入。  
-2. 运行时：`/v1/me`、`/v1/route`、`/v1/dispatch`（MVP 为“返回分发建议”，不执行真实工具）。
+当前仓库包含三部分：
 
-核心特性：
+- `intent-hub-backend/`：Flask 后端
+- `intent-hub-frontend/`：Vue 管理台
+- `intent-hub-cli/`：独立 CLI 和 Python SDK
 
-1. 多租户隔离：每个租户独立 `routes.json`、`settings.json`、`diagnostics_cache.json`、`skills_index.json`。  
-2. 统一租户凭证：`access_code` 同时用于运行时 API、租户控制面 API、CLI、SDK。  
-3. 管理员与租户身份分离：管理员走 `/auth/login` + 管理员 API key；租户走 `access_code`。  
+后端当前主接口分为：
 
-## 2. 目录结构
+- 管理员接口：`/auth/login`、`/admin/*`
+- 租户控制面：`/tenant/*`
+- 租户运行时：`/v1/me`、`/v1/route`、`/v1/dispatch`
 
-后端数据目录（`intent-hub-backend/data`）：
+## 2. 访问方式
 
-```text
-data/
-  platform/
-    admin_settings.json
-    tenants.json
-  tenants/
-    <tenant_id>/
-      settings.json
-      routes.json
-      diagnostics_cache.json
-      skills_index.json
-      imports/
-```
+普通用户直接访问线上服务：
 
-说明：
+- Web 入口：`http://intenthub.free4inno.com/`
 
-1. `data/platform/tenants.json`：租户元数据、access code 哈希、skill source 配置。  
-2. `data/tenants/<tenant_id>/`：租户业务数据与导入草稿。  
+### 2.1 本地开发
 
-## 3. 启动方式
-
-### 3.1 后端启动
-
-在 `intent-hub-backend` 下：
+后端：
 
 ```bash
+cd intent-hub-backend
+pip install -e .[dev]
 python run.py
 ```
 
-默认监听 `0.0.0.0:5000`（由 `intent_hub/config.py` 决定）。
-
-### 3.2 前端启动（可选）
-
-在 `intent-hub-frontend` 下：
+前端：
 
 ```bash
+cd intent-hub-frontend
 npm install
 npm run dev
 ```
 
-生产构建：
+## 3. 鉴权模型
+
+### 3.1 管理员
+
+1. 调用 `/auth/login`
+2. 获取管理员 `api_key`
+3. 调用 `/admin/*` 时使用 `Authorization: Bearer <api_key>`
+
+### 3.2 租户
+
+1. 使用租户 `access_code`
+2. 调用 `/v1/*` 和 `/tenant/*` 时使用 `Authorization: Bearer <access_code>`
+
+## 4. 常用流程
+
+### 4.1 管理员登录
 
 ```bash
-npm run build
-```
-
-## 4. 鉴权模型
-
-### 4.1 管理员鉴权
-
-1. 调用 `/auth/login`，传用户名密码。  
-2. 返回管理员 `api_key`。  
-3. 后续调用 `/admin/*` 时带 `Authorization: Bearer <api_key>`。
-
-### 4.2 租户鉴权
-
-1. 使用租户 `access_code`。  
-2. 调用 `/v1/*` 与 `/tenant/*` 时带 `Authorization: Bearer <access_code>`。  
-
-## 5. 快速上手流程（推荐）
-
-### 5.1 管理员登录
-
-```bash
-curl -X POST http://127.0.0.1:5000/auth/login \
+curl -X POST http://intenthub.free4inno.com/auth/login \
   -H "Content-Type: application/json" \
   -d "{\"username\":\"admin\",\"password\":\"123456\"}"
 ```
 
-返回里拿到 `api_key`。
-
-### 5.2 创建租户
+### 4.2 创建租户
 
 ```bash
-curl -X POST http://127.0.0.1:5000/admin/tenants \
+curl -X POST http://intenthub.free4inno.com/admin/tenants \
   -H "Authorization: Bearer <admin_api_key>" \
   -H "Content-Type: application/json" \
   -d "{\"tenant_id\":\"team_alpha\",\"name\":\"Team Alpha\"}"
 ```
 
-返回包含初始明文 `access_code`（只在创建/轮换时可见）。
+返回中包含创建时生成的明文 `access_code`。
 
-### 5.3 用租户 code 验证身份
+### 4.3 查询租户身份
 
 ```bash
-curl http://127.0.0.1:5000/v1/me \
+curl http://intenthub.free4inno.com/v1/me \
   -H "Authorization: Bearer <access_code>"
 ```
 
-### 5.4 路由判定
+### 4.4 路由判定
 
 ```bash
-curl -X POST http://127.0.0.1:5000/v1/route \
+curl -X POST http://intenthub.free4inno.com/v1/route \
   -H "Authorization: Bearer <access_code>" \
   -H "Content-Type: application/json" \
   -d "{\"text\":\"帮我整理 wiki\"}"
 ```
 
-### 5.5 Route 与 Dispatch 区别
-
-1. `POST /v1/route`：只做“意图路由判定”，返回最匹配 `route_key` 与候选列表。  
-2. `POST /v1/dispatch`：在 `route` 结果基础上，额外返回 `dispatch` 建议结构（`status/executor/suggestion`）。  
-3. 当前版本 `dispatch.status=not_executed`，不会真正执行工具或外部动作。  
-
-### 5.6 Dispatch（MVP）
+### 4.5 Dispatch 建议
 
 ```bash
-curl -X POST http://127.0.0.1:5000/v1/dispatch \
+curl -X POST http://intenthub.free4inno.com/v1/dispatch \
   -H "Authorization: Bearer <access_code>" \
   -H "Content-Type: application/json" \
   -d "{\"text\":\"帮我整理 wiki\"}"
 ```
 
-说明：当前只返回 `dispatch.suggestion`，不执行外部工具。
+当前 `dispatch` 只返回建议，不执行真实工具。
 
-## 6. API 使用说明
+## 5. Skills 相关流程
 
-### 6.1 运行时 API（租户）
+### 5.1 配置 skill source
 
-1. `GET /v1/me`：返回当前 tenant、code 信息、collection。  
-2. `POST /v1/route`：返回 `route_key`、`score`、`matches`。  
-3. `POST /v1/dispatch`：返回 route 结果 + dispatch 建议。  
-4. `POST /predict`：兼容接口，支持 legacy 认证方式。  
+先通过租户控制面配置技能源目录。
 
-### 6.2 管理员 API
+### 5.2 扫描
 
-1. `GET /admin/tenants`  
-2. `POST /admin/tenants`  
-3. `POST /admin/tenants/{tenant_id}/access-codes`  
-4. `POST /admin/tenants/{tenant_id}/access-codes/{code_id}/rotate`  
-5. `POST /admin/tenants/{tenant_id}/access-codes/{code_id}/disable`  
-
-### 6.3 租户控制面 API
-
-1. 路由管理：`/tenant/routes`、`/tenant/routes/{route_id}`、`/tenant/routes/import`。  
-2. 设置管理：`GET/POST /tenant/settings`。  
-3. 诊断能力：`/tenant/diagnostics/overlap`、`/tenant/diagnostics/umap`、`/tenant/diagnostics/repair`。  
-4. skills 管理：`/tenant/skill-sources`、`/tenant/skill-sources/scan`、`/tenant/skill-drafts`、`/tenant/skill-drafts/apply`。  
-
-## 7. Skills 自动导入流程
-
-标准流程：
-
-1. 管理员或租户先配置 skill source：`POST /tenant/skill-sources`。  
-2. 扫描：`POST /tenant/skill-sources/scan`。  
-3. 系统识别 `SKILL.md`，生成 JSON 结果并执行自动导入策略。  
-4. 查看索引：`GET /tenant/skill-drafts`。  
-5. 手动应用（可选）：`POST /tenant/skill-drafts/apply`。  
-
-`sync_mode` 说明：
-
-1. `scan`：仅扫描并更新索引。  
-2. `apply`：扫描后自动导入；若 `route_key` 已存在则跳过，不覆盖原路由。  
-
-## 8. CLI 使用
-
-先安装独立客户端包，然后登录远程服务：
+Skill source 保存的是逻辑元数据，不是后端部署机器上的真实目录。
+CLI、Python SDK 和 Web 页面会先在用户本地收集 `SKILL.md`，再把内容上传到后端扫描。
 
 ```bash
-cd intent-hub-cli
-pip install -e .
-intent-hub login --endpoint http://127.0.0.1:5000 --code <access_code>
-intent-hub whoami
-intenthub route "帮我整理 wiki"
-intenthub route "帮我整理 wiki" --json
-intenthub dispatch "帮我整理 wiki"
-intenthub dispatch "帮我整理 wiki" --json
-intent-hub skills scan
-intent-hub skills apply --draft-file D:/.../imports/skills/src_001/wiki_builder.json
+curl -X POST http://intenthub.free4inno.com/tenant/skill-sources/scan \
+  -H "Authorization: Bearer <access_code>"
 ```
 
-如果需要按标准 pip 分发包形式安装：
+如果通过 Web 页面操作，需要使用浏览器目录选择器重新选择本地目录；浏览器不会把用户完整本地路径直接暴露给后端。
+
+### 5.3 应用草稿
+
+```bash
+curl -X POST http://intenthub.free4inno.com/tenant/skill-drafts/apply \
+  -H "Authorization: Bearer <access_code>" \
+  -H "Content-Type: application/json" \
+  -d "{\"draft_file\":\"D:/path/to/draft.json\"}"
+```
+
+## 6. 独立 CLI 包
+
+如果你只需要访问远程 Intent Hub，不需要本地部署后端，请使用 `intent-hub-cli`。
+
+使用 CLI 或 Python SDK 时，请直接安装已发布版本：
+
+```bash
+pip install intent-hub-cli==0.1.0
+```
+
+发布前校验：
 
 ```bash
 cd intent-hub-cli
-python -m pip install -U build
+python -m pip install -e .[dev]
+pytest tests -q
 python -m build
-pip install dist/intent_hub_cli-0.1.0-py3-none-any.whl
+python -m twine check dist/*
 ```
 
-后续发布到 PyPI 后，可直接执行：
+发布后用户安装方式：
 
 ```bash
-pip install intent-hub-cli
+pip install intent-hub-cli==0.1.0
 ```
 
-## 9. Python SDK 使用
+### 6.1 CLI 用法
+
+```bash
+intent-hub login --endpoint http://intenthub.free4inno.com/ --code <access_code>
+intent-hub whoami
+intent-hub route "帮我整理 wiki"
+intent-hub route "帮我整理 wiki" --json
+intent-hub dispatch "帮我整理 wiki"
+intent-hub skills scan --source-path ./skills
+intent-hub skills scan --source-path D:/skills --source-label team-skills
+intent-hub skills apply --draft-file D:/path/to/draft.json
+```
+
+### 6.2 Python SDK 用法
 
 ```python
 from intent_hub_cli import IntentHubClient
 
 client = IntentHubClient(
-    endpoint="http://127.0.0.1:5000",
+    endpoint="http://intenthub.free4inno.com/",
     access_code="ih_live_team_alpha_xxx",
 )
 
 print(client.whoami())
 print(client.route("帮我整理 wiki"))
 print(client.dispatch("帮我整理 wiki"))
+
+scan_result = client.skills_scan_uploaded(
+    source_id=None,
+    source_label="team-skills",
+    client_path_hint="./skills",
+    skills=[
+        {
+            "relative_path": "wiki-builder/SKILL.md",
+            "content": "# wiki-builder\n...",
+        }
+    ],
+)
+print(scan_result)
 ```
 
-## 10. 前端使用说明
+`intent-hub-backend/pythonSDK.py` 目前仅保留为仓库内兼容示例入口，实际 SDK 包以 `intent-hub-cli` 为准。
 
-登录页支持两种入口：
+## 7. 运行时数据
 
-1. 管理员登录（用户名密码）。  
-2. 租户 access code 登录。  
+当前多租户数据目录结构：
 
-常用页面：
+```text
+intent-hub-backend/data/
+├── platform/
+│   ├── admin_settings.json
+│   └── tenants.json
+└── tenants/
+    └── <tenant_id>/
+        ├── diagnostics_cache.json
+        ├── imports/
+        ├── routes.json
+        ├── settings.json
+        └── skills_index.json
+```
 
-1. 管理员视图：租户列表、access code 管理。  
-2. 租户视图：路由列表、设置、诊断、skill source 与 skill drafts。  
+## 8. 常见问题
 
-## 11. 迁移与兼容
+### 8.1 返回 401
 
-已有单租户数据可通过迁移脚本转为默认租户：
+检查 `Authorization` 是否为 `Bearer <api_key>` 或 `Bearer <access_code>`。
 
-`intent-hub-backend/intent_hub/scripts/migrate_single_tenant.py`
+### 8.2 `/v1/route` 总是回退
 
-迁移目标：
+检查：
 
-1. 旧 `data/routes.json` -> `data/tenants/default/routes.json`  
-2. 旧 `data/settings.json` -> `data/tenants/default/settings.json`  
-3. 旧 `data/diagnostics_cache.json` -> `data/tenants/default/diagnostics_cache.json`  
-4. 生成 `data/platform/tenants.json`（默认租户）  
+- 当前租户是否已经配置路由
+- 路由是否已经建立向量索引
+- Embedding 服务和 Qdrant 是否可访问
 
-## 12. 运维与安全建议
+### 8.3 Skills 扫描没有结果
 
-1. 生产环境必须修改默认管理员密码。  
-2. `access_code` 仅在创建/轮换时显示，需安全存储。  
-3. 建议优先验证扫描结果；`apply` 模式会自动导入新路由，并跳过同 `route_key` 已存在路由。  
-4. skill source 路径使用受控目录，避免扫描任意系统路径。  
-5. 定期轮换 access code，并停用不用的 code。  
+确认本地目录结构满足 `<source_root>/<skill_name>/SKILL.md`，并且 Web 端重新选择了正确目录或 CLI 传入了正确 `--source-path`。
 
-## 13. 常见问题
+### 8.4 `dispatch` 没有执行工具
 
-1. `401 Authentication failed`：检查 `Authorization` 是否为 `Bearer <access_code/api_key>`。  
-2. `/v1/route` 总回默认路由：检查租户路由是否已建立向量索引并满足阈值。  
-3. skills 扫描无结果：确认目录结构为 `<source_root>/<skill_name>/SKILL.md`。  
-4. `dispatch` 没有执行动作：当前版本只返回建议，属预期行为。  
+这是当前设计，`dispatch` 只返回建议。

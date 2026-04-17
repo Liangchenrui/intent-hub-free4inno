@@ -28,6 +28,14 @@ class SkillSourceRecord(BaseModel):
     sync_mode: Literal["scan", "apply"] = Field(
         default="scan", description="Skill source sync mode"
     )
+    source_label: Optional[str] = Field(
+        default=None,
+        description="Human-readable label for this source",
+    )
+    client_path_hint: Optional[str] = Field(
+        default=None,
+        description="Hint for client-local directory selection",
+    )
 
 
 class TenantRecord(BaseModel):

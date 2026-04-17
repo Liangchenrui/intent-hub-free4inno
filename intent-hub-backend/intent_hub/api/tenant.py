@@ -237,7 +237,8 @@ def create_skill_source():
     data = request.get_json() or {}
     _, source = get_tenant_registry().create_skill_source(
         tenant_id=g.tenant_context.tenant_id,
-        path=data.get("path", ""),
+        path=data.get("path", "") or data.get("client_path_hint", ""),
+        source_label=data.get("source_label"),
         sync_mode=data.get("sync_mode", "apply"),
         enabled=data.get("enabled", True),
     )
@@ -249,17 +250,31 @@ def create_skill_source():
 def scan_skill_sources():
     from intent_hub.services.skill_scan_service import SkillScanService
 
+    data = request.get_json() or {}
     tenant = get_tenant_registry().get_tenant(g.tenant_context.tenant_id)
     if tenant is None:
         raise ValueError(f"Tenant not found: {g.tenant_context.tenant_id}")
+    skills = data.get("skills")
+    if not isinstance(skills, list):
+        raise ValueError("skills is required")
+    source_id = (data.get("source_id", "") or "").strip()
+    source = next((item for item in tenant.skill_sources if item.source_id == source_id), None) if source_id else None
+    if source is None:
+        _, source = get_tenant_registry().create_skill_source(
+            tenant_id=g.tenant_context.tenant_id,
+            path=data.get("client_path_hint", ""),
+            source_label=data.get("source_label"),
+            sync_mode=data.get("sync_mode", "apply"),
+            enabled=data.get("enabled", True),
+        )
     component_manager = get_tenant_component_registry().get(g.tenant_context)
     scan_service = SkillScanService(
         g.tenant_context,
         draft_generator=build_skill_draft_generator(component_manager),
         draft_applier=build_skill_draft_applier(component_manager),
     )
-    result = scan_service.scan_sources(tenant.skill_sources)
-    return jsonify(result), 200
+    result = scan_service.scan_uploaded_source(source=source, uploaded_skills=skills)
+    return jsonify({"source_id": source.source_id, **result}), 200
 
 
 @handle_errors

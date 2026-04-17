@@ -345,7 +345,9 @@ export interface TenantAccessCode {
 
 export interface SkillSourceRecord {
   source_id: string;
-  path: string;
+  path?: string;
+  source_label: string;
+  client_path_hint?: string | null;
   enabled: boolean;
   sync_mode: 'scan' | 'apply';
   last_scanned_at?: string | null;
@@ -391,15 +393,31 @@ export interface SkillSourceResponse {
 }
 
 export interface SkillSourceCreateRequest {
-  path: string;
+  path?: string;
+  source_label?: string;
+  client_path_hint?: string;
   sync_mode?: 'scan' | 'apply';
   enabled?: boolean;
+}
+
+export interface UploadedSkillPayload {
+  relative_path: string;
+  content: string;
+}
+
+export interface SkillSourceScanRequest {
+  source_id?: string;
+  source_label?: string;
+  client_path_hint?: string;
+  sync_mode?: 'scan' | 'apply';
+  enabled?: boolean;
+  skills: UploadedSkillPayload[];
 }
 
 export const listSkillSources = () => api.get<SkillSourceResponse>('/tenant/skill-sources');
 export const createSkillSource = (data: SkillSourceCreateRequest) =>
   api.post<{ item: SkillSourceRecord }>('/tenant/skill-sources', data);
-export const scanSkillSources = () => api.post('/tenant/skill-sources/scan');
+export const scanSkillSources = (data: SkillSourceScanRequest) => api.post('/tenant/skill-sources/scan', data);
 
 export interface SkillDraftRecord {
   draft_file: string;

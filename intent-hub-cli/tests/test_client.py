@@ -35,3 +35,26 @@ def test_skills_apply_posts_expected_payload():
 
     assert session.calls[0]["url"] == "https://api.example.com/tenant/skill-drafts/apply"
     assert session.calls[0]["json"] == {"draft_file": "draft.json"}
+
+
+def test_skills_scan_uploaded_posts_expected_payload():
+    session = DummySession()
+    client = IntentHubClient("https://api.example.com", "ih_live_test", session=session)
+
+    client.skills_scan_uploaded(
+        source_id="src_001",
+        source_label="My Local Skills",
+        client_path_hint="D:/skills",
+        skills=[
+            {
+                "skill_name": "wiki_builder",
+                "relative_path": "wiki_builder/SKILL.md",
+                "content": "# Wiki Builder\nbuild wiki",
+            }
+        ],
+    )
+
+    assert session.calls[0]["url"] == "https://api.example.com/tenant/skill-sources/scan"
+    assert session.calls[0]["json"]["source_id"] == "src_001"
+    assert session.calls[0]["json"]["source_label"] == "My Local Skills"
+    assert session.calls[0]["json"]["skills"][0]["relative_path"] == "wiki_builder/SKILL.md"

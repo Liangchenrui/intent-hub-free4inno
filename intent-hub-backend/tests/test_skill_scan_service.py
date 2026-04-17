@@ -60,64 +60,101 @@ def draft_generator(skill_path: Path, content: str) -> dict:
     }
 
 
-def test_skill_scan_discovers_skills_and_generates_drafts(test_dir):
-    skills_root = test_dir / "skills"
-    (skills_root / "wiki_builder").mkdir(parents=True, exist_ok=True)
-    (skills_root / "wiki_builder" / "SKILL.md").write_text("# Wiki Builder\nbuild wiki", encoding="utf-8")
-    (skills_root / "mail_sender").mkdir(parents=True, exist_ok=True)
-    (skills_root / "mail_sender" / "SKILL.md").write_text("# Mail Sender\nsend mail", encoding="utf-8")
+def make_source() -> SkillSourceRecord:
+    return SkillSourceRecord(
+        source_id="src_001",
+        path="D:/skills",
+        source_label="My Local Skills",
+        client_path_hint="D:/skills",
+        enabled=True,
+        sync_mode="scan",
+    )
+
+
+def test_skill_scan_ingests_uploaded_skills_and_generates_drafts(test_dir):
+    source = make_source()
 
     context = make_context(test_dir)
     service = SkillScanService(context, draft_generator=draft_generator)
 
-    result = service.scan_sources(
-        [
-            SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="scan")
+    result = service.scan_uploaded_source(
+        source=source,
+        uploaded_skills=[
+            {
+                "skill_name": "wiki_builder",
+                "relative_path": "wiki_builder/SKILL.md",
+                "content": "# Wiki Builder\nbuild wiki",
+            },
+            {
+                "skill_name": "mail_sender",
+                "relative_path": "mail_sender/SKILL.md",
+                "content": "# Mail Sender\nsend mail",
+            },
         ]
     )
 
     assert result["discovered"] == 2
+    assert result["uploaded"] == 2
     index = json.loads(context.skills_index_path.read_text(encoding="utf-8"))
     assert len(index["items"]) == 2
+    assert {item["skill_key"] for item in index["items"]} == {
+        "src_001::mail_sender/SKILL.md",
+        "src_001::wiki_builder/SKILL.md",
+    }
     draft_file = Path(index["items"][0]["draft_file"])
     assert draft_file.exists()
 
 
-def test_skill_scan_updates_changed_skill_only(test_dir):
-    skills_root = test_dir / "skills"
-    skill_dir = skills_root / "wiki_builder"
-    skill_dir.mkdir(parents=True, exist_ok=True)
-    skill_file = skill_dir / "SKILL.md"
-    skill_file.write_text("# Wiki Builder\nbuild wiki", encoding="utf-8")
-
+def test_skill_scan_updates_changed_uploaded_skill_only(test_dir):
     context = make_context(test_dir)
     service = SkillScanService(context, draft_generator=draft_generator)
-    service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="scan")])
+    source = make_source()
+    service.scan_uploaded_source(
+        source=source,
+        uploaded_skills=[
+            {
+                "skill_name": "wiki_builder",
+                "relative_path": "wiki_builder/SKILL.md",
+                "content": "# Wiki Builder\nbuild wiki",
+            }
+        ],
+    )
 
     first_index = json.loads(context.skills_index_path.read_text(encoding="utf-8"))
     first_hash = first_index["items"][0]["skill_hash"]
 
-    skill_file.write_text("# Wiki Builder\nbuild better wiki", encoding="utf-8")
-    service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="scan")])
+    service.scan_uploaded_source(
+        source=source,
+        uploaded_skills=[
+            {
+                "skill_name": "wiki_builder",
+                "relative_path": "wiki_builder/SKILL.md",
+                "content": "# Wiki Builder\nbuild better wiki",
+            }
+        ],
+    )
 
     second_index = json.loads(context.skills_index_path.read_text(encoding="utf-8"))
     second_hash = second_index["items"][0]["skill_hash"]
     assert first_hash != second_hash
 
 
-def test_skill_scan_marks_deleted_skill_as_stale(test_dir):
-    skills_root = test_dir / "skills"
-    skill_dir = skills_root / "wiki_builder"
-    skill_dir.mkdir(parents=True, exist_ok=True)
-    skill_file = skill_dir / "SKILL.md"
-    skill_file.write_text("# Wiki Builder\nbuild wiki", encoding="utf-8")
-
+def test_skill_scan_marks_missing_uploaded_skill_as_stale(test_dir):
     context = make_context(test_dir)
     service = SkillScanService(context, draft_generator=draft_generator)
-    service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="scan")])
+    source = make_source()
+    service.scan_uploaded_source(
+        source=source,
+        uploaded_skills=[
+            {
+                "skill_name": "wiki_builder",
+                "relative_path": "wiki_builder/SKILL.md",
+                "content": "# Wiki Builder\nbuild wiki",
+            }
+        ],
+    )
 
-    skill_file.unlink()
-    result = service.scan_sources([SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="scan")])
+    result = service.scan_uploaded_source(source=source, uploaded_skills=[])
 
     assert result["stale"] == 1
     index = json.loads(context.skills_index_path.read_text(encoding="utf-8"))
@@ -125,11 +162,6 @@ def test_skill_scan_marks_deleted_skill_as_stale(test_dir):
 
 
 def test_skill_scan_apply_mode_calls_applier_and_marks_synced(test_dir):
-    skills_root = test_dir / "skills"
-    skill_dir = skills_root / "wiki_builder"
-    skill_dir.mkdir(parents=True, exist_ok=True)
-    (skill_dir / "SKILL.md").write_text("# Wiki Builder\nbuild wiki", encoding="utf-8")
-
     context = make_context(test_dir)
 
     def applier(draft_payload, source, skill_file):
@@ -140,8 +172,22 @@ def test_skill_scan_apply_mode_calls_applier_and_marks_synced(test_dir):
         draft_generator=draft_generator,
         draft_applier=applier,
     )
-    result = service.scan_sources(
-        [SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="apply")]
+    result = service.scan_uploaded_source(
+        source=SkillSourceRecord(
+            source_id="src_001",
+            path="D:/skills",
+            source_label="My Local Skills",
+            client_path_hint="D:/skills",
+            enabled=True,
+            sync_mode="apply",
+        ),
+        uploaded_skills=[
+            {
+                "skill_name": "wiki_builder",
+                "relative_path": "wiki_builder/SKILL.md",
+                "content": "# Wiki Builder\nbuild wiki",
+            }
+        ],
     )
 
     assert result["applied"] == 1
@@ -153,11 +199,6 @@ def test_skill_scan_apply_mode_calls_applier_and_marks_synced(test_dir):
 
 
 def test_skill_scan_apply_mode_marks_skipped_when_route_exists(test_dir):
-    skills_root = test_dir / "skills"
-    skill_dir = skills_root / "wiki_builder"
-    skill_dir.mkdir(parents=True, exist_ok=True)
-    (skill_dir / "SKILL.md").write_text("# Wiki Builder\nbuild wiki", encoding="utf-8")
-
     context = make_context(test_dir)
 
     def applier(draft_payload, source, skill_file):
@@ -168,8 +209,22 @@ def test_skill_scan_apply_mode_marks_skipped_when_route_exists(test_dir):
         draft_generator=draft_generator,
         draft_applier=applier,
     )
-    result = service.scan_sources(
-        [SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="apply")]
+    result = service.scan_uploaded_source(
+        source=SkillSourceRecord(
+            source_id="src_001",
+            path="D:/skills",
+            source_label="My Local Skills",
+            client_path_hint="D:/skills",
+            enabled=True,
+            sync_mode="apply",
+        ),
+        uploaded_skills=[
+            {
+                "skill_name": "wiki_builder",
+                "relative_path": "wiki_builder/SKILL.md",
+                "content": "# Wiki Builder\nbuild wiki",
+            }
+        ],
     )
 
     assert result["applied"] == 1
@@ -177,3 +232,46 @@ def test_skill_scan_apply_mode_marks_skipped_when_route_exists(test_dir):
     item = index["items"][0]
     assert item["status"] == "skipped"
     assert item["route_id"] == 7
+
+
+def test_skill_scan_rejects_duplicate_relative_paths(test_dir):
+    context = make_context(test_dir)
+    service = SkillScanService(context, draft_generator=draft_generator)
+
+    with pytest.raises(ValueError, match="duplicate relative_path"):
+        service.scan_uploaded_source(
+            source=make_source(),
+            uploaded_skills=[
+                {
+                    "skill_name": "wiki_builder",
+                    "relative_path": "dup/SKILL.md",
+                    "content": "# First\nbody",
+                },
+                {
+                    "skill_name": "mail_sender",
+                    "relative_path": "dup/SKILL.md",
+                    "content": "# Second\nbody",
+                },
+            ],
+        )
+
+
+def test_skill_scan_uses_relative_path_based_draft_file_name(test_dir):
+    context = make_context(test_dir)
+    service = SkillScanService(context, draft_generator=draft_generator)
+
+    service.scan_uploaded_source(
+        source=make_source(),
+        uploaded_skills=[
+            {
+                "skill_name": "wiki_builder",
+                "relative_path": "folder/wiki_builder/SKILL.md",
+                "content": "# Wiki Builder\nbuild wiki",
+            }
+        ],
+    )
+
+    index = json.loads(context.skills_index_path.read_text(encoding="utf-8"))
+    draft_file = Path(index["items"][0]["draft_file"])
+
+    assert draft_file.name == "folder__wiki_builder__SKILL.json"

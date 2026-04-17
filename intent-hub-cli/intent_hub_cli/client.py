@@ -30,6 +30,25 @@ class IntentHubClient:
     def skills_scan(self) -> dict[str, Any]:
         return self._request("POST", "/tenant/skill-sources/scan")
 
+    def skills_scan_uploaded(
+        self,
+        *,
+        source_id: str | None,
+        source_label: str | None,
+        client_path_hint: str | None,
+        skills: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            "/tenant/skill-sources/scan",
+            json={
+                "source_id": source_id,
+                "source_label": source_label,
+                "client_path_hint": client_path_hint,
+                "skills": skills,
+            },
+        )
+
     def skills_apply(self, draft_file: str) -> dict[str, Any]:
         return self._request("POST", "/tenant/skill-drafts/apply", json={"draft_file": draft_file})
 

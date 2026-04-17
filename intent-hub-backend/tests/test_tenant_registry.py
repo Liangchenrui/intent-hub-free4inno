@@ -163,3 +163,102 @@ def test_tenant_context_can_be_built_from_tenant_and_workspace(test_dir):
     assert context.collection_name == "intent_hub_team_alpha"
     assert context.workspace_dir == test_dir / "tenants" / "team_alpha"
     assert context.routes_path == test_dir / "tenants" / "team_alpha" / "routes.json"
+
+
+def test_skill_source_record_has_source_label_and_client_path_hint():
+    source = SkillSourceRecord(
+        source_id="src_001",
+        path="/some/path",
+        enabled=True,
+        sync_mode="scan",
+        source_label="My Skill Source",
+        client_path_hint="/client/side/path",
+    )
+
+    assert source.source_label == "My Skill Source"
+    assert source.client_path_hint == "/client/side/path"
+
+
+def test_create_skill_source_sets_source_label_from_basename(test_dir):
+    platform_dir = test_dir / "platform"
+    platform_dir.mkdir(parents=True, exist_ok=True)
+    tenants_file = platform_dir / "tenants.json"
+    tenants_file.write_text("[]", encoding="utf-8")
+
+    registry = TenantRegistry(tenants_file)
+
+    registry.create_tenant(tenant_id="test_tenant", name="Test Tenant")
+
+    updated_tenant, source = registry.create_skill_source(
+        tenant_id="test_tenant",
+        path="/some/path/to/my_skills",
+        sync_mode="scan",
+        enabled=True,
+    )
+
+    assert updated_tenant.skill_sources[0].source_id == source.source_id
+    assert source.source_label == "my_skills"
+    assert source.client_path_hint == "/some/path/to/my_skills"
+
+
+def test_create_skill_source_with_explicit_source_label(test_dir):
+    platform_dir = test_dir / "platform"
+    platform_dir.mkdir(parents=True, exist_ok=True)
+    tenants_file = platform_dir / "tenants.json"
+    tenants_file.write_text("[]", encoding="utf-8")
+
+    registry = TenantRegistry(tenants_file)
+
+    registry.create_tenant(tenant_id="test_tenant", name="Test Tenant")
+
+    _, source = registry.create_skill_source(
+        tenant_id="test_tenant",
+        path="/some/path/to/my_skills",
+        source_label="My Local Skills",
+        sync_mode="apply",
+        enabled=True,
+    )
+
+    assert source.source_label == "My Local Skills"
+    assert source.client_path_hint == "/some/path/to/my_skills"
+
+
+def test_backward_compatibility_with_existing_json(test_dir):
+    platform_dir = test_dir / "platform"
+    platform_dir.mkdir(parents=True, exist_ok=True)
+
+    tenants_file = platform_dir / "tenants.json"
+    tenants_file.write_text(
+        json.dumps(
+            [
+                {
+                    "tenant_id": "old_tenant",
+                    "name": "Old Tenant",
+                    "status": "active",
+                    "qdrant_collection": "intent_hub_old",
+                    "access_codes": [],
+                    "skill_sources": [
+                        {
+                            "source_id": "src_001",
+                            "path": "/old/path",
+                            "enabled": True,
+                            "sync_mode": "scan",
+                        }
+                    ],
+                }
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    registry = TenantRegistry(tenants_file)
+    tenant = registry.get_tenant("old_tenant")
+
+    assert tenant is not None
+    assert len(tenant.skill_sources) == 1
+    source = tenant.skill_sources[0]
+
+    assert source.path == "/old/path"
+    assert source.source_label is None
+    assert source.client_path_hint is None

@@ -1,229 +1,120 @@
-# Intent Hub 🚀
+# Intent Hub
 
-Intent Hub is a static routing system based on vector similarity. It matches user input semantically and dispatches the request to the right downstream AI Agent.
+Intent Hub is a multi-tenant intent routing service. It combines a Flask backend, a Vue admin frontend, and a standalone CLI/SDK package for remote access.
 
 **[English](README.md)** | **[中文](README.zh-CN.md)**
 
-📹 **Video Demo:** [Watch on YouTube](https://youtu.be/bWHMFci6Pkc?si=z7W_GVkbC3i0_Udp)
+## What Is In This Repo
 
----
+- `intent-hub-backend/`: backend service package
+- `intent-hub-frontend/`: admin UI
+- `intent-hub-cli/`: standalone CLI and Python SDK package
+- `docs/`: shared project documentation
 
-## Overview
+The backend currently exposes three API layers:
 
-- This repository contains the admin frontend and the Flask backend.
-- Intent routing depends on an external embedding service and a reachable Qdrant instance.
-- Route data and system settings are persisted under `intent-hub-backend/data/`.
+- Runtime APIs for tenants: `/v1/me`, `/v1/route`, `/v1/dispatch`
+- Tenant control-plane APIs: `/tenant/*`
+- Platform admin APIs: `/admin/*`
 
----
+The old single-tenant endpoints such as `/routes`, `/settings`, `/diagnostics/*`, `/reindex`, and `/predict` still exist for compatibility, but the current project structure and documentation are centered on the multi-tenant API surface.
 
 ## Quick Start
 
-### Prerequisites
+For normal users, use the hosted service directly:
 
-- Docker and Docker Compose
-- A reachable Qdrant service
-- A reachable embedding service
-- An LLM API key if you want utterance generation or diagnostics repair
+- Web entry: `http://intenthub.free4inno.com/`
 
-### Start with Docker Compose
+If you need the remote CLI or Python SDK, install:
 
-1. Optional: copy the template if you need custom build mirrors or image prefixes.
-   ```shell
-   cp .env.example .env
-   ```
-2. Start the frontend and backend containers.
-   ```shell
-   docker compose up -d --build
-   ```
-   For China mirror settings:
-   ```shell
-   docker compose --env-file .env.china up -d --build
-   ```
-3. Open the admin UI and complete runtime settings, or write them directly into `intent-hub-backend/data/settings.json`.
-
-After startup:
-
-- Frontend: `http://localhost`
-- Backend API: `http://localhost:8000`
-
-Notes:
-
-- `docker-compose.yml` in this repository starts `intent-hub-frontend` and `intent-hub-backend`.
-- Qdrant and the embedding service are external dependencies for this repo and must already be reachable from the backend.
-- Runtime files are stored in `intent-hub-backend/data/`.
-
----
-
-## Route Contract
-
-Each intent entity now includes a required `route_key`. This is the stable identifier that downstream systems should use for request routing.
-
-Rules and behavior:
-
-- `route_key` is required on create, update, import, and utterance generation requests.
-- `route_key` must be unique across routes.
-- Normalization is intentionally loose: trim, lowercase, replace whitespace with `.`, collapse repeated dots, trim leading and trailing dots.
-- Changing `route_key` is allowed, but it should be treated as a routing contract change for downstream callers.
-- Legacy `routes.json` entries without `route_key` are migrated automatically on load and written back to disk.
-
-Example route config:
-
-```json
-{
-  "id": 1,
-  "name": "Weather Service",
-  "route_key": "weather.query",
-  "description": "Return weather information for a city",
-  "utterances": ["what is the weather in Beijing"],
-  "negative_samples": [],
-  "score_threshold": 0.85,
-  "negative_threshold": 0.95
-}
+```bash
+pip install intent-hub-cli==0.1.0
 ```
 
-Example `/predict` response:
+Skill scanning for end users is client-side:
 
-```json
-[
-  {
-    "id": 1,
-    "name": "Weather Service",
-    "route_key": "weather.query",
-    "score": 0.93
-  }
-]
+- CLI and Python SDK scan local absolute or relative directories on the user's machine, collect `SKILL.md`, and upload the contents to the backend.
+- The Web tenant page asks the browser to select a local directory and uploads discovered `SKILL.md` files.
+- The backend no longer assumes a tenant can point at a filesystem path on the deployment host for routine skill scanning.
+
+## Local Development
+
+### Backend
+
+```bash
+cd intent-hub-backend
+pip install -e .[dev]
+python run.py
 ```
 
-If no route matches the threshold, the backend returns the fallback route with `route_key: "fallback.default"`.
+### Frontend
 
----
+```bash
+cd intent-hub-frontend
+npm install
+npm run dev
+```
 
-## Configuration and Data
+### Standalone CLI Package
 
-Runtime state is stored in `intent-hub-backend/data/`:
+Use the standalone package if you only need to call a remote Intent Hub deployment:
 
-- `intent-hub-backend/data/routes.json`: route definitions
-- `intent-hub-backend/data/settings.json`: runtime system settings
-- `intent-hub-backend/data/diagnostics_cache.json`: cached diagnostics results
+```bash
+pip install intent-hub-cli==0.1.0
+```
 
-Typical settings managed by the backend:
+Example local scan:
 
-- `QDRANT_URL`
-- `QDRANT_COLLECTION`
-- `EMBEDDING_SERVICE_URL`
-- `LLM_PROVIDER`
-- `LLM_API_KEY`
-- `PREDICT_AUTH_KEY`
-- `DEFAULT_USERNAME`
-- `DEFAULT_PASSWORD`
+```bash
+intent-hub skills scan --source-path ./skills
+intent-hub skills scan --source-path D:/skills --source-label team-skills
+```
 
-`README` and the API docs assume the persisted settings file is the runtime source of truth.
+## Runtime Data Layout
 
----
+Backend runtime data is stored under `intent-hub-backend/data/`.
 
-## Production Deployment
+Important paths:
 
-The production deployment described in `Intent Hub 部署文档.docx` uses these services on Hufu:
+- `platform/tenants.json`: tenant metadata and access code records
+- `platform/admin_settings.json`: platform admin settings
+- `tenants/<tenant_id>/routes.json`: tenant routes
+- `tenants/<tenant_id>/settings.json`: tenant settings
+- `tenants/<tenant_id>/diagnostics_cache.json`: diagnostics cache
+- `tenants/<tenant_id>/skills_index.json`: scanned skill index
+- `tenants/<tenant_id>/imports/`: imported skill drafts
 
-- `intent-hub-frontend`
-- `intent-hub-backend`
-- `intent-hub-embedding`
-- `qdrant`
+Legacy single-tenant files such as `routes.json` and `settings.json` may still exist for compatibility or migration, but tenant-scoped files are the current source of truth.
 
-### Upgrade Flow
+## Key Docs
 
-1. Before upgrading, enter the old Intent Hub instance and save or export the current route configuration.
-2. Build the frontend artifact:
-   ```shell
-   cd intent-hub-frontend
-   npm install
-   npm run build:prod
-   ```
-   This generates `dist.tar.gz`. Upload the updated mounted files for the Hufu frontend service:
-   `https://hf.free4inno.com/#/project/container/detail/732`
-3. Build and publish the backend image:
-   ```shell
-   cd intent-hub-backend
-   docker build -f Dockerfile .
-   docker tag intent-hub-backend:latest crpi-v8ss93lfn0gwwreg.cn-hangzhou.personal.cr.aliyuncs.com/free4inno-lcr/intent-hub:2.0.0
-   docker push crpi-v8ss93lfn0gwwreg.cn-hangzhou.personal.cr.aliyuncs.com/free4inno-lcr/intent-hub:2.0.0
-   ```
-   Then update the backend service image in Hufu:
-   `https://hf.free4inno.com/#/project/container/detail/720`
-4. If the embedding model or embedding logic changes, update the embedding project and then refresh the embedding service image:
-   - Repo: `https://gitee.com/free4inno-bupt/embedding-zpoint`
-   - Service: `https://hf.free4inno.com/#/project/container/detail/733`
-5. After rollout, verify frontend access, backend health, route import, and `/predict` responses including `route_key`.
-
----
+- `USER_GUIDE.md`: operator-facing usage guide
+- `docs/API.md`: API map and authentication model
+- `docs/ARCHITECTURE.md`: code layout, runtime layout, and compatibility notes
+- `intent-hub-cli/README.md`: CLI/SDK package usage
+- `intent-hub-cli/PUBLISH.md`: standalone package release flow
 
 ## Project Layout
 
 ```text
 intent-hub/
-├── intent-hub-backend/       # Flask backend
-│   ├── intent_hub/           # Core application code
-│   ├── data/                 # Runtime data
-│   ├── docs/                 # Backend docs
-│   └── tests/                # Backend tests
-├── intent-hub-frontend/      # Vue 3 + Vite admin UI
-│   ├── src/                  # Frontend source
-│   └── dist/                 # Frontend build output
-├── docker-compose.yml        # Local frontend/backend compose
-├── .env.example              # Optional compose/build template
+├── docs/
+├── intent-hub-backend/
+│   ├── intent_hub/
+│   ├── data/
+│   └── tests/
+├── intent-hub-cli/
+│   ├── intent_hub_cli/
+│   └── tests/
+├── intent-hub-frontend/
+│   ├── public/
+│   └── src/
+├── AGENT.md
 ├── README.md
-└── README.zh-CN.md
-```
-
----
-
-## Runtime Notes
-
-1. `POST /v1/route` returns only route matching results.
-2. `POST /v1/dispatch` returns route matching + dispatch suggestion payload.
-3. Current `dispatch` is suggestion-only (`status: not_executed`), no real tool execution yet.
-
-## Backend CLI Install
-
-```bash
-cd intent-hub-backend
-pip install -e .
-```
-
-After install, both commands are available:
-
-```bash
-intent-hub --help
-intenthub --help
-```
-
----
-
-## Standalone CLI Package
-
-End users who only need the CLI or Python SDK for a remote Intent Hub deployment should install the standalone intent-hub-cli package instead of the backend package.
-
-Current local install options:
-
-```bash
-pip install ./intent-hub-cli
-```
-
-Or build a wheel first:
-
-```bash
-cd intent-hub-cli
-python -m pip install -U build
-python -m build
-pip install dist/intent_hub_cli-0.1.0-py3-none-any.whl
-```
-
-After the package is published to PyPI, the intended install command is:
-
-```bash
-pip install intent-hub-cli
+├── README.zh-CN.md
+└── USER_GUIDE.md
 ```
 
 ## License
 
-Distributed under the MIT License. See LICENSE for details.
+MIT. See `LICENSE`.

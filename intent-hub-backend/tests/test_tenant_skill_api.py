@@ -76,11 +76,16 @@ def test_tenant_skill_source_create_and_list(test_dir, monkeypatch):
     create_response = client.post(
         "/tenant/skill-sources",
         headers={"Authorization": "Bearer ih_live_team_alpha"},
-        json={"path": str(test_dir / "skills"), "sync_mode": "apply"},
+        json={
+            "source_label": "My Local Skills",
+            "client_path_hint": str(test_dir / "skills"),
+            "sync_mode": "apply",
+        },
     )
     assert create_response.status_code == 201
     created = create_response.get_json()
     assert created["item"]["source_id"] == "src_001"
+    assert created["item"]["source_label"] == "My Local Skills"
 
     list_response = client.get(
         "/tenant/skill-sources",
@@ -88,17 +93,22 @@ def test_tenant_skill_source_create_and_list(test_dir, monkeypatch):
     )
     assert list_response.status_code == 200
     payload = list_response.get_json()
-    assert payload["items"][0]["path"] == str(test_dir / "skills")
+    assert payload["items"][0]["client_path_hint"] == str(test_dir / "skills")
+    assert payload["items"][0]["source_label"] == "My Local Skills"
 
 
 def test_tenant_skill_scan_and_list_drafts(test_dir, monkeypatch):
     registry, context = make_tenant(test_dir)
-    skills_root = test_dir / "skills"
-    (skills_root / "wiki_builder").mkdir(parents=True, exist_ok=True)
-    (skills_root / "wiki_builder" / "SKILL.md").write_text("# Wiki Builder\nbuild wiki", encoding="utf-8")
     tenant_record = registry.update_skill_source(
         "team_alpha",
-        SkillSourceRecord(source_id="src_001", path=str(skills_root), enabled=True, sync_mode="apply"),
+        SkillSourceRecord(
+            source_id="src_001",
+            path=str(test_dir / "skills"),
+            source_label="My Local Skills",
+            client_path_hint=str(test_dir / "skills"),
+            enabled=True,
+            sync_mode="apply",
+        ),
     )
 
     monkeypatch.setattr("intent_hub.auth.get_tenant_auth_service", lambda: DummyTenantAuthService(context, tenant_record))
@@ -144,6 +154,16 @@ def test_tenant_skill_scan_and_list_drafts(test_dir, monkeypatch):
     scan_response = client.post(
         "/tenant/skill-sources/scan",
         headers={"Authorization": "Bearer ih_live_team_alpha"},
+        json={
+            "source_id": "src_001",
+            "skills": [
+                {
+                    "skill_name": "wiki_builder",
+                    "relative_path": "wiki_builder/SKILL.md",
+                    "content": "# Wiki Builder\nbuild wiki",
+                }
+            ],
+        },
     )
     assert scan_response.status_code == 200
     assert scan_response.get_json()["discovered"] == 1
@@ -196,7 +216,7 @@ def test_tenant_skill_draft_apply_imports_routes(test_dir, monkeypatch):
                 "items": [
                     {
                         "source_id": "src_001",
-                        "skill_path": str(test_dir / "skills" / "wiki_builder" / "SKILL.md"),
+                        "skill_key": "src_001::wiki_builder/SKILL.md",
                         "draft_file": str(draft_path),
                         "status": "draft",
                     }

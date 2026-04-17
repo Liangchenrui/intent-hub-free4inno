@@ -178,6 +178,87 @@ def test_tenant_skill_scan_and_list_drafts(test_dir, monkeypatch):
     assert payload["items"][0]["draft_file"].endswith(".json")
 
 
+def test_tenant_skill_scan_accepts_uploaded_skill_without_skill_name(test_dir, monkeypatch):
+    registry, context = make_tenant(test_dir)
+    tenant_record = registry.update_skill_source(
+        "team_alpha",
+        SkillSourceRecord(
+            source_id="src_001",
+            path=str(test_dir / "skills"),
+            source_label="My Local Skills",
+            client_path_hint=str(test_dir / "skills"),
+            enabled=True,
+            sync_mode="apply",
+        ),
+    )
+
+    monkeypatch.setattr("intent_hub.auth.get_tenant_auth_service", lambda: DummyTenantAuthService(context, tenant_record))
+    monkeypatch.setattr("intent_hub.api.tenant.get_tenant_registry", lambda: registry)
+    monkeypatch.setattr(
+        "intent_hub.api.tenant.build_skill_draft_generator",
+        lambda component_manager: (
+            lambda skill_file, content: {
+                "mode": "merge",
+                "routes": [
+                    {
+                        "id": 0,
+                        "name": skill_file.parent.name,
+                        "route_key": "wiki.builder",
+                        "description": content.splitlines()[0],
+                        "utterances": ["整理 wiki"],
+                        "negative_samples": [],
+                        "score_threshold": 0.75,
+                        "negative_threshold": 0.95,
+                        "source": {
+                            "type": "json_import",
+                            "import_origin": "skill_scan",
+                            "managed_fields": [],
+                        },
+                        "sync": {"status": "pending", "last_synced_at": None, "manual_overrides": []},
+                        "lifecycle_status": "active",
+                    }
+                ],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "intent_hub.api.tenant.get_tenant_component_registry",
+        lambda: DummyTenantComponentRegistry(context),
+    )
+    monkeypatch.setattr(
+        "intent_hub.api.tenant.build_skill_draft_applier",
+        lambda component_manager: (lambda draft_payload, source, skill_file: {"route_id": 1}),
+    )
+
+    client = app.test_client()
+
+    scan_response = client.post(
+        "/tenant/skill-sources/scan",
+        headers={"Authorization": "Bearer ih_live_team_alpha"},
+        json={
+            "source_id": "src_001",
+            "skills": [
+                {
+                    "relative_path": "wiki_builder/SKILL.md",
+                    "content": "# Wiki Builder\nbuild wiki",
+                }
+            ],
+        },
+    )
+
+    assert scan_response.status_code == 200
+    payload = scan_response.get_json()
+    assert payload["discovered"] == 1
+
+    drafts_response = client.get(
+        "/tenant/skill-drafts",
+        headers={"Authorization": "Bearer ih_live_team_alpha"},
+    )
+    assert drafts_response.status_code == 200
+    draft_payload = drafts_response.get_json()
+    assert draft_payload["items"][0]["skill_name"] == "wiki_builder"
+
+
 def test_tenant_skill_draft_apply_imports_routes(test_dir, monkeypatch):
     registry, context = make_tenant(test_dir)
     context.routes_path.parent.mkdir(parents=True, exist_ok=True)

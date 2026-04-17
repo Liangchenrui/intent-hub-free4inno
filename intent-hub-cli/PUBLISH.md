@@ -61,7 +61,7 @@ python -m twine upload \
 Users can then install the package with:
 
 ```bash
-pip install intent-hub-cli
+pip install intent-hub-cli==0.1.0
 ```
 
 ## GitHub Actions Release

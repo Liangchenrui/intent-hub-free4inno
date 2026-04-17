@@ -189,8 +189,11 @@ const buildUploadedSkills = async (files: File[]): Promise<UploadedSkillPayload[
   return Promise.all(
     skillFiles.map(async (file) => {
       const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+      const normalizedPath = relativePath.replace(/\\/g, '/');
+      const segments = normalizedPath.split('/').filter(Boolean);
       return {
-        relative_path: relativePath.replace(/\\/g, '/'),
+        skill_name: segments.length >= 2 ? segments[segments.length - 2] : 'SKILL',
+        relative_path: normalizedPath,
         content: await file.text(),
       };
     })

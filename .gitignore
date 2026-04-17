@@ -1,5 +1,26 @@
+# OS and editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.cursor/
+.vscode/
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+*.tmp
+
+# Local worktrees and scratch space
+.worktrees/
+.tmp/
+**/.tmp/
+
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,77 +28,87 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Editor directories and files
-.vscode/
-!.vscode/extensions.json
-.idea/
-.cursor/
-.worktrees/
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-*~
-Thumbs.db
-*.tmp
-desktop.ini
-
-# Dependencies
-node_modules/
-dist/
-dist-ssr/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+.python-version
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+htmlcov/
 build/
+dist/
+site/
 develop-eggs/
 eggs/
 .eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
 # Virtual environments
+.venv/
 venv/
 env/
 ENV/
-.venv/
 
-# Environment variables
-.env
-.env.local
-.env.*.local
-*.env
-!.env.example
-!.env.china
-!.env.official
-!intent-hub-backend/.env
-
-# Frontend specific
+# Node / frontend
+node_modules/
+dist-ssr/
+coverage/
+*.tsbuildinfo
+.vite/
+.cache/
+.parcel-cache/
+.eslintcache
 intent-hub-frontend/dist/
 intent-hub-frontend/dist-ssr/
-*.local
+intent-hub-frontend/node_modules/
+intent-hub-frontend/dist.tar.gz
 
-# Backend specific
+# Environment and secrets
+.env
+.env.*
+*.env
+*.local
+!.env.example
+!*.example
+!*.example.*
+
+# Backend runtime data
 intent-hub-backend/intent_hub/models/
 !intent-hub-backend/intent_hub/models/.gitkeep
-data/*
-!data/.gitkeep
+intent-hub-backend/data/**
+!intent-hub-backend/data/
+!intent-hub-backend/data/platform/
+!intent-hub-backend/data/tenants/
+!intent-hub-backend/data/platform/*.example
+!intent-hub-backend/data/tenants/default/
+!intent-hub-backend/data/tenants/default/*.example
 
-# Large files and models
+# Test artifacts
+pytest-cache-files-*/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Binary/model artifacts
 *.safetensors
 *.bin
 *.pt
@@ -88,23 +119,9 @@ data/*
 *.onnx
 *.msgpack
 
-# HuggingFace Cache
-.cache/
-huggingface/
-
-# Test and coverage
-.coverage
-htmlcov/
-.pytest_cache/
-pytest-cache-files-*/
-.tox/
-.nox/
-
-# Jupyter Notebook
-.ipynb_checkpoints
+# Notebooks
+.ipynb_checkpoints/
 *.ipynb
 
-# Databases
-*.db
-*.sqlite
-*.sqlite3
+# Local screenshots and archives
+ScreenShot_*.png

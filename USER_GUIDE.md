@@ -156,16 +156,193 @@ pip install intent-hub-cli==0.1.0
 
 ### 6.1 CLI 用法
 
+CLI 安装后可执行名有两个：
+
+- `intent-hub`
+- `intenthub`
+
+两者作用完全相同，下面统一使用 `intent-hub` 举例。
+
 ```bash
 intent-hub login --endpoint http://intenthub.free4inno.com/ --code <access_code>
 intent-hub whoami
 intent-hub route "帮我整理 wiki"
 intent-hub route "帮我整理 wiki" --json
 intent-hub dispatch "帮我整理 wiki"
+intent-hub dispatch "帮我整理 wiki" --json
 intent-hub skills scan --source-path ./skills
 intent-hub skills scan --source-path D:/skills --source-label team-skills
+intent-hub skills scan --source-path D:/skills --source-id src_001
 intent-hub skills apply --draft-file D:/path/to/draft.json
 ```
+
+CLI 会把登录信息保存在 `~/.intent-hub/config.json`。除了 `login` 之外，其余命令都会优先读取这个配置文件，因此通常先执行一次登录即可。
+
+#### 6.1.1 `login`
+
+用于保存远端 Intent Hub 地址和租户 `access_code`，不会立即调用服务端验证。
+
+```bash
+intent-hub login --endpoint http://intenthub.free4inno.com/ --code <access_code>
+```
+
+参数说明：
+
+- `--endpoint`：必填。Intent Hub 服务地址，例如 `http://intenthub.free4inno.com/`。后续 CLI 会基于这个地址调用 `/v1/*` 和 `/tenant/*` 接口。
+- `--code`：必填。租户访问码，即 `access_code`。
+
+执行结果：
+
+- 成功时输出 `Saved login config`
+- 会覆盖本地已有的 `~/.intent-hub/config.json`
+
+适用场景：
+
+- 首次使用 CLI
+- 切换到新的环境，例如从测试环境切到生产环境
+- 切换到新的租户访问码
+
+#### 6.1.2 `whoami`
+
+用于验证当前配置的 `endpoint` 和 `access_code` 是否可用，并查看当前租户身份。
+
+```bash
+intent-hub whoami
+```
+
+参数说明：
+
+- 无命令参数。
+
+输出说明：
+
+- 返回 JSON 字符串
+- 通常包含当前 `tenant_id`、`tenant_name`、`code_id`、`code_label`、`collection` 等字段
+
+常见用途：
+
+- 登录后快速确认当前 CLI 正在使用哪个租户
+- 排查 401 或 access code 配错问题
+
+#### 6.1.3 `route`
+
+用于调用运行时路由判定接口 `/v1/route`。
+
+```bash
+intent-hub route "帮我整理 wiki"
+intent-hub route "帮我整理 wiki" --json
+```
+
+参数说明：
+
+- `text`：必填。要判定的用户输入文本，这是位置参数，不需要写成 `--text`。
+- `--json`：可选。默认不传。传入后输出完整 JSON；不传时只输出预测结果里的 `route_key`。
+
+输出行为：
+
+- 默认输出最核心的 `route_key`
+- 使用 `--json` 时，通常会返回完整响应，包括 `score`、`matches`、`collection` 等字段
+
+适用场景：
+
+- Shell 脚本中只关心路由 key 时，直接用默认输出
+- 调试模型打分和候选结果时，使用 `--json`
+
+#### 6.1.4 `dispatch`
+
+用于调用运行时 dispatch 接口 `/v1/dispatch`。
+
+```bash
+intent-hub dispatch "帮我整理 wiki"
+intent-hub dispatch "帮我整理 wiki" --json
+```
+
+参数说明：
+
+- `text`：必填。要提交给 dispatch 的用户输入文本。
+- `--json`：可选。默认不传。传入后输出完整 JSON；不传时只输出响应中的 `route_key`。
+
+输出行为：
+
+- 默认只打印 `route_key`
+- 使用 `--json` 时可看到完整 dispatch 响应，包括 `matches`、`dispatch` 建议等字段
+
+注意：
+
+- 当前系统中的 `dispatch` 只返回建议，不会真的执行外部工具
+- 如果你要排查为什么某条请求没有命中预期技能，建议加 `--json`
+
+#### 6.1.5 `skills scan`
+
+用于扫描本地 skill 目录，递归收集其中的 `SKILL.md`，然后把内容上传到后端 `/tenant/skill-sources/scan` 生成或更新草稿。
+
+```bash
+intent-hub skills scan --source-path ./skills
+intent-hub skills scan --source-path D:/skills --source-label team-skills
+intent-hub skills scan --source-path D:/skills --source-id src_001
+```
+
+参数说明：
+
+- `--source-path`：必填。本地目录路径。CLI 会递归查找该目录下所有 `SKILL.md`。
+- `--source-label`：可选。上传时附带的 source 名称。通常在首次上传某个本地目录、希望后端自动创建新的 source 时使用。
+- `--source-id`：可选。已有 source 的唯一标识。传入后，后端会尝试把本次上传结果归属到这个已有 source，而不是新建一个。
+
+扫描规则：
+
+- CLI 会递归查找 `--source-path` 下的所有 `SKILL.md`
+- 每个 skill 会上传三个核心字段：`skill_name`、`relative_path`、`content`
+- `skill_name` 默认取 `SKILL.md` 所在文件夹名称
+- `relative_path` 是相对于 `--source-path` 的相对路径，例如 `wiki_builder/SKILL.md`
+
+返回结果：
+
+- 命令输出完整 JSON
+- 常见字段包括 `source_id`、`discovered`、`uploaded`、`updated`、`stale`、`applied`、`errors`
+
+参数组合建议：
+
+- 首次扫描某个本地目录：只传 `--source-path`，或同时传 `--source-label`
+- 重传到已有 source：优先传 `--source-id`
+- 如果你希望前后端界面里显示更友好的名称，可以同时传 `--source-label`
+
+注意：
+
+- `--source-path` 必须是本地真实存在的目录
+- 目录中没有 `SKILL.md` 时，上传结果通常会是空列表或 `discovered=0`
+- 某个 `SKILL.md` 读不到或内容为空时，CLI 会把错误追加到输出 JSON 的 `errors` 字段
+
+#### 6.1.6 `skills apply`
+
+用于将某个草稿文件提交给后端 `/tenant/skill-drafts/apply`，把草稿真正导入为路由。
+
+```bash
+intent-hub skills apply --draft-file D:/path/to/draft.json
+```
+
+参数说明：
+
+- `--draft-file`：必填。要应用的草稿文件路径。这个路径通常来自前一次扫描后返回的 `draft_file` 字段。
+
+输出说明：
+
+- 命令输出完整 JSON
+- 内容取决于后端导入结果，通常会包含 `created`、`updated`、`removed`、`total`、`conflicts` 等字段
+
+常见流程：
+
+1. 先执行 `intent-hub skills scan --source-path ...`
+2. 从返回结果或 Web 页面中拿到某个 `draft_file`
+3. 再执行 `intent-hub skills apply --draft-file ...`
+
+#### 6.1.7 命令使用建议
+
+- 只想保存登录信息：使用 `login`
+- 想确认当前 access code 是否可用：使用 `whoami`
+- 想快速得到预测到的路由 key：使用 `route`
+- 想查看更完整的运行时建议：使用 `dispatch --json`
+- 想从本地 skills 目录生成草稿：使用 `skills scan`
+- 想把某个草稿正式导入为路由：使用 `skills apply`
 
 ### 6.2 Python SDK 用法
 

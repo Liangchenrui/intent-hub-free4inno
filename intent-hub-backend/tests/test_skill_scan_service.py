@@ -275,3 +275,23 @@ def test_skill_scan_uses_relative_path_based_draft_file_name(test_dir):
     draft_file = Path(index["items"][0]["draft_file"])
 
     assert draft_file.name == "folder__wiki_builder__SKILL.json"
+
+
+def test_skill_scan_infers_skill_name_from_relative_path_when_missing(test_dir):
+    context = make_context(test_dir)
+    service = SkillScanService(context, draft_generator=draft_generator)
+
+    service.scan_uploaded_source(
+        source=make_source(),
+        uploaded_skills=[
+            {
+                "relative_path": "wiki_builder/SKILL.md",
+                "content": "# Wiki Builder\nbuild wiki",
+            }
+        ],
+    )
+
+    index = json.loads(context.skills_index_path.read_text(encoding="utf-8"))
+    item = index["items"][0]
+
+    assert item["skill_name"] == "wiki_builder"

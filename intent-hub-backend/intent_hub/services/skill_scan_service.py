@@ -114,7 +114,7 @@ class SkillScanService:
             item["source_id"] = source.source_id
             item["source_label"] = source.source_label
             item["skill_key"] = key
-            item["skill_name"] = payload["skill_name"]
+            item["skill_name"] = self._resolve_skill_name(payload, relative_path)
             item["relative_path"] = relative_path
             item["client_path_hint"] = payload.get("client_path_hint") or source.client_path_hint
             item["skill_hash"] = self._hash_text(content)
@@ -216,6 +216,16 @@ class SkillScanService:
         if not normalized or not normalized.endswith("SKILL.md"):
             raise ValueError("relative_path must point to SKILL.md")
         return normalized
+
+    @staticmethod
+    def _resolve_skill_name(payload: dict, relative_path: str) -> str:
+        skill_name = (payload.get("skill_name") or "").strip()
+        if skill_name:
+            return skill_name
+        parts = [part for part in relative_path.split("/") if part]
+        if len(parts) >= 2:
+            return parts[-2]
+        return "SKILL"
 
     @staticmethod
     def _hash_text(text: str) -> str:

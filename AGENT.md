@@ -1,28 +1,36 @@
 # AGENT.md
 
-本文件用于说明在 `intent-hub` 仓库内执行任务时的统一操作约定。
+本文件定义 `intent-hub` 仓库内的统一协作约定。
 
-## 1. 命令执行规则
+## 仓库事实
 
-- 统一使用项目约定的命令与工具执行开发、测试、构建任务。
+- 根目录是主入口，公共文档统一维护在 `docs/`。
+- 后端位于 `intent-hub-backend/`，提供 Flask API、兼容单租户接口、多租户管理接口和运行时接口。
+- 前端位于 `intent-hub-frontend/`，提供 Vue 3 + Vite 管理台。
+- 远程 CLI 与 Python SDK 位于 `intent-hub-cli/`，作为独立分发包维护。
 
-## 2. 仓库结构
+## 文档约定
 
-- 后端：`intent-hub-backend/`
-- 前端：`intent-hub-frontend/`
-- 后端文档：`intent-hub-backend/docs/`
+- 根目录文档优先级最高：
+  - `README.md` / `README.zh-CN.md`：项目概览与快速开始
+  - `USER_GUIDE.md`：面向使用者的操作说明
+  - `docs/API.md`：接口说明
+  - `docs/ARCHITECTURE.md`：架构与数据布局
+- 如子项目需要独立分发或发布说明，可在子项目内保留局部文档，例如 `intent-hub-cli/README.md`、`intent-hub-cli/PUBLISH.md`。
 
-## 3. 常用验证命令
+## 常用验证命令
 
 - 后端测试：`pytest intent-hub-backend/tests -q`
-- 前端构建：`npm run build`（在仓库根目录执行）
+- CLI 测试：`pytest intent-hub-cli/tests -q`
+- 前端构建：在 `intent-hub-frontend/` 下执行 `npm run build`
 
-## 4. 文档约定
+## 清理规则
 
-- 多租户与操作说明优先维护在：`intent-hub-backend/docs/USER_GUIDE.md`
-- 设计与里程碑文档放在：`intent-hub-backend/docs/`
+- 可再生产物、缓存和临时目录不应作为有效源码或文档的一部分保留。
+- 包括但不限于：`.venv/`、`node_modules/`、`dist/`、`*.egg-info/`、`__pycache__/`、测试 `.tmp/`。
+- 示例数据与运行时数据是否保留，应以是否影响当前本地运行和调试为准。
 
-## 5. 优先级
+## 优先级
 
-- 用户最新明确指令优先于本文件。
-- 若与系统/开发者上层指令冲突，遵循上层指令。
+- 用户当前指令高于本文件。
+- 若与更高层系统或开发约束冲突，遵循更高层约束。

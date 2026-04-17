@@ -413,6 +413,7 @@ export interface SkillSourceCreateRequest {
 }
 
 export interface UploadedSkillPayload {
+  skill_name?: string;
   relative_path: string;
   content: string;
 }

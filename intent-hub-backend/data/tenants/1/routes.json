@@ -361,5 +361,104 @@
       "manual_overrides": []
     },
     "lifecycle_status": "active"
+  },
+  {
+    "id": 12,
+    "name": "生成式算法艺术创作",
+    "route_key": "art.generative.create",
+    "description": "根据用户输入的美学概念或灵感，创作一份算法艺术哲学宣言（.md文件），并基于此实现一个交互式的p5.js生成艺术程序（.html文件）。该技能专注于通过代码表达计算美学、涌现行为、受控混沌和参数化变化，产出的是可探索的、基于种子的生成系统，而非静态图像。",
+    "utterances": [
+      "算法艺术",
+      "生成艺术",
+      "用代码创作艺术",
+      "做一个p5.js生成艺术",
+      "帮我创作一个算法艺术哲学",
+      "实现一个交互式粒子系统艺术",
+      "创建一个基于噪声场的生成艺术",
+      "设计一个可探索参数的算法画作",
+      "用p5.js做个流场可视化",
+      "根据我的想法生成一份算法艺术代码"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 13,
+    "name": "Anthropic品牌样式应用",
+    "route_key": "brand.styling.apply",
+    "description": "将Anthropic官方品牌色彩、字体和视觉样式应用到各类文档或设计元素中，确保符合公司品牌规范。该技能专注于视觉格式化和品牌一致性处理，区别于通用的文档编辑或设计工具。",
+    "utterances": [
+      "品牌样式",
+      "应用品牌色",
+      "Anthropic风格",
+      "品牌字体",
+      "品牌色彩",
+      "帮我应用Anthropic品牌样式",
+      "把这个文档改成Anthropic风格",
+      "应用公司品牌规范",
+      "使用品牌配色方案",
+      "应用Poppins和Lora字体"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
+  },
+  {
+    "id": 14,
+    "name": "视觉哲学与画布设计",
+    "route_key": "design.philosophy.canvas",
+    "description": "根据用户输入或概念，创建一个原创的视觉设计哲学（美学运动），并基于此哲学生成高度视觉化的艺术画布（PDF/PNG）。核心是产出原创、精致、博物馆级别的视觉艺术品，强调空间、形式、色彩、构图的表达，文本极少且作为视觉点缀。区别于通用图像生成或模板设计，它专注于从哲学理念到视觉表达的完整、高水准创作流程。",
+    "utterances": [
+      "视觉哲学",
+      "设计画布",
+      "艺术运动",
+      "美学宣言",
+      "帮我设计一个海报",
+      "创建一个有哲学感的视觉作品",
+      "我需要一个原创的艺术设计",
+      "基于这个概念生成一个视觉画布",
+      "设计一个体现极简主义的艺术品",
+      "创作一份视觉优先的设计文档"
+    ],
+    "negative_samples": [],
+    "score_threshold": 0.75,
+    "negative_threshold": 0.95,
+    "source": {
+      "type": "json_import",
+      "source_id": null,
+      "import_origin": "skill_import",
+      "managed_fields": []
+    },
+    "sync": {
+      "status": "pending",
+      "last_synced_at": null,
+      "manual_overrides": []
+    },
+    "lifecycle_status": "active"
   }
 ]

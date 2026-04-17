@@ -173,23 +173,11 @@ curl -X POST http://127.0.0.1:5000/v1/dispatch \
 
 ## 8. CLI 使用
 
-先安装后端包（确保有 `intent-hub` 命令）：
-在 intent-hub-backend 目录执行：
+先安装独立客户端包，然后登录远程服务：
+
 ```bash
-python -m venv .venv
-. .\.venv\Scripts\Activate.ps1
-python -m pip install -U pip
+cd intent-hub-cli
 pip install -e .
-```
-
-然后：
-
-```bash
-cd intent-hub-backend
-pip install -e .
-```
-
-```bash
 intent-hub login --endpoint http://127.0.0.1:5000 --code <access_code>
 intent-hub whoami
 intenthub route "帮我整理 wiki"
@@ -200,10 +188,25 @@ intent-hub skills scan
 intent-hub skills apply --draft-file D:/.../imports/skills/src_001/wiki_builder.json
 ```
 
+如果需要按标准 pip 分发包形式安装：
+
+```bash
+cd intent-hub-cli
+python -m pip install -U build
+python -m build
+pip install dist/intent_hub_cli-0.1.0-py3-none-any.whl
+```
+
+后续发布到 PyPI 后，可直接执行：
+
+```bash
+pip install intent-hub-cli
+```
+
 ## 9. Python SDK 使用
 
 ```python
-from intent_hub import IntentHubClient
+from intent_hub_cli import IntentHubClient
 
 client = IntentHubClient(
     endpoint="http://127.0.0.1:5000",

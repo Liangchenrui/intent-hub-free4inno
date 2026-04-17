@@ -200,6 +200,31 @@ intenthub --help
 
 ---
 
+## 独立 CLI 包
+
+如果用户只需要连接远程部署的 Intent Hub 服务，应安装独立的 intent-hub-cli 包，而不是后端服务包。
+
+当前可直接本地按 pip 包方式安装：
+
+```bash
+pip install ./intent-hub-cli
+```
+
+如果希望先打包再安装：
+
+```bash
+cd intent-hub-cli
+python -m pip install -U build
+python -m build
+pip install dist/intent_hub_cli-0.1.0-py3-none-any.whl
+```
+
+后续发布到 PyPI 后，目标安装方式为：
+
+```bash
+pip install intent-hub-cli
+```
+
 ## License
 
 Distributed under the MIT License. See `LICENSE` for more information.

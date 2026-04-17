@@ -1,0 +1,63 @@
+name: publish-intent-hub-cli
+
+on:
+  push:
+    tags:
+      - "intent-hub-cli-v*"
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "Target package index"
+        required: true
+        default: "testpypi"
+        type: choice
+        options:
+          - testpypi
+          - pypi
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: intent-hub-cli
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+
+      - name: Run tests
+        run: pytest tests -q
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Check distributions
+        run: python -m twine check dist/*
+
+      - name: Publish to TestPyPI
+        if: github.event_name == 'workflow_dispatch' && inputs.repository == 'testpypi'
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}
+        run: python -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+
+      - name: Publish to PyPI
+        if: startsWith(github.ref, 'refs/tags/intent-hub-cli-v') || (github.event_name == 'workflow_dispatch' && inputs.repository == 'pypi')
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: python -m twine upload dist/*

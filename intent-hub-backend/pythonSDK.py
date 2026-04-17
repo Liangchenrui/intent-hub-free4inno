@@ -1,4 +1,4 @@
-from intent_hub import IntentHubClient
+from intent_hub_cli import IntentHubClient
 
 client = IntentHubClient(
     endpoint="http://127.0.0.1:5000",

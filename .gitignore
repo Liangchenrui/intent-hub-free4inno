@@ -96,6 +96,7 @@ huggingface/
 .coverage
 htmlcov/
 .pytest_cache/
+pytest-cache-files-*/
 .tox/
 .nox/
 

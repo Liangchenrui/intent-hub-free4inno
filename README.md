@@ -199,6 +199,31 @@ intenthub --help
 
 ---
 
+## Standalone CLI Package
+
+End users who only need the CLI or Python SDK for a remote Intent Hub deployment should install the standalone intent-hub-cli package instead of the backend package.
+
+Current local install options:
+
+```bash
+pip install ./intent-hub-cli
+```
+
+Or build a wheel first:
+
+```bash
+cd intent-hub-cli
+python -m pip install -U build
+python -m build
+pip install dist/intent_hub_cli-0.1.0-py3-none-any.whl
+```
+
+After the package is published to PyPI, the intended install command is:
+
+```bash
+pip install intent-hub-cli
+```
+
 ## License
 
-Distributed under the MIT License. See `LICENSE` for details.
+Distributed under the MIT License. See LICENSE for details.

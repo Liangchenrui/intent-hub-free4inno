@@ -8,13 +8,13 @@
       </template>
 
       <el-tabs v-model="mode" stretch>
-        <el-tab-pane label="Tenant Access Code" name="tenant" />
-        <el-tab-pane label="Admin Login" name="admin" />
+        <el-tab-pane :label="$t('mode.tenant')" name="tenant" />
+        <el-tab-pane :label="$t('mode.admin')" name="admin" />
       </el-tabs>
 
       <el-form v-if="mode === 'tenant'" @submit.prevent="handleTenantLogin" label-position="top">
-        <el-form-item label="Access Code">
-          <el-input v-model="tenantCode" placeholder="ih_live_xxx" clearable />
+        <el-form-item :label="$t('login.accessCode')">
+          <el-input v-model="tenantCode" :placeholder="$t('login.accessCodePlaceholder')" clearable />
         </el-form-item>
         <el-button
           type="primary"
@@ -23,7 +23,7 @@
           class="login-btn"
           size="large"
         >
-          {{ loading ? '验证中...' : '登录租户控制台' }}
+          {{ loading ? $t('login.verifying') : $t('login.tenantLogin') }}
         </el-button>
       </el-form>
 
@@ -50,7 +50,7 @@
           class="login-btn"
           size="large"
         >
-          {{ loading ? $t('login.logging') : '登录管理员控制台' }}
+          {{ loading ? $t('login.logging') : $t('login.adminLogin') }}
         </el-button>
       </el-form>
 
@@ -91,7 +91,7 @@ const handleTenantLogin = async () => {
     setActiveMode('tenant');
     router.push('/');
   } catch (err: any) {
-    error.value = err?.response?.data?.detail || 'Access code 无效';
+    error.value = err?.response?.data?.detail || t('login.accessCodeInvalid');
   } finally {
     loading.value = false;
   }

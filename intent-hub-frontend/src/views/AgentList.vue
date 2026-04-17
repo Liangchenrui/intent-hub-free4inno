@@ -105,28 +105,7 @@
               <el-tag size="small" effect="light">{{ row.score_threshold }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column :label="$t('agent.sourceType')" width="120" align="center">
-            <template #default="{ row }">
-              <el-tag size="small" effect="plain" type="info">
-                {{ row.source?.type || '-' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column :label="$t('agent.syncStatus')" width="120" align="center">
-            <template #default="{ row }">
-              <el-tag size="small" effect="plain" :type="row.sync?.status === 'synced' ? 'success' : 'warning'">
-                {{ row.sync?.status || '-' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column :label="$t('agent.lifecycleStatus')" width="120" align="center">
-            <template #default="{ row }">
-              <el-tag size="small" effect="plain" type="info">
-                {{ row.lifecycle_status || '-' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column :label="$t('agent.utterances')" min-width="400">
+          <el-table-column :label="$t('agent.utterances')" min-width="520">
             <template #default="{ row }">
               <div class="utterances-container">
                 <el-tag 
@@ -164,7 +143,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="$t('agent.negativeSamples')" min-width="300">
+          <el-table-column :label="$t('agent.negativeSamples')" min-width="220">
             <template #default="{ row }">
               <div class="utterances-container">
                 <el-tag 
@@ -201,6 +180,7 @@
                   </el-tag>
                 </el-tooltip>
                 <span v-if="!row.negative_samples || row.negative_samples.length === 0" class="empty-text">
+                  {{ $t('common.empty') }}
                 </span>
               </div>
             </template>

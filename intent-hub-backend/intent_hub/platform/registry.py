@@ -18,6 +18,10 @@ class TenantRegistry:
         self.tenants_file = Path(tenants_file)
         self._tenants = self._load_tenants()
 
+    def reload(self) -> list[TenantRecord]:
+        self._tenants = self._load_tenants()
+        return self._tenants
+
     @staticmethod
     def hash_access_code(access_code: str) -> str:
         normalized = (access_code or "").strip()
@@ -60,15 +64,18 @@ class TenantRegistry:
         )
 
     def list_tenants(self) -> list[TenantRecord]:
+        self.reload()
         return list(self._tenants)
 
     def get_tenant(self, tenant_id: str) -> Optional[TenantRecord]:
+        self.reload()
         for tenant in self._tenants:
             if tenant.tenant_id == tenant_id:
                 return tenant
         return None
 
     def get_tenant_by_access_code(self, access_code: str) -> Optional[TenantRecord]:
+        self.reload()
         code_hash = self.hash_access_code(access_code)
 
         for tenant in self._tenants:
@@ -91,6 +98,7 @@ class TenantRegistry:
         access_code_label: str = "default",
         access_code: Optional[str] = None,
     ) -> tuple[TenantRecord, AccessCodeRecord, str]:
+        self.reload()
         tenant_id = (tenant_id or "").strip()
         name = (name or "").strip()
         if not tenant_id:
@@ -128,6 +136,7 @@ class TenantRegistry:
         label: str,
         access_code: Optional[str] = None,
     ) -> tuple[TenantRecord, AccessCodeRecord, str]:
+        self.reload()
         tenant = self.get_tenant(tenant_id)
         if tenant is None:
             raise ValueError(f"Tenant not found: {tenant_id}")
@@ -151,6 +160,7 @@ class TenantRegistry:
         code_id: str,
         access_code: Optional[str] = None,
     ) -> tuple[TenantRecord, AccessCodeRecord, str]:
+        self.reload()
         tenant = self.get_tenant(tenant_id)
         if tenant is None:
             raise ValueError(f"Tenant not found: {tenant_id}")
@@ -169,6 +179,7 @@ class TenantRegistry:
         return tenant, target, plain_code
 
     def disable_access_code(self, tenant_id: str, code_id: str) -> tuple[TenantRecord, AccessCodeRecord]:
+        self.reload()
         tenant = self.get_tenant(tenant_id)
         if tenant is None:
             raise ValueError(f"Tenant not found: {tenant_id}")
@@ -182,6 +193,7 @@ class TenantRegistry:
         return tenant, target
 
     def list_skill_sources(self, tenant_id: str) -> list[SkillSourceRecord]:
+        self.reload()
         tenant = self.get_tenant(tenant_id)
         if tenant is None:
             raise ValueError(f"Tenant not found: {tenant_id}")
@@ -195,6 +207,7 @@ class TenantRegistry:
         sync_mode: str = "apply",
         enabled: bool = True,
     ) -> tuple[TenantRecord, SkillSourceRecord]:
+        self.reload()
         tenant = self.get_tenant(tenant_id)
         if tenant is None:
             raise ValueError(f"Tenant not found: {tenant_id}")
@@ -221,6 +234,7 @@ class TenantRegistry:
         tenant_id: str,
         source: SkillSourceRecord,
     ) -> TenantRecord:
+        self.reload()
         tenant = self.get_tenant(tenant_id)
         if tenant is None:
             raise ValueError(f"Tenant not found: {tenant_id}")

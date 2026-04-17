@@ -8,6 +8,7 @@ import pytest
 from intent_hub.platform.models import AccessCodeRecord, SkillSourceRecord, TenantRecord
 from intent_hub.platform.registry import TenantRegistry
 from intent_hub.platform.workspace import TenantWorkspaceResolver
+from intent_hub.services.tenant_auth_service import TenantAuthService
 from intent_hub.tenant.context import TenantContext
 
 
@@ -262,3 +263,24 @@ def test_backward_compatibility_with_existing_json(test_dir):
     assert source.path == "/old/path"
     assert source.source_label is None
     assert source.client_path_hint is None
+
+
+def test_tenant_auth_service_sees_access_code_created_after_service_init(test_dir):
+    platform_dir = test_dir / "platform"
+    platform_dir.mkdir(parents=True, exist_ok=True)
+    tenants_file = platform_dir / "tenants.json"
+    tenants_file.write_text("[]", encoding="utf-8")
+
+    auth_service = TenantAuthService(tenants_file=tenants_file, data_dir=test_dir)
+    registry = TenantRegistry(tenants_file)
+    _, _, plain_code = registry.create_tenant(
+        tenant_id="team_alpha",
+        name="Team Alpha",
+        access_code="ih_live_team_alpha",
+    )
+
+    context, tenant, code = auth_service.authenticate_access_code(plain_code)
+
+    assert context.tenant_id == "team_alpha"
+    assert tenant.tenant_id == "team_alpha"
+    assert code.code_id == "ac_001"

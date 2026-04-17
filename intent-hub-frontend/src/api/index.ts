@@ -37,9 +37,21 @@ const setRawAuthorization = (config: any, token?: string | null) => {
   }
 };
 
+const hasExplicitAuthHeaders = (config: any): boolean => {
+  const headers = config?.headers;
+  if (!headers) {
+    return false;
+  }
+  return Boolean(headers['Authorization'] || headers['X-API-Key']);
+};
+
 api.interceptors.request.use((config) => {
   const url = config.url || '';
   if (url === '/auth/login') {
+    return config;
+  }
+
+  if (hasExplicitAuthHeaders(config)) {
     return config;
   }
 

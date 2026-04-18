@@ -40,6 +40,15 @@
             </el-input>
           </div>
           <div class="toolbar-actions">
+            <el-button
+              type="danger"
+              plain
+              @click="handleBatchDelete"
+              :disabled="selectedRouteIds.length === 0"
+              :loading="batchDeleting"
+            >
+              {{ $t('agent.batchDelete', { count: selectedRouteIds.length }) }}
+            </el-button>
             <el-button 
               @click="handleReindex" 
               :loading="reindexing"
@@ -84,12 +93,16 @@
         />
 
         <el-table 
+          ref="agentTableRef"
           v-loading="loading"
-          :data="agents" 
+          :data="paginatedAgents"
           style="width: 100%"
           class="custom-table"
           header-cell-class-name="table-header-cell"
+          row-key="id"
+          @selection-change="handleSelectionChange"
         >
+          <el-table-column type="selection" width="48" align="center" />
           <el-table-column prop="id" :label="$t('agent.id')" width="70" align="center" />
           <el-table-column :label="$t('agent.nameDesc')" min-width="200">
             <template #default="{ row }">
@@ -193,6 +206,16 @@
             </template>
           </el-table-column>
         </el-table>
+        <div class="pagination-bar">
+          <el-pagination
+            background
+            layout="total, prev, pager, next"
+            :total="totalAgents"
+            :page-size="pageSize"
+            :current-page="currentPage"
+            @current-change="handlePageChange"
+          />
+        </div>
       </el-card>
     </el-main>
 
@@ -326,7 +349,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { debounce } from 'lodash-es';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -360,11 +383,36 @@ const generating = ref(false);
 const reindexing = ref(false);
 const importing = ref(false);
 const importingSkill = ref(false);
+const batchDeleting = ref(false);
 const genCount = ref(5);
 const searchQuery = ref('');
 const activeTab = ref('list');
 const importFileInput = ref<HTMLInputElement | null>(null);
 const skillFileInput = ref<HTMLInputElement | null>(null);
+const agentTableRef = ref<any>(null);
+const selectedRouteIds = ref<number[]>([]);
+const currentPage = ref(1);
+const pageSize = 10;
+
+const totalAgents = computed(() => agents.value.length);
+const paginatedAgents = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return agents.value.slice(start, start + pageSize);
+});
+
+const syncTableSelection = async () => {
+  await nextTick();
+  const table = agentTableRef.value;
+  if (!table) {
+    return;
+  }
+  table.clearSelection();
+  paginatedAgents.value.forEach((row) => {
+    if (selectedRouteIds.value.includes(row.id)) {
+      table.toggleRowSelection(row, true);
+    }
+  });
+};
 
 const fetchAgents = async (query: string = '') => {
   loading.value = true;
@@ -373,6 +421,12 @@ const fetchAgents = async (query: string = '') => {
       ? await searchRoutes(query.trim())
       : await getRoutes();
     agents.value = response.data;
+    const maxPage = Math.max(1, Math.ceil(agents.value.length / pageSize));
+    if (currentPage.value > maxPage) {
+      currentPage.value = maxPage;
+    }
+    selectedRouteIds.value = selectedRouteIds.value.filter((id) => agents.value.some((agent) => agent.id === id));
+    await syncTableSelection();
   } catch (error) {
     ElMessage.error(t('agent.fetchError'));
   } finally {
@@ -382,6 +436,7 @@ const fetchAgents = async (query: string = '') => {
 
 // 防抖搜索处理
 const handleSearch = debounce(() => {
+  currentPage.value = 1;
   fetchAgents(searchQuery.value);
 }, 300);
 
@@ -407,6 +462,10 @@ const handleTabChange = (tabName: any) => {
     router.push('/settings');
   }
 };
+
+watch(paginatedAgents, () => {
+  syncTableSelection();
+});
 
 const showModal = ref(false);
 const isEdit = ref(false);
@@ -635,7 +694,8 @@ const handleSave = async () => {
     }
     ElMessage.success(t('agent.saveSuccess'));
     closeModal();
-    fetchAgents();
+    currentPage.value = 1;
+    fetchAgents(searchQuery.value);
   } catch (e: any) {
     const detail = e?.response?.data?.detail;
     ElMessage.error(detail || t('agent.saveError'));
@@ -648,8 +708,54 @@ const handleDelete = async (id: number) => {
     await deleteRoute(id);
     localStorage.removeItem('last_full_reindex');
     ElMessage.success(t('agent.deleteSuccess'));
-    fetchAgents();
+    selectedRouteIds.value = selectedRouteIds.value.filter((item) => item !== id);
+    fetchAgents(searchQuery.value);
   } catch (e) {}
+};
+
+const handleSelectionChange = (selection: RouteConfig[]) => {
+  const pageIds = paginatedAgents.value.map((item) => item.id);
+  const selectedOnPage = selection.map((item) => item.id);
+  selectedRouteIds.value = [
+    ...selectedRouteIds.value.filter((id) => !pageIds.includes(id)),
+    ...selectedOnPage,
+  ];
+};
+
+const handlePageChange = (page: number) => {
+  currentPage.value = page;
+};
+
+const handleBatchDelete = async () => {
+  if (selectedRouteIds.value.length === 0) {
+    return;
+  }
+
+  try {
+    const deleteCount = selectedRouteIds.value.length;
+    await ElMessageBox.confirm(
+      t('agent.batchDeleteConfirm', { count: deleteCount }),
+      t('agent.batchDeleteTitle'),
+      { type: 'error' }
+    );
+    batchDeleting.value = true;
+
+    for (const id of [...selectedRouteIds.value]) {
+      await deleteRoute(id);
+    }
+
+    localStorage.removeItem('last_full_reindex');
+    selectedRouteIds.value = [];
+    ElMessage.success(t('agent.batchDeleteSuccess', { count: deleteCount }));
+    await fetchAgents(searchQuery.value);
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      const detail = e?.response?.data?.detail;
+      ElMessage.error(detail || t('agent.batchDeleteError'));
+    }
+  } finally {
+    batchDeleting.value = false;
+  }
 };
 </script>
 
@@ -722,6 +828,7 @@ const handleDelete = async (id: number) => {
 .toolbar {
   display: flex;
   justify-content: space-between;
+  gap: 16px;
   margin-bottom: 24px;
 }
 
@@ -734,6 +841,13 @@ const handleDelete = async (id: number) => {
 
 .search-input {
   width: 100%;
+}
+
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .agent-info {
@@ -863,6 +977,12 @@ const handleDelete = async (id: number) => {
 
 .gen-count-input {
   width: 90px;
+}
+
+.pagination-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
 }
 
 :deep(.table-header-cell) {

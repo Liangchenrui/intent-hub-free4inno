@@ -6,6 +6,9 @@ import requests
 
 
 class IntentHubClient:
+    DEFAULT_TIMEOUT = 30
+    LONG_RUNNING_TIMEOUT = 120
+
     def __init__(self, endpoint: str, access_code: str, session: requests.Session | None = None):
         self.endpoint = endpoint.rstrip("/")
         self.access_code = access_code
@@ -27,8 +30,15 @@ class IntentHubClient:
     def dispatch(self, text: str) -> dict[str, Any]:
         return self._request("POST", "/v1/dispatch", json={"text": text})
 
-    def skills_scan(self) -> dict[str, Any]:
-        return self._request("POST", "/tenant/skill-sources/scan")
+    def reindex(self, force_full: bool = False) -> dict[str, Any]:
+        return self._request("POST", "/tenant/reindex", json={"force_full": force_full})
+
+    def sync_routes(self, route_ids: list[int]) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            "/tenant/reindex/sync-route",
+            json={"route_ids": route_ids},
+        )
 
     def skills_scan_uploaded(
         self,
@@ -49,16 +59,18 @@ class IntentHubClient:
             },
         )
 
-    def skills_apply(self, draft_file: str) -> dict[str, Any]:
-        return self._request("POST", "/tenant/skill-drafts/apply", json={"draft_file": draft_file})
-
     def _request(self, method: str, path: str, **kwargs) -> dict[str, Any]:
         response = self.session.request(
             method=method,
             url=f"{self.endpoint}{path}",
             headers=self._headers,
-            timeout=30,
+            timeout=self._timeout_for_path(path),
             **kwargs,
         )
         response.raise_for_status()
         return response.json()
+
+    def _timeout_for_path(self, path: str) -> int:
+        if path.startswith("/tenant/skill-") or path.startswith("/tenant/reindex"):
+            return self.LONG_RUNNING_TIMEOUT
+        return self.DEFAULT_TIMEOUT

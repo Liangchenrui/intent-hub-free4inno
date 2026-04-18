@@ -43,12 +43,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("whoami")
 
     route_parser = subparsers.add_parser("route")
+    route_parser.add_argument("--dispatch", action="store_true", dest="dispatch_mode")
     route_parser.add_argument("text")
     route_parser.add_argument("--json", action="store_true", dest="json_output")
-
-    dispatch_parser = subparsers.add_parser("dispatch")
-    dispatch_parser.add_argument("text")
-    dispatch_parser.add_argument("--json", action="store_true", dest="json_output")
 
     skills_parser = subparsers.add_parser("skills")
     skills_subparsers = skills_parser.add_subparsers(dest="skills_command", required=True)
@@ -56,8 +53,12 @@ def build_parser() -> argparse.ArgumentParser:
     scan_parser.add_argument("--source-path", required=True)
     scan_parser.add_argument("--source-label")
     scan_parser.add_argument("--source-id")
-    apply_parser = skills_subparsers.add_parser("apply")
-    apply_parser.add_argument("--draft-file", required=True)
+
+    sync_parser = subparsers.add_parser("sync")
+    sync_parser.add_argument("--route-id", type=int)
+    sync_parser.add_argument("--route-ids")
+    sync_parser.add_argument("--force-full", action="store_true", dest="force_full")
+    sync_parser.add_argument("--json", action="store_true", dest="json_output")
 
     return parser
 
@@ -84,12 +85,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "route":
-            payload = client.route(args.text)
-            print(json.dumps(payload, ensure_ascii=False) if args.json_output else payload.get("route_key", ""))
-            return 0
-
-        if args.command == "dispatch":
-            payload = client.dispatch(args.text)
+            payload = client.dispatch(args.text) if args.dispatch_mode else client.route(args.text)
             print(json.dumps(payload, ensure_ascii=False) if args.json_output else payload.get("route_key", ""))
             return 0
 
@@ -106,8 +102,25 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(payload, ensure_ascii=False))
             return 0
 
-        if args.command == "skills" and args.skills_command == "apply":
-            print(json.dumps(client.skills_apply(args.draft_file), ensure_ascii=False))
+        if args.command == "sync":
+            route_ids: list[int] = []
+            if args.route_id is not None:
+                route_ids.append(args.route_id)
+            if args.route_ids:
+                route_ids.extend(int(part.strip()) for part in args.route_ids.split(",") if part.strip())
+
+            if args.force_full and route_ids:
+                raise ValueError("sync does not support combining route ids with --force-full.")
+
+            if route_ids:
+                payload = client.sync_routes(route_ids)
+            else:
+                payload = client.reindex(force_full=args.force_full)
+
+            if args.json_output:
+                print(json.dumps(payload, ensure_ascii=False))
+            else:
+                print(payload.get("message", json.dumps(payload, ensure_ascii=False)))
             return 0
     except ValueError as exc:
         print(str(exc), file=sys.stderr)

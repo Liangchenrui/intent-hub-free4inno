@@ -68,6 +68,8 @@ Example local scan:
 ```bash
 intent-hub skills scan --source-path ./skills
 intent-hub skills scan --source-path D:/skills --source-label team-skills
+intent-hub route --dispatch "help me organize a wiki"
+intent-hub sync --route-ids 12,15 --json
 ```
 
 ## Runtime Data Layout

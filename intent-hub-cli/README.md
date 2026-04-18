@@ -76,11 +76,13 @@ intent-hub login --endpoint https://api.example.com --code <access_code>
 intent-hub whoami
 intent-hub route "help me organize a wiki"
 intent-hub route "help me organize a wiki" --json
-intent-hub dispatch "help me organize a wiki"
-intent-hub dispatch "help me organize a wiki" --json
+intent-hub route --dispatch "help me organize a wiki"
+intent-hub route --dispatch "help me organize a wiki" --json
 intent-hub skills scan --source-path ./skills
 intent-hub skills scan --source-path D:/skills --source-label team-skills
-intent-hub skills apply --draft-file /path/to/draft.json
+intent-hub sync
+intent-hub sync --force-full --json
+intent-hub sync --route-ids 12,15 --json
 ```
 
 `intenthub` is available as an alias.
@@ -98,6 +100,8 @@ client = IntentHubClient(
 print(client.whoami())
 print(client.route("help me organize a wiki"))
 print(client.dispatch("help me organize a wiki"))
+print(client.reindex())
+print(client.sync_routes([12, 15]))
 scan_result = client.skills_scan_uploaded(
     source_id=None,
     source_label="team-skills",
@@ -110,7 +114,6 @@ scan_result = client.skills_scan_uploaded(
     ],
 )
 print(scan_result)
-print(client.skills_apply("draft.json"))
 ```
 
 ## Configuration
@@ -130,3 +133,5 @@ The CLI stores credentials at `~/.intent-hub/config.json`:
 - This package does not ship backend dependencies such as Flask or Qdrant client
 - Use this package for remote access; use `intent-hub-backend` when you are running or developing the server itself
 - Skill scanning runs against the user's local directories and uploads `SKILL.md` content to the backend
+- `skills scan` directly associates newly discovered skills with route entities; there is no separate `skills apply` step
+- `sync` triggers backend index synchronization for all routes or selected route ids

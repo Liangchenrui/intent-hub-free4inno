@@ -68,6 +68,8 @@ CLI 扫描示例：
 ```bash
 intent-hub skills scan --source-path ./skills
 intent-hub skills scan --source-path D:/skills --source-label team-skills
+intent-hub route --dispatch "帮我整理 wiki"
+intent-hub sync --route-ids 12,15 --json
 ```
 
 ## 运行时数据布局

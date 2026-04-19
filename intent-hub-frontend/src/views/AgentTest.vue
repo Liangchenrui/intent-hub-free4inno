@@ -80,30 +80,86 @@
               v-for="(result, index) in results" 
               :key="`${result.id}-${result.route_key}`" 
               class="result-item" 
-              :class="{ 'top-match': index === 0 }"
+              :class="{ 'top-match': index === 0 && !isNoneRoute(result), 'none-match': isNoneRoute(result) }"
               shadow="hover"
             >
               <div class="result-info">
                 <div class="name-box">
-                  <el-tag v-if="index === 0" size="small" type="success" effect="dark" class="match-badge">{{ $t('test.bestMatch') }}</el-tag>
+                  <el-tag v-if="index === 0 && !isNoneRoute(result)" size="small" type="success" effect="dark" class="match-badge">{{ $t('test.bestMatch') }}</el-tag>
+                  <el-tag v-else-if="isNoneRoute(result)" size="small" type="info" effect="plain" class="match-badge">{{ $t('test.noRouteBadge') }}</el-tag>
                   <div class="result-title">
-                    <span class="result-name">{{ result.name }}</span>
-                    <span class="result-route-key">{{ result.route_key }}</span>
+                    <span class="result-name">{{ isNoneRoute(result) ? $t('test.noRouteTitle') : result.name }}</span>
+                    <span v-if="isNoneRoute(result)" class="result-route-key none-route-copy">{{ $t('test.noRouteDescription') }}</span>
+                    <span v-else class="result-route-key">{{ result.route_key }}</span>
                   </div>
                 </div>
-                <el-tag size="small" type="info" effect="plain">ID: {{ result.id }}</el-tag>
+                <el-tag v-if="!isNoneRoute(result)" size="small" type="info" effect="plain">ID: {{ result.id }}</el-tag>
               </div>
               <div class="result-score">
                 <div class="score-label">{{ $t('test.confidenceScore') }}</div>
                 <div class="score-bar-container">
                   <el-progress 
                     :percentage="Math.min(Math.round((result.score || 0) * 100), 100)" 
-                    :status="(result.score || 0) > 0.7 ? 'success' : ((result.score || 0) > 0.4 ? 'warning' : 'exception')"
+                    :status="isNoneRoute(result) ? 'warning' : ((result.score || 0) > 0.7 ? 'success' : ((result.score || 0) > 0.4 ? 'warning' : 'exception'))"
                     :stroke-width="14"
                     :show-text="false"
                   />
                 </div>
-                <div class="score-number">{{ (result.score || 0).toFixed(4) }}</div>
+                <div class="score-number">{{ result.score == null ? '--' : result.score.toFixed(4) }}</div>
+              </div>
+              <div v-if="!isNoneRoute(result)" class="feedback-actions">
+                <el-button
+                  circle
+                  class="feedback-button positive-button"
+                  :class="{ 'is-active': getFeedbackState(result.id) === 'positive', 'is-pending': isFeedbackPending(result.id) }"
+                  :disabled="isFeedbackPending(result.id)"
+                  @click="handleFeedback(result, 'positive')"
+                >
+                  <span class="thumb-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M7 21V9"
+                        stroke="currentColor"
+                        stroke-width="1.9"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <path
+                        d="M14.7 4.2 11.9 9H19a2 2 0 0 1 1.94 2.5l-1.4 5A2 2 0 0 1 17.62 18H7V9.8a2 2 0 0 1 .58-1.4l4.83-4.95a1.15 1.15 0 0 1 1.93 1.11Z"
+                        stroke="currentColor"
+                        stroke-width="1.9"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </span>
+                </el-button>
+                <el-button
+                  circle
+                  class="feedback-button negative-button"
+                  :class="{ 'is-active': getFeedbackState(result.id) === 'negative', 'is-pending': isFeedbackPending(result.id) }"
+                  :disabled="isFeedbackPending(result.id)"
+                  @click="handleFeedback(result, 'negative')"
+                >
+                  <span class="thumb-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M17 3v12"
+                        stroke="currentColor"
+                        stroke-width="1.9"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <path
+                        d="M9.3 19.8 12.1 15H5a2 2 0 0 1-1.94-2.5l1.4-5A2 2 0 0 1 6.38 6H17v8.2a2 2 0 0 1-.58 1.4l-4.83 4.95a1.15 1.15 0 0 1-1.93-1.11Z"
+                        stroke="currentColor"
+                        stroke-width="1.9"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </span>
+                </el-button>
               </div>
             </el-card>
           </div>
@@ -122,7 +178,17 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { ChatLineRound } from '@element-plus/icons-vue';
-import { clearTenantSession, predict, reindex, setActiveMode, type PredictResult } from '../api';
+import {
+  clearTenantSession,
+  deleteNegativeRouteFeedback,
+  deletePositiveRouteFeedback,
+  predict,
+  reindex,
+  setActiveMode,
+  submitNegativeRouteFeedback,
+  submitPositiveRouteFeedback,
+  type PredictResult,
+} from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 import ModeSwitcher from '../components/ModeSwitcher.vue';
 
@@ -135,6 +201,8 @@ const loading = ref(false);
 const hasTested = ref(false);
 const activeTab = ref('test');
 const reindexing = ref(false);
+const feedbackState = ref<Record<number, 'positive' | 'negative' | undefined>>({});
+const feedbackPending = ref<Record<number, boolean | undefined>>({});
 
 // 检查是否已完成全量同步
 const hasFullReindex = computed(() => {
@@ -192,10 +260,63 @@ const handleTest = async () => {
   try {
     const response = await predict(queryText.value);
     results.value = response.data;
+    feedbackState.value = {};
+    feedbackPending.value = {};
   } catch (error) {
     ElMessage.error(t('test.predictError'));
   } finally {
     loading.value = false;
+  }
+};
+
+const isNoneRoute = (result: PredictResult) => result.route_key === 'none';
+const getFeedbackState = (routeId: number) => feedbackState.value[routeId];
+const isFeedbackPending = (routeId: number) => Boolean(feedbackPending.value[routeId]);
+
+const handleFeedback = async (result: PredictResult, feedbackType: 'positive' | 'negative') => {
+  const text = queryText.value.trim();
+  if (!text) {
+    ElMessage.warning(t('test.inputQueryWarning'));
+    return;
+  }
+
+  const previousState = feedbackState.value[result.id];
+  const nextState = previousState === feedbackType ? undefined : feedbackType;
+  feedbackState.value = {
+    ...feedbackState.value,
+    [result.id]: nextState,
+  };
+  feedbackPending.value = {
+    ...feedbackPending.value,
+    [result.id]: true,
+  };
+  try {
+    if (previousState === feedbackType) {
+      if (feedbackType === 'positive') {
+        await deletePositiveRouteFeedback(result.id, text);
+      } else {
+        await deleteNegativeRouteFeedback(result.id, text);
+      }
+    } else if (feedbackType === 'positive') {
+      await submitPositiveRouteFeedback(result.id, text);
+    } else {
+      await submitNegativeRouteFeedback(result.id, text);
+    }
+    ElMessage({
+      type: 'success',
+      message: t('test.feedbackSyncHint'),
+    });
+  } catch (error) {
+    feedbackState.value = {
+      ...feedbackState.value,
+      [result.id]: previousState,
+    };
+    ElMessage.error(t('test.feedbackError'));
+  } finally {
+    feedbackPending.value = {
+      ...feedbackPending.value,
+      [result.id]: false,
+    };
   }
 };
 </script>
@@ -299,6 +420,11 @@ const handleTest = async () => {
   background-color: #f0f9eb;
 }
 
+.none-match {
+  border-left: 4px solid var(--el-color-warning);
+  background-color: #fff8eb;
+}
+
 .result-info {
   display: flex;
   justify-content: space-between;
@@ -358,6 +484,71 @@ const handleTest = async () => {
   min-width: 60px;
   text-align: right;
   font-size: 14px;
+}
+
+.feedback-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.feedback-button {
+  width: 40px;
+  height: 40px;
+  border-width: 1px;
+  transition: all 0.2s ease;
+}
+
+.thumb-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+}
+
+.thumb-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.feedback-button.is-pending {
+  opacity: 0.7;
+}
+
+.positive-button {
+  border-color: #d0d5dd;
+  color: #475467;
+  background: #ffffff;
+}
+
+.positive-button.is-active {
+  border-color: #1f2937;
+  color: #ffffff;
+  background: #1f2937;
+}
+
+.negative-button {
+  border-color: #d0d5dd;
+  color: #475467;
+  background: #ffffff;
+}
+
+.negative-button.is-active {
+  border-color: #1f2937;
+  color: #ffffff;
+  background: #1f2937;
+}
+
+.feedback-button:not(.is-active):hover {
+  border-color: #98a2b3;
+  color: #111827;
+  background: #f8fafc;
+}
+
+.none-route-copy {
+  color: #909399;
+  white-space: normal;
 }
 
 .empty-results {

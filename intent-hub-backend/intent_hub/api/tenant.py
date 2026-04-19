@@ -10,6 +10,7 @@ from intent_hub.auth import require_tenant_access
 from intent_hub.config import Config
 from intent_hub.models import PredictRequest, RepairRequest, ApplyRepairRequest, RouteConfig, RouteImportDraft
 from intent_hub.platform.registry import TenantRegistry
+from intent_hub.services.sync_service import SyncService
 from intent_hub.tenant.components import TenantComponentRegistry
 from intent_hub.utils.error_handler import handle_errors, validate_request
 
@@ -454,6 +455,19 @@ class AddNegativeSamplesRequest(BaseModel):
     negative_threshold: float = Field(default=0.95, ge=0.0, le=1.0)
 
 
+class RouteFeedbackRequest(BaseModel):
+    text: str = Field(..., description="用户反馈语句", min_length=1)
+
+
+def _get_route_feedback_request() -> RouteFeedbackRequest:
+    data = request.get_json(silent=True) or {}
+    if not data.get("text"):
+        data["text"] = request.args.get("text", "")
+    if not data.get("text"):
+        data["text"] = request.values.get("text", "")
+    return RouteFeedbackRequest(**data)
+
+
 @handle_errors
 @require_tenant_access
 def add_negative_samples(route_id: int):
@@ -501,9 +515,121 @@ def delete_negative_samples(route_id: int):
 
 @handle_errors
 @require_tenant_access
-def reindex():
-    from intent_hub.services.sync_service import SyncService
+def add_positive_feedback(route_id: int):
+    try:
+        req = _get_route_feedback_request()
+    except ValidationError as e:
+        return jsonify({"error": "请求参数错误", "detail": str(e)}), 400
 
+    component_manager = _tenant_component_manager()
+    component_manager.ensure_ready()
+    route_manager = component_manager.route_manager
+    route = route_manager.get_route(route_id)
+    if not route:
+        return jsonify({"error": "路由不存在", "detail": f"路由ID {route_id} 不存在"}), 404
+
+    text = req.text.strip()
+    if text not in route.utterances:
+        route.utterances.append(text)
+    route_manager.add_route(route)
+
+    return jsonify(
+        {
+            "message": f"成功为路由 {route_id} 添加 1 条正向语料",
+            "route_id": route_id,
+            "total_utterances": len(route.utterances),
+        }
+    ), 200
+
+
+@handle_errors
+@require_tenant_access
+def add_negative_feedback(route_id: int):
+    try:
+        req = _get_route_feedback_request()
+    except ValidationError as e:
+        return jsonify({"error": "请求参数错误", "detail": str(e)}), 400
+
+    component_manager = _tenant_component_manager()
+    component_manager.ensure_ready()
+    route_manager = component_manager.route_manager
+    route = route_manager.get_route(route_id)
+    if not route:
+        return jsonify({"error": "路由不存在", "detail": f"路由ID {route_id} 不存在"}), 404
+
+    text = req.text.strip()
+    if text not in route.negative_samples:
+        route.negative_samples.append(text)
+    route_manager.add_route(route)
+
+    return jsonify(
+        {
+            "message": f"成功为路由 {route_id} 添加 1 条负向语料",
+            "route_id": route_id,
+            "total_negative_samples": len(route.negative_samples),
+        }
+    ), 200
+
+
+@handle_errors
+@require_tenant_access
+def delete_positive_feedback(route_id: int):
+    try:
+        req = _get_route_feedback_request()
+    except ValidationError as e:
+        return jsonify({"error": "请求参数错误", "detail": str(e)}), 400
+
+    component_manager = _tenant_component_manager()
+    component_manager.ensure_ready()
+    route_manager = component_manager.route_manager
+    route = route_manager.get_route(route_id)
+    if not route:
+        return jsonify({"error": "路由不存在", "detail": f"路由ID {route_id} 不存在"}), 404
+
+    text = req.text.strip()
+    route.utterances = [item for item in route.utterances if item != text]
+    route_manager.add_route(route)
+
+    return jsonify(
+        {
+            "message": f"成功从路由 {route_id} 移除 1 条正向语料",
+            "route_id": route_id,
+            "total_utterances": len(route.utterances),
+        }
+    ), 200
+
+
+@handle_errors
+@require_tenant_access
+def delete_negative_feedback(route_id: int):
+    try:
+        req = _get_route_feedback_request()
+    except ValidationError as e:
+        return jsonify({"error": "请求参数错误", "detail": str(e)}), 400
+
+    component_manager = _tenant_component_manager()
+    component_manager.ensure_ready()
+    route_manager = component_manager.route_manager
+    route = route_manager.get_route(route_id)
+    if not route:
+        return jsonify({"error": "路由不存在", "detail": f"路由ID {route_id} 不存在"}), 404
+
+    text = req.text.strip()
+    route.negative_samples = [item for item in route.negative_samples if item != text]
+    route_manager.add_route(route)
+
+    return jsonify(
+        {
+            "message": f"成功从路由 {route_id} 移除 1 条负向语料",
+            "route_id": route_id,
+            "total_negative_samples": len(route.negative_samples),
+        }
+    ), 200
+
+
+@handle_errors
+@require_tenant_access
+def reindex():
     component_manager = _tenant_component_manager()
     component_manager.ensure_ready()
     data = request.get_json() or {}
@@ -516,8 +642,6 @@ def reindex():
 @handle_errors
 @require_tenant_access
 def sync_route():
-    from intent_hub.services.sync_service import SyncService
-
     component_manager = _tenant_component_manager()
     component_manager.ensure_ready()
     data = request.get_json() or {}

@@ -170,6 +170,13 @@ export interface PredictResult {
   score?: number;
 }
 
+export interface RouteFeedbackResponse {
+  message: string;
+  route_id: number;
+  total_utterances?: number;
+  total_negative_samples?: number;
+}
+
 export const getRoutes = () => api.get<RouteConfig[]>('/tenant/routes');
 export const searchRoutes = (query: string = '') =>
   api.get<RouteConfig[]>('/tenant/routes/search', { params: { q: query } });
@@ -278,6 +285,20 @@ export const reindex = (forceFull: boolean = false) =>
   api.post<ReindexResponse>('/tenant/reindex', { force_full: forceFull });
 
 export const predict = (text: string) => api.post<PredictResult[]>('/predict', { text });
+export const submitPositiveRouteFeedback = (routeId: number, text: string) =>
+  api.post<RouteFeedbackResponse>(`/tenant/routes/${routeId}/feedback/positive`, { text });
+export const submitNegativeRouteFeedback = (routeId: number, text: string) =>
+  api.post<RouteFeedbackResponse>(`/tenant/routes/${routeId}/feedback/negative`, { text });
+export const deletePositiveRouteFeedback = (routeId: number, text: string) =>
+  api.delete<RouteFeedbackResponse>(`/tenant/routes/${routeId}/feedback/positive`, {
+    params: { text },
+    data: { text },
+  });
+export const deleteNegativeRouteFeedback = (routeId: number, text: string) =>
+  api.delete<RouteFeedbackResponse>(`/tenant/routes/${routeId}/feedback/negative`, {
+    params: { text },
+    data: { text },
+  });
 
 export type LlmProvider = 'deepseek' | 'openrouter' | 'doubao' | 'qwen' | 'gemini';
 

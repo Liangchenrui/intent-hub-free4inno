@@ -178,6 +178,38 @@ def tenant_reindex():
     return tenant.reindex()
 
 
+@app.route("/tenant/routes/<int:route_id>/feedback/positive", methods=["POST"])
+def tenant_add_positive_feedback(route_id: int):
+    """Add tenant route positive feedback."""
+    from intent_hub.api import tenant
+
+    return tenant.add_positive_feedback(route_id)
+
+
+@app.route("/tenant/routes/<int:route_id>/feedback/positive", methods=["DELETE"])
+def tenant_delete_positive_feedback(route_id: int):
+    """Delete tenant route positive feedback."""
+    from intent_hub.api import tenant
+
+    return tenant.delete_positive_feedback(route_id)
+
+
+@app.route("/tenant/routes/<int:route_id>/feedback/negative", methods=["POST"])
+def tenant_add_negative_feedback(route_id: int):
+    """Add tenant route negative feedback."""
+    from intent_hub.api import tenant
+
+    return tenant.add_negative_feedback(route_id)
+
+
+@app.route("/tenant/routes/<int:route_id>/feedback/negative", methods=["DELETE"])
+def tenant_delete_negative_feedback(route_id: int):
+    """Delete tenant route negative feedback."""
+    from intent_hub.api import tenant
+
+    return tenant.delete_negative_feedback(route_id)
+
+
 @app.route("/tenant/reindex/sync-route", methods=["POST"])
 def tenant_sync_route():
     """Tenant sync route(s) to vector DB."""

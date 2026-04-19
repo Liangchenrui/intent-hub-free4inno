@@ -14,9 +14,15 @@
       "帮我登录这个网站",
       "自动测试这个Web应用",
       "从网页上提取数据",
-      "模拟用户操作浏览网页"
+      "模拟用户操作浏览网页",
+      "打开浏览器",
+      "关闭浏览器",
+      "打开网页",
+      "自动化浏览器"
     ],
-    "negative_samples": [],
+    "negative_samples": [
+      "打开网页"
+    ],
     "score_threshold": 0.75,
     "negative_threshold": 0.95,
     "source": {
@@ -47,9 +53,13 @@
       "实现一个带有复杂动效的仪表盘",
       "生成一个打破常规布局的网站首页",
       "设计一个具有杂志编辑感的用户界面",
-      "创建一个带有有机自然元素的产品展示页"
+      "创建一个带有有机自然元素的产品展示页",
+      "前端界面",
+      "设计一个登录界面"
     ],
-    "negative_samples": [],
+    "negative_samples": [
+      "设计一个登录界面"
+    ],
     "score_threshold": 0.75,
     "negative_threshold": 0.95,
     "source": {
@@ -80,7 +90,9 @@
       "让这个设计更专业",
       "检查这段前端代码的设计问题",
       "给这个界面添加有意义的动效",
-      "让这个设计看起来更沉稳"
+      "让这个设计看起来更沉稳",
+      "审查UI",
+      "审查前端代码"
     ],
     "negative_samples": [],
     "score_threshold": 0.75,
@@ -179,9 +191,12 @@
       "用 cli 搜索我的 obsidian 库",
       "执行 obsidian 命令",
       "运行 obsidian 插件开发命令",
-      "调试 obsidian 插件"
+      "调试 obsidian 插件",
+      "发布笔记"
     ],
-    "negative_samples": [],
+    "negative_samples": [
+      "发布ob笔记"
+    ],
     "score_threshold": 0.75,
     "negative_threshold": 0.95,
     "source": {
@@ -245,7 +260,10 @@
       "发布这篇Markdown到Hexo",
       "生成博客文章并部署",
       "发布笔记并预览",
-      "转换笔记为Hexo文章"
+      "转换笔记为Hexo文章",
+      "发布obsidian笔记",
+      "发布笔记",
+      "发布ob笔记"
     ],
     "negative_samples": [],
     "score_threshold": 0.75,
@@ -379,7 +397,9 @@
       "用p5.js做个流场可视化",
       "根据我的想法生成一份算法艺术代码"
     ],
-    "negative_samples": [],
+    "negative_samples": [
+      "艺术鉴赏"
+    ],
     "score_threshold": 0.75,
     "negative_threshold": 0.95,
     "source": {

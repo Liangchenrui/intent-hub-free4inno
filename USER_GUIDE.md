@@ -122,7 +122,7 @@ curl -X POST http://intenthub.free4inno.com/tenant/skill-sources/scan \
 ### 5.3 同步索引
 
 ```bash
-curl -X POST http://intenthub.free4inno.com/reindex \
+curl -X POST http://intenthub.free4inno.com/tenant/reindex \
   -H "Authorization: Bearer <access_code>" \
   -H "Content-Type: application/json" \
   -d "{\"force_full\":false}"
@@ -135,7 +135,7 @@ curl -X POST http://intenthub.free4inno.com/reindex \
 使用 CLI 或 Python SDK 时，请直接安装已发布版本：
 
 ```bash
-pip install intent-hub-cli==0.1.0
+pip install intent-hub-cli==0.1.4
 ```
 
 发布前校验：
@@ -151,7 +151,7 @@ python -m twine check dist/*
 发布后用户安装方式：
 
 ```bash
-pip install intent-hub-cli==0.1.0
+pip install intent-hub-cli==0.1.4
 ```
 
 ### 6.1 CLI 用法
@@ -328,7 +328,7 @@ intent-hub sync --route-ids 12,15 --json
 
 参数说明：
 
-- `--force-full`：可选。执行全量重建，对应后端 `/reindex` 且 `force_full=true`。
+- `--force-full`：可选。执行全量重建，对应后端 `/tenant/reindex` 且 `force_full=true`。
 - `--route-id`：可选。同步单个路由。
 - `--route-ids`：可选。同步多个路由 id，逗号分隔，例如 `12,15,18`。
 - `--json`：可选。输出完整 JSON；不传时默认输出后端返回的 `message`。

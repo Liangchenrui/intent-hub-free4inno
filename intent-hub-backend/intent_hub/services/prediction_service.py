@@ -35,6 +35,7 @@ class PredictionService:
         encoder = self.component_manager.encoder
         qdrant_client = self.component_manager.qdrant_client
         route_manager = self.component_manager.route_manager
+        route_manager.reload()
 
         # 1. 向量化
         query_vector = encoder.encode_single(request.text)

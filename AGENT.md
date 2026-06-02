@@ -22,6 +22,7 @@
 
 - 后端测试：`pytest intent-hub-backend/tests -q`
 - CLI 测试：`pytest intent-hub-cli/tests -q`
+- API 文档一致性：`python -m scripts.api_docs check`
 - 前端构建：在 `intent-hub-frontend/` 下执行 `npm run build`
 
 ## 清理规则

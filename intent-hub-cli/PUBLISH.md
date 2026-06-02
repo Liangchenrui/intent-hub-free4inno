@@ -61,7 +61,7 @@ python -m twine upload \
 Users can then install the package with:
 
 ```bash
-pip install intent-hub-cli==0.1.0
+pip install intent-hub-cli==0.1.4
 ```
 
 ## GitHub Actions Release
@@ -79,5 +79,5 @@ Recommended release flow:
 
 1. Bump `intent-hub-cli/pyproject.toml` version.
 2. Run the local release check.
-3. Push a tag like `intent-hub-cli-v0.1.0` to publish to PyPI.
+3. Push a tag like `intent-hub-cli-v0.1.4` to publish to PyPI.
 4. Or run the workflow manually against `testpypi` before the final PyPI release.

@@ -1,0 +1,3794 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Intent Hub API",
+    "version": "1.0.0",
+    "description": "Intent Hub 用户可用 API。导入 Apifox 后，在环境中配置 baseUrl，并把管理员 api_key 或租户 access_code 填入鉴权。"
+  },
+  "servers": [
+    {
+      "url": "http://intenthub.free4inno.com",
+      "description": "线上服务"
+    },
+    {
+      "url": "http://localhost:5000",
+      "description": "本地后端"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Admin"
+    },
+    {
+      "name": "Runtime"
+    },
+    {
+      "name": "Tenant Skills"
+    },
+    {
+      "name": "Tenant Routes"
+    },
+    {
+      "name": "Tenant Diagnostics"
+    },
+    {
+      "name": "Tenant Settings"
+    },
+    {
+      "name": "Compatibility"
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "管理员登录",
+        "description": "用用户名和密码获取管理员 api_key。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "example": {
+                "username": "admin",
+                "password": "123456"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/tenants": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "查询租户列表",
+        "description": "管理员查询所有租户。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "创建租户",
+        "description": "创建租户并返回初始 access_code。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantCreateRequest"
+              },
+              "example": {
+                "tenant_id": "team_alpha",
+                "name": "Team Alpha",
+                "access_code_label": "default"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/tenants/{tenant_id}/access-codes": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "创建租户访问码",
+        "description": "为指定租户创建新的 access_code。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "description": "租户 ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessCodeCreateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/tenants/{tenant_id}/access-codes/{code_id}/rotate": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "轮换租户访问码",
+        "description": "对指定访问码执行操作。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "description": "租户 ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_id",
+            "in": "path",
+            "required": true,
+            "description": "访问码 ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/admin/tenants/{tenant_id}/access-codes/{code_id}/disable": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "禁用租户访问码",
+        "description": "对指定访问码执行操作。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "description": "租户 ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_id",
+            "in": "path",
+            "required": true,
+            "description": "访问码 ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "tags": [
+          "Runtime"
+        ],
+        "summary": "查询当前租户身份",
+        "description": "根据 access_code 返回当前租户信息。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/route": {
+      "post": {
+        "tags": [
+          "Runtime"
+        ],
+        "summary": "路由判定",
+        "description": "输入文本，返回最匹配的 route_key 和候选结果。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextRequest"
+              },
+              "example": {
+                "text": "帮我整理 wiki"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/dispatch": {
+      "post": {
+        "tags": [
+          "Runtime"
+        ],
+        "summary": "获取执行建议",
+        "description": "输入文本，返回路由结果和 dispatch 建议；当前只返回建议，不执行真实工具。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextRequest"
+              },
+              "example": {
+                "text": "帮我整理 wiki"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/skill-sources": {
+      "get": {
+        "tags": [
+          "Tenant Skills"
+        ],
+        "summary": "查询 Skill 来源",
+        "description": "查询当前租户配置的 Skill 来源。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SkillSource"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Tenant Skills"
+        ],
+        "summary": "创建 Skill 来源",
+        "description": "创建或登记一个 Skill 来源。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "item": {
+                      "$ref": "#/components/schemas/SkillSource"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillSourceCreateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/skill-sources/scan": {
+      "post": {
+        "tags": [
+          "Tenant Skills"
+        ],
+        "summary": "扫描上传的 Skills",
+        "description": "上传本地收集到的 SKILL.md 内容，生成或应用路由草稿。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillScanRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/skill-drafts": {
+      "get": {
+        "tags": [
+          "Tenant Skills"
+        ],
+        "summary": "查询 Skill 草稿",
+        "description": "查询扫描后生成的路由草稿。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDraftList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/tenant/skill-drafts/apply": {
+      "post": {
+        "tags": [
+          "Tenant Skills"
+        ],
+        "summary": "应用 Skill 草稿",
+        "description": "根据 draft_file 应用一个路由草稿。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRoutesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "draft_file"
+                ],
+                "properties": {
+                  "draft_file": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/routes": {
+      "get": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "查询路由列表",
+        "description": "查询当前租户全部路由。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Route"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "创建路由",
+        "description": "创建一个租户路由，创建后通常需要同步索引。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Route"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Route"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/routes/search": {
+      "get": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "搜索路由",
+        "description": "按关键词搜索当前租户路由。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Route"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "搜索关键词",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/tenant/routes/{route_id}": {
+      "put": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "更新路由",
+        "description": "按路由 ID 更新租户路由。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Route"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Route"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "删除路由",
+        "description": "按路由 ID 删除租户路由。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/tenant/routes/generate-utterances": {
+      "post": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "生成路由语料",
+        "description": "根据路由信息生成建议语料。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Route"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateUtterancesRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/routes/import-skill": {
+      "post": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "从 SKILL.md 生成路由草稿",
+        "description": "上传 SKILL.md 文本内容，生成路由草稿。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDraft"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillImportRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/routes/import": {
+      "post": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "导入路由",
+        "description": "批量导入路由，支持 merge 或 replace。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRoutesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRoutesRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/routes/{route_id}/negative-samples": {
+      "post": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "添加负例样本",
+        "description": "为指定路由添加负例样本。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NegativeSamplesRequest"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "清空负例样本",
+        "description": "删除指定路由的全部负例样本。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/tenant/routes/{route_id}/feedback/positive": {
+      "post": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "添加正向反馈语料",
+        "description": "为指定路由添加一条正向反馈语料。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextRequest"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "删除正向反馈语料",
+        "description": "从指定路由删除一条正向反馈语料。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "text",
+            "in": "query",
+            "required": false,
+            "description": "要删除的语料文本",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/tenant/routes/{route_id}/feedback/negative": {
+      "post": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "添加负向反馈语料",
+        "description": "为指定路由添加一条负向反馈语料。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextRequest"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "删除负向反馈语料",
+        "description": "从指定路由删除一条负向反馈语料。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "text",
+            "in": "query",
+            "required": false,
+            "description": "要删除的语料文本",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/tenant/reindex": {
+      "post": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "重建索引",
+        "description": "重建当前租户路由索引。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReindexRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/reindex/sync-route": {
+      "post": {
+        "tags": [
+          "Tenant Routes"
+        ],
+        "summary": "同步指定路由索引",
+        "description": "同步一个或多个路由到向量索引；route_id 和 route_ids 二选一。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRouteRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/diagnostics/overlap": {
+      "get": {
+        "tags": [
+          "Tenant Diagnostics"
+        ],
+        "summary": "查询全部路由重叠诊断",
+        "description": "分析全部路由之间的重叠和冲突。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DiagnosticResult"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "description": "是否刷新缓存",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "max_conflicts",
+            "in": "query",
+            "required": false,
+            "description": "每组最多返回的冲突数量",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ]
+      }
+    },
+    "/tenant/diagnostics/overlap/{route_id}": {
+      "get": {
+        "tags": [
+          "Tenant Diagnostics"
+        ],
+        "summary": "查询单个路由重叠诊断",
+        "description": "分析指定路由与其他路由的重叠和冲突。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "max_conflicts",
+            "in": "query",
+            "required": false,
+            "description": "最多返回的冲突数量",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/tenant/diagnostics/umap": {
+      "get": {
+        "tags": [
+          "Tenant Diagnostics"
+        ],
+        "summary": "查询 UMAP 可视化数据",
+        "description": "返回路由语料二维投影数据。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UmapResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "n_neighbors",
+            "in": "query",
+            "required": false,
+            "description": "UMAP n_neighbors",
+            "schema": {
+              "type": "integer",
+              "default": 15
+            }
+          },
+          {
+            "name": "min_dist",
+            "in": "query",
+            "required": false,
+            "description": "UMAP min_dist",
+            "schema": {
+              "type": "number",
+              "default": 0.1
+            }
+          },
+          {
+            "name": "seed",
+            "in": "query",
+            "required": false,
+            "description": "随机种子",
+            "schema": {
+              "type": "integer",
+              "default": 42
+            }
+          }
+        ]
+      }
+    },
+    "/tenant/diagnostics/repair": {
+      "post": {
+        "tags": [
+          "Tenant Diagnostics"
+        ],
+        "summary": "生成修复建议",
+        "description": "根据两个路由的冲突情况生成修复建议。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepairSuggestion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepairRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/diagnostics/apply-repair": {
+      "post": {
+        "tags": [
+          "Tenant Diagnostics"
+        ],
+        "summary": "应用修复建议",
+        "description": "将修复后的 utterances 应用到指定路由。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyRepairRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant/settings": {
+      "get": {
+        "tags": [
+          "Tenant Settings"
+        ],
+        "summary": "查询租户配置",
+        "description": "查询当前租户配置。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Tenant Settings"
+        ],
+        "summary": "更新租户配置",
+        "description": "更新当前租户允许修改的配置项。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsUpdateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Settings"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/predict": {
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版路由判定",
+        "description": "旧版单租户预测接口。新接入建议使用 /v1/route。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PredictMatch"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextRequest"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/routes": {
+      "get": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 查询路由列表",
+        "description": "查询当前租户全部路由。\n\n旧版兼容路径。新接入建议使用 `/tenant/routes`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Route"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "deprecated": true
+      },
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 创建路由",
+        "description": "创建一个租户路由，创建后通常需要同步索引。\n\n旧版兼容路径。新接入建议使用 `/tenant/routes`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Route"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Route"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/routes/search": {
+      "get": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 搜索路由",
+        "description": "按关键词搜索当前租户路由。\n\n旧版兼容路径。新接入建议使用 `/tenant/routes/search`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Route"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "搜索关键词",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "deprecated": true
+      }
+    },
+    "/routes/{route_id}": {
+      "put": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 更新路由",
+        "description": "按路由 ID 更新租户路由。\n\n旧版兼容路径。新接入建议使用 `/tenant/routes/{route_id}`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Route"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Route"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      },
+      "delete": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 删除路由",
+        "description": "按路由 ID 删除租户路由。\n\n旧版兼容路径。新接入建议使用 `/tenant/routes/{route_id}`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "deprecated": true
+      }
+    },
+    "/routes/generate-utterances": {
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 生成路由语料",
+        "description": "根据路由信息生成建议语料。\n\n旧版兼容路径。新接入建议使用 `/tenant/routes/generate-utterances`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Route"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateUtterancesRequest"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/routes/import-skill": {
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 从 SKILL.md 生成路由草稿",
+        "description": "上传 SKILL.md 文本内容，生成路由草稿。\n\n旧版兼容路径。新接入建议使用 `/tenant/routes/import-skill`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDraft"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillImportRequest"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/routes/import": {
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 导入路由",
+        "description": "批量导入路由，支持 merge 或 replace。\n\n旧版兼容路径。新接入建议使用 `/tenant/routes/import`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRoutesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRoutesRequest"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/routes/{route_id}/negative-samples": {
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 添加负例样本",
+        "description": "为指定路由添加负例样本。\n\n旧版兼容路径。新接入建议使用 `/tenant/routes/{route_id}/negative-samples`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NegativeSamplesRequest"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      },
+      "delete": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 清空负例样本",
+        "description": "删除指定路由的全部负例样本。\n\n旧版兼容路径。新接入建议使用 `/tenant/routes/{route_id}/negative-samples`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "deprecated": true
+      }
+    },
+    "/reindex": {
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 重建索引",
+        "description": "重建当前租户路由索引。\n\n旧版兼容路径。新接入建议使用 `/tenant/reindex`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReindexRequest"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/reindex/sync-route": {
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 同步指定路由索引",
+        "description": "同步一个或多个路由到向量索引；route_id 和 route_ids 二选一。\n\n旧版兼容路径。新接入建议使用 `/tenant/reindex/sync-route`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRouteRequest"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/diagnostics/overlap": {
+      "get": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 查询全部路由重叠诊断",
+        "description": "分析全部路由之间的重叠和冲突。\n\n旧版兼容路径。新接入建议使用 `/tenant/diagnostics/overlap`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DiagnosticResult"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "description": "是否刷新缓存",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "max_conflicts",
+            "in": "query",
+            "required": false,
+            "description": "每组最多返回的冲突数量",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "deprecated": true
+      }
+    },
+    "/diagnostics/overlap/{route_id}": {
+      "get": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 查询单个路由重叠诊断",
+        "description": "分析指定路由与其他路由的重叠和冲突。\n\n旧版兼容路径。新接入建议使用 `/tenant/diagnostics/overlap/{route_id}`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "description": "路由 ID",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "max_conflicts",
+            "in": "query",
+            "required": false,
+            "description": "最多返回的冲突数量",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "deprecated": true
+      }
+    },
+    "/diagnostics/umap": {
+      "get": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 查询 UMAP 可视化数据",
+        "description": "返回路由语料二维投影数据。\n\n旧版兼容路径。新接入建议使用 `/tenant/diagnostics/umap`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UmapResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "n_neighbors",
+            "in": "query",
+            "required": false,
+            "description": "UMAP n_neighbors",
+            "schema": {
+              "type": "integer",
+              "default": 15
+            }
+          },
+          {
+            "name": "min_dist",
+            "in": "query",
+            "required": false,
+            "description": "UMAP min_dist",
+            "schema": {
+              "type": "number",
+              "default": 0.1
+            }
+          },
+          {
+            "name": "seed",
+            "in": "query",
+            "required": false,
+            "description": "随机种子",
+            "schema": {
+              "type": "integer",
+              "default": 42
+            }
+          }
+        ],
+        "deprecated": true
+      }
+    },
+    "/diagnostics/repair": {
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 生成修复建议",
+        "description": "根据两个路由的冲突情况生成修复建议。\n\n旧版兼容路径。新接入建议使用 `/tenant/diagnostics/repair`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepairSuggestion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepairRequest"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/diagnostics/apply-repair": {
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 应用修复建议",
+        "description": "将修复后的 utterances 应用到指定路由。\n\n旧版兼容路径。新接入建议使用 `/tenant/diagnostics/apply-repair`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyRepairRequest"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/settings": {
+      "get": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 查询租户配置",
+        "description": "查询当前租户配置。\n\n旧版兼容路径。新接入建议使用 `/tenant/settings`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "deprecated": true
+      },
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "旧版兼容 - 更新租户配置",
+        "description": "更新当前租户允许修改的配置项。\n\n旧版兼容路径。新接入建议使用 `/tenant/settings`。",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsUpdateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未认证或凭证无效"
+          },
+          "500": {
+            "description": "服务端错误"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Settings"
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Authorization: Bearer <api_key 或 access_code>"
+      },
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "旧版接口也支持 X-API-Key"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "admin"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "example": "123456"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "api_key": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_key",
+          "message"
+        ]
+      },
+      "AccessCode": {
+        "type": "object",
+        "properties": {
+          "code_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "last_used_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "access_code": {
+            "type": "string",
+            "description": "仅创建或轮换时返回明文"
+          }
+        }
+      },
+      "SkillSource": {
+        "type": "object",
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "source_label": {
+            "type": "string"
+          },
+          "client_path_hint": {
+            "type": "string",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "sync_mode": {
+            "type": "string",
+            "enum": [
+              "scan",
+              "apply"
+            ]
+          },
+          "last_scanned_at": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Tenant": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "qdrant_collection": {
+            "type": "string"
+          },
+          "access_codes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccessCode"
+            }
+          },
+          "skill_sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkillSource"
+            }
+          }
+        }
+      },
+      "TenantList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tenant"
+            }
+          }
+        }
+      },
+      "TenantCreateRequest": {
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "name"
+        ],
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "example": "team_alpha"
+          },
+          "name": {
+            "type": "string",
+            "example": "Team Alpha"
+          },
+          "qdrant_collection": {
+            "type": "string"
+          },
+          "access_code_label": {
+            "type": "string",
+            "example": "default"
+          },
+          "access_code": {
+            "type": "string",
+            "description": "不传则自动生成"
+          }
+        }
+      },
+      "TenantCreateResponse": {
+        "type": "object",
+        "properties": {
+          "tenant": {
+            "$ref": "#/components/schemas/Tenant"
+          },
+          "access_code": {
+            "$ref": "#/components/schemas/AccessCode"
+          }
+        }
+      },
+      "AccessCodeCreateRequest": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "example": "developer"
+          },
+          "access_code": {
+            "type": "string",
+            "description": "不传则自动生成"
+          }
+        }
+      },
+      "MeResponse": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string"
+          },
+          "tenant_name": {
+            "type": "string"
+          },
+          "code_id": {
+            "type": "string"
+          },
+          "code_label": {
+            "type": "string"
+          },
+          "collection": {
+            "type": "string"
+          }
+        }
+      },
+      "TextRequest": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "example": "帮我整理 wiki"
+          }
+        }
+      },
+      "PredictMatch": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "route_key": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          }
+        }
+      },
+      "RouteResult": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string"
+          },
+          "route_key": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PredictMatch"
+            }
+          },
+          "collection": {
+            "type": "string"
+          }
+        }
+      },
+      "DispatchResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RouteResult"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "dispatch": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "example": "not_executed"
+                  },
+                  "executor": {
+                    "type": "string",
+                    "example": "none"
+                  },
+                  "suggestion": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Route": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "route_key",
+          "utterances"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 12
+          },
+          "name": {
+            "type": "string",
+            "example": "整理 Wiki"
+          },
+          "route_key": {
+            "type": "string",
+            "example": "obsidian_raw_to_wiki"
+          },
+          "description": {
+            "type": "string"
+          },
+          "utterances": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "negative_samples": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "score_threshold": {
+            "type": "number",
+            "default": 0.75
+          },
+          "negative_threshold": {
+            "type": "number",
+            "default": 0.95
+          },
+          "lifecycle_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "draft",
+              "stale",
+              "disabled"
+            ]
+          }
+        }
+      },
+      "GenerateUtterancesRequest": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "route_key"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "route_key": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "default": 5
+          },
+          "utterances": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SkillImportRequest": {
+        "type": "object",
+        "required": [
+          "skill_content"
+        ],
+        "properties": {
+          "skill_content": {
+            "type": "string"
+          }
+        }
+      },
+      "SkillDraft": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "route_key": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "utterances": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ImportRoutesRequest": {
+        "type": "object",
+        "required": [
+          "routes"
+        ],
+        "properties": {
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Route"
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "replace"
+            ],
+            "default": "merge"
+          }
+        }
+      },
+      "ImportRoutesResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "created": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          },
+          "removed": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "skipped": {
+            "type": "integer"
+          }
+        }
+      },
+      "NegativeSamplesRequest": {
+        "type": "object",
+        "required": [
+          "negative_samples"
+        ],
+        "properties": {
+          "negative_samples": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "negative_threshold": {
+            "type": "number",
+            "default": 0.95
+          }
+        }
+      },
+      "FeedbackResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "route_id": {
+            "type": "integer"
+          },
+          "total_utterances": {
+            "type": "integer"
+          },
+          "total_negative_samples": {
+            "type": "integer"
+          }
+        }
+      },
+      "SkillSourceCreateRequest": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "source_label": {
+            "type": "string"
+          },
+          "client_path_hint": {
+            "type": "string"
+          },
+          "sync_mode": {
+            "type": "string",
+            "enum": [
+              "scan",
+              "apply"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SkillScanRequest": {
+        "type": "object",
+        "required": [
+          "skills"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "source_label": {
+            "type": "string"
+          },
+          "client_path_hint": {
+            "type": "string"
+          },
+          "sync_mode": {
+            "type": "string",
+            "enum": [
+              "scan",
+              "apply"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "relative_path",
+                "content"
+              ],
+              "properties": {
+                "skill_name": {
+                  "type": "string"
+                },
+                "relative_path": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "SkillDraftList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "draft_file": {
+                  "type": "string"
+                },
+                "skill_path": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "last_scanned_at": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "route_id": {
+                  "type": "integer",
+                  "nullable": true
+                },
+                "skill_hash": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "json_hash": {
+                  "type": "string",
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "ReindexRequest": {
+        "type": "object",
+        "properties": {
+          "force_full": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "SyncRouteRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "route_id"
+            ],
+            "properties": {
+              "route_id": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "route_ids"
+            ],
+            "properties": {
+              "route_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "DiagnosticResult": {
+        "type": "object",
+        "properties": {
+          "route_id": {
+            "type": "integer"
+          },
+          "route_name": {
+            "type": "string"
+          },
+          "overlaps": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "RepairRequest": {
+        "type": "object",
+        "required": [
+          "source_route_id",
+          "target_route_id"
+        ],
+        "properties": {
+          "source_route_id": {
+            "type": "integer"
+          },
+          "target_route_id": {
+            "type": "integer"
+          },
+          "include_negative_samples": {
+            "type": "boolean",
+            "description": "前端会传此字段，当前后端可能忽略"
+          }
+        }
+      },
+      "RepairSuggestion": {
+        "type": "object",
+        "properties": {
+          "route_id": {
+            "type": "integer"
+          },
+          "route_name": {
+            "type": "string"
+          },
+          "new_utterances": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "negative_samples": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conflicting_utterances": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rationalization": {
+            "type": "string"
+          }
+        }
+      },
+      "ApplyRepairRequest": {
+        "type": "object",
+        "required": [
+          "route_id",
+          "utterances"
+        ],
+        "properties": {
+          "route_id": {
+            "type": "integer"
+          },
+          "utterances": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UmapResponse": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "meta": {
+            "type": "object"
+          }
+        }
+      },
+      "Settings": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "EMBEDDING_SERVICE_URL": {
+            "type": "string"
+          },
+          "LLM_PROVIDER": {
+            "type": "string"
+          },
+          "LLM_API_KEY": {
+            "type": "string",
+            "nullable": true
+          },
+          "LLM_BASE_URL": {
+            "type": "string",
+            "nullable": true
+          },
+          "LLM_MODEL": {
+            "type": "string",
+            "nullable": true
+          },
+          "LLM_TEMPERATURE": {
+            "type": "number"
+          },
+          "BATCH_SIZE": {
+            "type": "integer"
+          }
+        }
+      },
+      "SettingsUpdateResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/Settings"
+          }
+        }
+      }
+    }
+  }
+}

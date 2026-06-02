@@ -7,7 +7,7 @@ Lightweight CLI and Python SDK for remote Intent Hub deployments.
 If you want to use the published CLI or Python SDK, install the released package:
 
 ```bash
-pip install intent-hub-cli==0.1.0
+pip install intent-hub-cli==0.1.4
 ```
 
 Editable install for package development:
@@ -23,18 +23,18 @@ Build and install a wheel:
 cd intent-hub-cli
 python -m pip install -U build
 python -m build
-pip install dist/intent_hub_cli-0.1.0-py3-none-any.whl
+pip install dist/intent_hub_cli-0.1.4-py3-none-any.whl
 ```
 
 This produces:
 
-- `dist/intent_hub_cli-0.1.0-py3-none-any.whl`
-- `dist/intent_hub_cli-0.1.0.tar.gz`
+- `dist/intent_hub_cli-0.1.4-py3-none-any.whl`
+- `dist/intent_hub_cli-0.1.4.tar.gz`
 
 After publishing:
 
 ```bash
-pip install intent-hub-cli==0.1.0
+pip install intent-hub-cli==0.1.4
 ```
 
 ## Publishing

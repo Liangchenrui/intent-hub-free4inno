@@ -1,104 +1,50 @@
 {
   "1": {
     "route_id": 1,
-    "route_name": "浏览器自动化",
-    "overlaps": []
+    "route_name": "BUPT-GradGuide",
+    "overlaps": [
+      {
+        "target_route_id": 3,
+        "target_route_name": "BUPT-Scholarship",
+        "region_similarity": 0.8656252892153672,
+        "instance_conflicts": [
+          {
+            "source_utterance": "奖学金申请条件是？",
+            "target_utterance": "奖学金申请条件",
+            "similarity": 0.946341574461306
+          }
+        ],
+        "total_conflicts": 1
+      }
+    ]
   },
   "2": {
     "route_id": 2,
-    "route_name": "前端界面创意设计",
+    "route_name": "BUPT-TrainPlan",
     "overlaps": []
   },
   "3": {
     "route_id": 3,
-    "route_name": "前端设计审查与优化",
-    "overlaps": []
+    "route_name": "BUPT-Scholarship",
+    "overlaps": [
+      {
+        "target_route_id": 1,
+        "target_route_name": "BUPT-GradGuide",
+        "region_similarity": 0.8656252892153672,
+        "instance_conflicts": [
+          {
+            "source_utterance": "奖学金申请条件",
+            "target_utterance": "奖学金申请条件是？",
+            "similarity": 0.946341574461306
+          }
+        ],
+        "total_conflicts": 1
+      }
+    ]
   },
   "4": {
     "route_id": 4,
-    "route_name": "创建或编辑 Obsidian Bases 文件",
-    "overlaps": []
-  },
-  "5": {
-    "route_id": 5,
-    "route_name": "Wiki内容审计与整合",
-    "overlaps": [
-      {
-        "target_route_id": 9,
-        "target_route_name": "AI知识库构建器",
-        "region_similarity": 0.8776015551147732,
-        "instance_conflicts": [],
-        "total_conflicts": 0
-      }
-    ]
-  },
-  "6": {
-    "route_id": 6,
-    "route_name": "Obsidian CLI 操作",
-    "overlaps": [
-      {
-        "target_route_id": 7,
-        "target_route_name": "Obsidian 风格 Markdown 编辑",
-        "region_similarity": 0.8609179301875365,
-        "instance_conflicts": [],
-        "total_conflicts": 0
-      }
-    ]
-  },
-  "7": {
-    "route_id": 7,
-    "route_name": "Obsidian 风格 Markdown 编辑",
-    "overlaps": [
-      {
-        "target_route_id": 6,
-        "target_route_name": "Obsidian CLI 操作",
-        "region_similarity": 0.8609179301875365,
-        "instance_conflicts": [],
-        "total_conflicts": 0
-      }
-    ]
-  },
-  "8": {
-    "route_id": 8,
-    "route_name": "Obsidian笔记发布到Hexo博客",
-    "overlaps": []
-  },
-  "9": {
-    "route_id": 9,
-    "route_name": "AI知识库构建器",
-    "overlaps": [
-      {
-        "target_route_id": 5,
-        "target_route_name": "Wiki内容审计与整合",
-        "region_similarity": 0.8776015551147732,
-        "instance_conflicts": [],
-        "total_conflicts": 0
-      }
-    ]
-  },
-  "10": {
-    "route_id": 10,
-    "route_name": "Vercel沙盒浏览器自动化",
-    "overlaps": []
-  },
-  "11": {
-    "route_id": 11,
-    "route_name": "Windows C盘安全清理顾问",
-    "overlaps": []
-  },
-  "12": {
-    "route_id": 12,
-    "route_name": "生成式算法艺术创作",
-    "overlaps": []
-  },
-  "13": {
-    "route_id": 13,
-    "route_name": "Anthropic品牌样式应用",
-    "overlaps": []
-  },
-  "14": {
-    "route_id": 14,
-    "route_name": "视觉哲学与画布设计",
+    "route_name": "财富顾问",
     "overlaps": []
   }
 }

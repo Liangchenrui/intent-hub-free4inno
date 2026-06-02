@@ -28,7 +28,7 @@ Intent Hub 是一个多租户意图路由服务仓库，包含 Flask 后端、Vu
 如果你需要远程 CLI 或 Python SDK，请安装：
 
 ```bash
-pip install intent-hub-cli==0.1.0
+pip install intent-hub-cli==0.1.4
 ```
 
 面向终端用户的 skill 扫描已经改为客户端本地目录模式：
@@ -60,7 +60,7 @@ npm run dev
 如果你只需要调用远程 Intent Hub 服务，请安装独立包：
 
 ```bash
-pip install intent-hub-cli==0.1.0
+pip install intent-hub-cli==0.1.4
 ```
 
 CLI 扫描示例：

@@ -28,7 +28,7 @@ For normal users, use the hosted service directly:
 If you need the remote CLI or Python SDK, install:
 
 ```bash
-pip install intent-hub-cli==0.1.0
+pip install intent-hub-cli==0.1.4
 ```
 
 Skill scanning for end users is client-side:
@@ -60,7 +60,7 @@ npm run dev
 Use the standalone package if you only need to call a remote Intent Hub deployment:
 
 ```bash
-pip install intent-hub-cli==0.1.0
+pip install intent-hub-cli==0.1.4
 ```
 
 Example local scan:

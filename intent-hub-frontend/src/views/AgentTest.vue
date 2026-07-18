@@ -1,561 +1,101 @@
 <template>
-  <el-container class="layout-container">
-    <el-header class="header-wrapper">
-      <div class="header-content">
-        <div class="brand">
-          <img src="@/assets/logo.png" alt="Intent Hub" class="logo-img" />
-        </div>
-        <div class="user-info">
-          <ModeSwitcher />
-          <LanguageSwitcher />
-          <el-button type="danger" @click="handleLogout">{{ $t('common.logout') }}</el-button>
-        </div>
+  <div class="page-intro">
+    <div>
+      <h1>路由测试</h1>
+      <p>输入真实用户问题，验证当前向量索引的 Agent 路由结果</p>
+    </div>
+  </div>
+
+  <el-card shadow="never" class="panel-card test-card">
+    <div class="test-heading">
+      <div>
+        <span class="step-label">QUERY</span>
+        <h2>输入测试问题</h2>
       </div>
-    </el-header>
+      <span class="threshold-note">仅返回超过 Agent 阈值的结果</span>
+    </div>
+    <el-input
+      v-model="query"
+      type="textarea"
+      :rows="5"
+      resize="none"
+      placeholder="例如：帮我查询明天北京的天气"
+      class="query-input"
+      @keydown.ctrl.enter="submit"
+    />
+    <div class="submit-row">
+      <span>Ctrl + Enter 快速提交</span>
+      <el-button type="primary" size="large" :loading="loading" @click="submit">查询路由</el-button>
+    </div>
 
-    <el-main class="main-wrapper">
-      <div class="page-header">
-        <el-tabs v-model="activeTab" class="nav-tabs" @tab-change="handleTabChange">
-          <el-tab-pane :label="$t('nav.list')" name="list"></el-tab-pane>
-          <el-tab-pane :label="$t('nav.test')" name="test"></el-tab-pane>
-          <el-tab-pane :label="$t('nav.diagnostics')" name="diagnostics"></el-tab-pane>
-          <el-tab-pane :label="$t('nav.settings')" name="settings"></el-tab-pane>
-        </el-tabs>
+    <div v-if="result" class="result-section">
+      <div class="section-title"><span>RESULT</span><strong>路由结果</strong></div>
+      <div v-if="!result.matched" class="fallback">
+        <strong>未命中 Agent</strong>
+        <p>{{ result.text }}</p>
       </div>
-
-      <el-card shadow="never" class="test-card">
-        <div v-if="!hasFullReindex" class="warning-banner">
-          <el-alert
-            :title="$t('test.title')"
-            type="warning"
-            :closable="false"
-            show-icon
-          >
-            <template #default>
-              <span>{{ $t('test.warningMessage') }}</span>
-              <el-button 
-                type="primary" 
-                size="small" 
-                :loading="reindexing"
-                @click="handleReindex"
-                style="margin-left: 8px;"
-              >
-                {{ $t('test.sync') }}
-              </el-button>
-            </template>
-          </el-alert>
-        </div>
-        <div class="input-section">
-          <el-input 
-            v-model="queryText" 
-            :placeholder="$t('test.placeholder')" 
-            size="large"
-            clearable
-            :disabled="!hasFullReindex"
-            @keyup.enter="handleTest"
-          >
-            <template #prefix>
-              <el-icon><ChatLineRound /></el-icon>
-            </template>
-            <template #append>
-              <el-button 
-                type="primary" 
-                :loading="loading" 
-                :disabled="!hasFullReindex"
-                @click="handleTest"
-              >
-                {{ $t('test.test') }}
-              </el-button>
-            </template>
-          </el-input>
-        </div>
-
-        <div v-if="results.length > 0" class="results-section">
-          <div class="results-header">
-            <h3>{{ $t('test.resultsTitle', { count: results.length }) }}</h3>
-            <el-divider />
-          </div>
-          <div class="results-list">
-            <el-card 
-              v-for="(result, index) in results" 
-              :key="`${result.id}-${result.route_key}`" 
-              class="result-item" 
-              :class="{ 'top-match': index === 0 && !isNoneRoute(result), 'none-match': isNoneRoute(result) }"
-              shadow="hover"
-            >
-              <div class="result-info">
-                <div class="name-box">
-                  <el-tag v-if="index === 0 && !isNoneRoute(result)" size="small" type="success" effect="dark" class="match-badge">{{ $t('test.bestMatch') }}</el-tag>
-                  <el-tag v-else-if="isNoneRoute(result)" size="small" type="info" effect="plain" class="match-badge">{{ $t('test.noRouteBadge') }}</el-tag>
-                  <div class="result-title">
-                    <span class="result-name">{{ isNoneRoute(result) ? $t('test.noRouteTitle') : result.name }}</span>
-                    <span v-if="isNoneRoute(result)" class="result-route-key none-route-copy">{{ $t('test.noRouteDescription') }}</span>
-                    <span v-else class="result-route-key">{{ result.route_key }}</span>
-                  </div>
-                </div>
-                <el-tag v-if="!isNoneRoute(result)" size="small" type="info" effect="plain">ID: {{ result.id }}</el-tag>
-              </div>
-              <div class="result-score">
-                <div class="score-label">{{ $t('test.confidenceScore') }}</div>
-                <div class="score-bar-container">
-                  <el-progress 
-                    :percentage="Math.min(Math.round((result.score || 0) * 100), 100)" 
-                    :status="isNoneRoute(result) ? 'warning' : ((result.score || 0) > 0.7 ? 'success' : ((result.score || 0) > 0.4 ? 'warning' : 'exception'))"
-                    :stroke-width="14"
-                    :show-text="false"
-                  />
-                </div>
-                <div class="score-number">{{ result.score == null ? '--' : result.score.toFixed(4) }}</div>
-              </div>
-              <div v-if="!isNoneRoute(result)" class="feedback-actions">
-                <el-button
-                  circle
-                  class="feedback-button positive-button"
-                  :class="{ 'is-active': getFeedbackState(result.id) === 'positive', 'is-pending': isFeedbackPending(result.id) }"
-                  :disabled="isFeedbackPending(result.id)"
-                  @click="handleFeedback(result, 'positive')"
-                >
-                  <span class="thumb-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M7 21V9"
-                        stroke="currentColor"
-                        stroke-width="1.9"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                      <path
-                        d="M14.7 4.2 11.9 9H19a2 2 0 0 1 1.94 2.5l-1.4 5A2 2 0 0 1 17.62 18H7V9.8a2 2 0 0 1 .58-1.4l4.83-4.95a1.15 1.15 0 0 1 1.93 1.11Z"
-                        stroke="currentColor"
-                        stroke-width="1.9"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                  </span>
-                </el-button>
-                <el-button
-                  circle
-                  class="feedback-button negative-button"
-                  :class="{ 'is-active': getFeedbackState(result.id) === 'negative', 'is-pending': isFeedbackPending(result.id) }"
-                  :disabled="isFeedbackPending(result.id)"
-                  @click="handleFeedback(result, 'negative')"
-                >
-                  <span class="thumb-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M17 3v12"
-                        stroke="currentColor"
-                        stroke-width="1.9"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                      <path
-                        d="M9.3 19.8 12.1 15H5a2 2 0 0 1-1.94-2.5l1.4-5A2 2 0 0 1 6.38 6H17v8.2a2 2 0 0 1-.58 1.4l-4.83 4.95a1.15 1.15 0 0 1-1.93-1.11Z"
-                        stroke="currentColor"
-                        stroke-width="1.9"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                  </span>
-                </el-button>
-              </div>
-            </el-card>
+      <el-card v-else shadow="never" class="match-card">
+        <div class="match-main">
+          <el-tag type="success" effect="dark" size="small">最佳匹配</el-tag>
+          <div>
+            <strong>{{ result.agent?.title }}</strong>
+            <span>Agent ID: {{ result.agent?.id }}</span>
           </div>
         </div>
-        <div v-else-if="hasTested && !loading" class="empty-results">
-          <el-empty :description="$t('test.noMatch')" :image-size="120" />
-        </div>
+        <el-tag type="success" effect="plain">已通过阈值</el-tag>
       </el-card>
-    </el-main>
-  </el-container>
+    </div>
+  </el-card>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
-import { ChatLineRound } from '@element-plus/icons-vue';
-import {
-  clearTenantSession,
-  deleteNegativeRouteFeedback,
-  deletePositiveRouteFeedback,
-  predict,
-  reindex,
-  setActiveMode,
-  submitNegativeRouteFeedback,
-  submitPositiveRouteFeedback,
-  type PredictResult,
-} from '../api';
-import LanguageSwitcher from '../components/LanguageSwitcher.vue';
-import ModeSwitcher from '../components/ModeSwitcher.vue';
+import { ref } from 'vue';
+import { ElMessage } from 'element-plus';
+import { route, type RouteData } from '../api';
 
-const { t } = useI18n();
-
-const router = useRouter();
-const queryText = ref('');
-const results = ref<PredictResult[]>([]);
+const query = ref('');
 const loading = ref(false);
-const hasTested = ref(false);
-const activeTab = ref('test');
-const reindexing = ref(false);
-const feedbackState = ref<Record<number, 'positive' | 'negative' | undefined>>({});
-const feedbackPending = ref<Record<number, boolean | undefined>>({});
-
-// 检查是否已完成全量同步
-const hasFullReindex = computed(() => {
-  return !!localStorage.getItem('last_full_reindex');
-});
-
-const handleLogout = () => {
-  clearTenantSession();
-  setActiveMode('tenant');
-  router.push('/login');
-};
-
-const handleTabChange = (tabName: any) => {
-  if (tabName === 'list') {
-    router.push('/');
-  } else if (tabName === 'diagnostics') {
-    router.push('/diagnostics');
-  } else if (tabName === 'settings') {
-    router.push('/settings');
-  }
-};
-
-const handleReindex = async () => {
-  try {
-    await ElMessageBox.confirm(t('agent.reindexConfirm'), t('agent.reindexTitle'));
-    reindexing.value = true;
-    try {
-      const response = await reindex(true);
-      const { message, routes_count, total_points } = response.data;
-      // 保存全量同步时间戳
-      localStorage.setItem('last_full_reindex', Date.now().toString());
-      ElMessage.success(`${message} (${t('nav.list')}: ${routes_count}, ${t('agent.utterances')}: ${total_points})`);
-    } catch (error) {
-      ElMessage.error(t('test.reindexError'));
-    } finally {
-      reindexing.value = false;
-    }
-  } catch (e) {
-    // 用户取消
-  }
-};
-
-const handleTest = async () => {
-  if (!queryText.value.trim()) return ElMessage.warning(t('test.inputQueryWarning'));
-
-  // 检查是否已完成全量同步
-  const lastReindex = localStorage.getItem('last_full_reindex');
-  if (!lastReindex) {
-    ElMessage.warning(t('test.syncFirstWarning'));
-    return;
-  }
-
+const result = ref<RouteData>();
+const submit = async () => {
+  if (!query.value.trim()) return ElMessage.warning('请输入用户问题');
   loading.value = true;
-  hasTested.value = true;
   try {
-    const response = await predict(queryText.value);
-    results.value = response.data;
-    feedbackState.value = {};
-    feedbackPending.value = {};
-  } catch (error) {
-    ElMessage.error(t('test.predictError'));
-  } finally {
-    loading.value = false;
+    const response = (await route(query.value.trim())).data;
+    result.value = response.data || undefined;
   }
-};
-
-const isNoneRoute = (result: PredictResult) => result.route_key === 'none';
-const getFeedbackState = (routeId: number) => feedbackState.value[routeId];
-const isFeedbackPending = (routeId: number) => Boolean(feedbackPending.value[routeId]);
-
-const handleFeedback = async (result: PredictResult, feedbackType: 'positive' | 'negative') => {
-  const text = queryText.value.trim();
-  if (!text) {
-    ElMessage.warning(t('test.inputQueryWarning'));
-    return;
-  }
-
-  const previousState = feedbackState.value[result.id];
-  const nextState = previousState === feedbackType ? undefined : feedbackType;
-  feedbackState.value = {
-    ...feedbackState.value,
-    [result.id]: nextState,
-  };
-  feedbackPending.value = {
-    ...feedbackPending.value,
-    [result.id]: true,
-  };
-  try {
-    if (previousState === feedbackType) {
-      if (feedbackType === 'positive') {
-        await deletePositiveRouteFeedback(result.id, text);
-      } else {
-        await deleteNegativeRouteFeedback(result.id, text);
-      }
-    } else if (feedbackType === 'positive') {
-      await submitPositiveRouteFeedback(result.id, text);
-    } else {
-      await submitNegativeRouteFeedback(result.id, text);
-    }
-    ElMessage({
-      type: 'success',
-      message: t('test.feedbackSyncHint'),
-    });
-  } catch (error) {
-    feedbackState.value = {
-      ...feedbackState.value,
-      [result.id]: previousState,
-    };
-    ElMessage.error(t('test.feedbackError'));
-  } finally {
-    feedbackPending.value = {
-      ...feedbackPending.value,
-      [result.id]: false,
-    };
-  }
+  catch (error: any) { ElMessage.error(error.response?.data?.error?.detail || '查询失败'); }
+  finally { loading.value = false; }
 };
 </script>
 
 <style scoped>
-.layout-container {
-  min-width: 160px;
-  min-height: 100vh;
-  background-color: #f5f7fa;
-}
+.test-card { padding: 8px; }
+.test-card :deep(.el-card__body) { padding: 28px 32px; }
+.test-heading, .submit-row, .match-card :deep(.el-card__body), .match-main { display: flex; align-items: center; }
+.test-heading { justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+.test-heading h2 { margin: 5px 0 0; color: #303133; font-size: 18px; }
+.step-label, .section-title span { color: #337ff2; font-size: 11px; font-weight: 700; letter-spacing: .14em; }
+.threshold-note { padding: 7px 11px; color: #7a828e; background: #f5f7fa; border-radius: 6px; font-size: 12px; }
+.query-input :deep(.el-textarea__inner) { padding: 16px; line-height: 1.7; box-shadow: 0 0 0 1px #dcdfe6 inset; }
+.query-input :deep(.el-textarea__inner:focus) { box-shadow: 0 0 0 1px #337ff2 inset; }
+.submit-row { justify-content: space-between; margin-top: 16px; }
+.submit-row > span { color: #a8abb2; font-size: 12px; }
+.submit-row .el-button { min-width: 128px; }
+.result-section { margin-top: 32px; padding-top: 28px; border-top: 1px solid #ebeef5; }
+.section-title { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+.section-title strong { font-size: 17px; }
+.fallback strong { display: block; margin-bottom: 6px; color: #7a5d18; }
+.fallback p { margin: 0; font-size: 13px; line-height: 1.6; }
+.match-card { border: 1px solid #d9ecff; border-left: 4px solid #67c23a; background: #f5fbf2; }
+.match-card :deep(.el-card__body) { justify-content: space-between; gap: 20px; padding: 20px 22px; }
+.match-main { gap: 14px; }
+.match-main > div { display: flex; flex-direction: column; gap: 5px; }
+.match-main strong { color: #303133; font-size: 17px; }
+.match-main span { color: #909399; font-family: Consolas, monospace; font-size: 12px; }
 
-.header-wrapper {
-  background-color: #fff;
-  border-bottom: 1px solid #e6e8eb;
-  padding: 0 40px;
-  height: 64px !important;
-  display: flex;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.header-content {
-  width: 95%;
-  max-width: 1400px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo-img {
-  height: 40px;
-  width: auto;
-}
-
-.main-wrapper {
-  width: 95%;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px 0;
-}
-
-.page-header {
-  margin-bottom: 24px;
-}
-
-.nav-tabs :deep(.el-tabs__header) {
-  margin-bottom: 0;
-}
-
-.nav-tabs :deep(.el-tabs__item) {
-  min-width: 120px;
-  padding: 0 5%;
-  justify-content: center;
-  font-size: 15px;
-}
-
-.test-card {
-  border: none;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
-  padding: 16px;
-}
-
-.input-section {
-  margin-bottom: 32px;
-}
-
-.results-section {
-  margin-top: 24px;
-}
-
-.results-header h3 {
-  margin: 0 0 12px 0;
-  font-size: 18px;
-  color: #303133;
-}
-
-.results-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.result-item {
-  border-radius: 10px;
-  border: 1px solid #ebeef5;
-  transition: all 0.3s;
-}
-
-.top-match {
-  border-left: 4px solid var(--el-color-success);
-  background-color: #f0f9eb;
-}
-
-.none-match {
-  border-left: 4px solid var(--el-color-warning);
-  background-color: #fff8eb;
-}
-
-.result-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.name-box {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.result-name {
-  font-weight: 700;
-  color: #303133;
-  font-size: 16px;
-}
-
-.result-title {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.result-route-key {
-  font-size: 12px;
-  color: #409eff;
-  font-family: 'Courier New', Courier, monospace;
-}
-
-.match-badge {
-  font-weight: normal;
-}
-
-.result-score {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.score-label {
-  font-size: 13px;
-  color: #909399;
-  white-space: nowrap;
-}
-
-.score-bar-container {
-  flex: 1;
-  min-width: 0; /* 防止溢出 */
-}
-
-.score-number {
-  font-family: 'Courier New', Courier, monospace;
-  font-weight: 600;
-  color: #606266;
-  min-width: 60px;
-  text-align: right;
-  font-size: 14px;
-}
-
-.feedback-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.feedback-button {
-  width: 40px;
-  height: 40px;
-  border-width: 1px;
-  transition: all 0.2s ease;
-}
-
-.thumb-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-}
-
-.thumb-icon svg {
-  width: 22px;
-  height: 22px;
-}
-
-.feedback-button.is-pending {
-  opacity: 0.7;
-}
-
-.positive-button {
-  border-color: #d0d5dd;
-  color: #475467;
-  background: #ffffff;
-}
-
-.positive-button.is-active {
-  border-color: #1f2937;
-  color: #ffffff;
-  background: #1f2937;
-}
-
-.negative-button {
-  border-color: #d0d5dd;
-  color: #475467;
-  background: #ffffff;
-}
-
-.negative-button.is-active {
-  border-color: #1f2937;
-  color: #ffffff;
-  background: #1f2937;
-}
-
-.feedback-button:not(.is-active):hover {
-  border-color: #98a2b3;
-  color: #111827;
-  background: #f8fafc;
-}
-
-.none-route-copy {
-  color: #909399;
-  white-space: normal;
-}
-
-.empty-results {
-  padding: 40px 0;
-}
-
-.warning-banner {
-  margin-bottom: 20px;
+@media (max-width: 600px) {
+  .test-card :deep(.el-card__body) { padding: 20px 16px; }
+  .test-heading, .match-card :deep(.el-card__body) { align-items: flex-start; flex-direction: column; }
+  .threshold-note { align-self: flex-start; }
 }
 </style>

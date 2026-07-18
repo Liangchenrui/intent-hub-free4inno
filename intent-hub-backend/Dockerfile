@@ -46,9 +46,8 @@ COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 
 COPY --chown=appuser:appuser . .
 
-# 创建必要的目录
-RUN mkdir -p /app/intent_hub/models /app/data && \
-    chown -R appuser:appuser /app/intent_hub/models /app/data
+# 创建运行时数据目录
+RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
 
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh

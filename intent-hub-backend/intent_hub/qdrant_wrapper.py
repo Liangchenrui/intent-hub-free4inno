@@ -1,213 +1,135 @@
-"""Qdrant客户端封装模块"""
+"""Qdrant operations used by the minimal Agent router."""
+
+from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, List, Optional
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
     FieldCondition,
     Filter,
+    MatchValue,
     PayloadSchemaType,
     PointStruct,
     VectorParams,
 )
 
-from intent_hub.utils.logger import logger
-
 
 class IntentHubQdrantClient:
-    """Intent Hub专用的Qdrant客户端封装"""
-
-    # Qdrant payload中的字段名
     ROUTE_ID_KEY = "route_id"
     ROUTE_NAME_KEY = "route_name"
     UTTERANCE_KEY = "utterance"
     ROUTE_HASH_KEY = "route_hash"
     MODEL_NAME_KEY = "model_name"
     SCORE_THRESHOLD_KEY = "score_threshold"
-    IS_NEGATIVE_KEY = "is_negative"  # 标识是否为负例向量
-    NEGATIVE_THRESHOLD_KEY = "negative_threshold"  # 负例阈值
+    IS_NEGATIVE_KEY = "is_negative"
+    NEGATIVE_THRESHOLD_KEY = "negative_threshold"
 
-    def __init__(
-        self,
-        url: str,
-        collection_name: str,
-        dimensions: int,
-        api_key: Optional[str] = None,
-    ):
-        """初始化Qdrant客户端
-
-        Args:
-            url: Qdrant服务地址
-            collection_name: Collection名称
-            dimensions: 向量维度
-            api_key: API密钥（可选）
-        """
-        # 彻底清洗 URL：去除空格、结尾斜杠
-        self.url = url.strip().rstrip("/") if url else ""
+    def __init__(self, url: str, collection_name: str, dimensions: int, api_key: str | None = None):
         self.collection_name = collection_name
+        self.client = QdrantClient(url=url.strip().rstrip("/"), api_key=api_key, timeout=600)
         self.dimensions = dimensions
-        self.api_key = api_key
-
-        try:
-            # 针对 Qdrant Cloud 环境，如果检测到 SSL 错误，尝试在代码层级绕过代理
-            import os
-
-            clean_url = self.url
-
-            # 如果是特定的外部地址，强制清理环境中的代理设置，防止 httpcore/httpx 走代理
-            if clean_url and (
-                ".qdrant.io" in clean_url or "free4inno.com" in clean_url
-            ):
-                host_only = (
-                    clean_url.replace("https://", "")
-                    .replace("http://", "")
-                    .split(":")[0]
-                ).strip()
-
-                no_proxy = os.environ.get("NO_PROXY", "")
-                if host_only not in no_proxy:
-                    os.environ["NO_PROXY"] = (
-                        f"{no_proxy},{host_only}" if no_proxy else host_only
-                    )
-                    logger.info(f"Added {host_only} to NO_PROXY")
-
-            # 根据配置决定使用 url 还是 host 模式
-            if clean_url and (
-                clean_url.startswith("http://")
-                or clean_url.startswith("https://")
-                or clean_url.startswith("grpc://")
-            ):
-                # 智能修复：如果是 Qdrant Cloud 地址且带了 6333 端口，云端通常使用 443
-                if ".cloud.qdrant.io" in clean_url and ":6333" in clean_url:
-                    logger.warning(
-                        "Qdrant Cloud with port 6333 detected. Correcting to HTTPS (443)..."
-                    )
-                    clean_url = clean_url.replace(":6333", "")
-
-                logger.info(f"Initializing Qdrant client (URL mode) with: {clean_url}")
-                self.client = QdrantClient(url=clean_url, api_key=api_key, timeout=600)
-                logger.info(f"Qdrant initialized (URL mode): {clean_url}")
-            else:
-                # Host 模式初始化
-                self.client = QdrantClient(
-                    host=clean_url if clean_url else None,
-                    api_key=api_key,
-                    https=True
-                    if (api_key and clean_url and ".qdrant.io" in clean_url)
-                    else None,
-                    timeout=30,
-                )
-                logger.info(
-                    f"Qdrant initialized (Host mode): {clean_url if clean_url else 'default'}"
-                )
-        except Exception as e:
-            if "SSL" in str(e) or "EOF" in str(e):
-                logger.error(
-                    "Qdrant SSL error. Check port (usually 443 for cloud) and proxy settings."
-                )
-            logger.error(f"Qdrant initialization failed: {e}", exc_info=True)
-            raise
-
         self._ensure_collection()
 
-    def _ensure_collection(self):
-        """确保Collection存在，不存在则创建"""
-        try:
-            try:
-                exists = self.client.collection_exists(self.collection_name)
-            except Exception as e:
-                logger.warning(f"Error checking collection {self.collection_name}: {e}")
-                exists = False
-
-            if not exists:
-                logger.info(f"Creating collection: {self.collection_name}")
-                try:
-                    self.client.create_collection(
-                        collection_name=self.collection_name,
-                        vectors_config=VectorParams(
-                            size=self.dimensions, distance=Distance.COSINE
-                        ),
-                    )
-                    logger.info(f"Collection created: {self.collection_name}")
-                except Exception as e:
-                    # 再次捕获 409 Conflict 或 "already exists" 错误，防止并发导致的初始化失败
-                    if "already exists" in str(e).lower() or "409" in str(e):
-                        logger.info(f"Collection {self.collection_name} already exists")
-                    else:
-                        raise
-            else:
-                logger.info(f"Collection exists: {self.collection_name}")
-
-            # 确保关键字段有索引 (针对 Qdrant Cloud 的性能或强制要求)
+    def _ensure_collection(self) -> None:
+        if not self.client.collection_exists(self.collection_name):
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(size=self.dimensions, distance=Distance.COSINE),
+            )
+        for field, schema in (
+            (self.ROUTE_ID_KEY, PayloadSchemaType.INTEGER),
+            (self.IS_NEGATIVE_KEY, PayloadSchemaType.BOOL),
+        ):
             try:
                 self.client.create_payload_index(
                     collection_name=self.collection_name,
-                    field_name=self.ROUTE_ID_KEY,
-                    field_schema=PayloadSchemaType.INTEGER,
+                    field_name=field,
+                    field_schema=schema,
                 )
-                logger.info(f"Index for {self.ROUTE_ID_KEY} ensured")
-            except Exception as e:
-                if (
-                    "already exists" not in str(e).lower()
-                    and "duplicate" not in str(e).lower()
-                ):
-                    logger.warning(
-                        f"Warning creating index for {self.ROUTE_ID_KEY}: {e}"
-                    )
+            except Exception as error:
+                if "already exists" not in str(error).lower():
+                    raise
 
-            try:
-                self.client.create_payload_index(
-                    collection_name=self.collection_name,
-                    field_name=self.IS_NEGATIVE_KEY,
-                    field_schema=PayloadSchemaType.BOOL,
-                )
-                logger.info(f"Index for {self.IS_NEGATIVE_KEY} ensured")
-            except Exception as e:
-                if (
-                    "already exists" not in str(e).lower()
-                    and "duplicate" not in str(e).lower()
-                ):
-                    logger.warning(
-                        f"Warning creating index for {self.IS_NEGATIVE_KEY}: {e}"
-                    )
+    def delete_all(self) -> None:
+        if self.client.collection_exists(self.collection_name):
+            self.client.delete_collection(self.collection_name)
+        self._ensure_collection()
 
-        except Exception as e:
-            logger.error(f"Collection initialization failed: {e}", exc_info=True)
-            raise
+    def points_count(self) -> int:
+        return int(self.client.get_collection(self.collection_name).points_count or 0)
+
+    def index_summary(self) -> dict:
+        route_ids = set()
+        route_hashes = {}
+        points_count = 0
+        offset = None
+        while True:
+            points, offset = self.client.scroll(
+                collection_name=self.collection_name,
+                limit=200,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+            points_count += len(points)
+            for point in points:
+                payload = point.payload or {}
+                route_id = payload.get(self.ROUTE_ID_KEY)
+                if route_id is not None:
+                    route_ids.add(route_id)
+                    if payload.get(self.ROUTE_HASH_KEY):
+                        route_hashes[route_id] = payload[self.ROUTE_HASH_KEY]
+            if offset is None:
+                break
+        return {
+            "points_count": points_count,
+            "route_ids": sorted(route_ids),
+            "route_hashes": route_hashes,
+        }
+
+    def update_route_thresholds(
+        self,
+        route_id: int,
+        score_threshold: float,
+        negative_threshold: float,
+        route_hash: str,
+    ) -> None:
+        route_filter = FieldCondition(key=self.ROUTE_ID_KEY, match=MatchValue(value=route_id))
+        self.client.set_payload(
+            collection_name=self.collection_name,
+            payload={self.SCORE_THRESHOLD_KEY: score_threshold, self.ROUTE_HASH_KEY: route_hash},
+            points=Filter(
+                must=[route_filter],
+                must_not=[FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True))],
+            ),
+        )
+        self.client.set_payload(
+            collection_name=self.collection_name,
+            payload={self.NEGATIVE_THRESHOLD_KEY: negative_threshold},
+            points=Filter(
+                must=[
+                    route_filter,
+                    FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)),
+                ]
+            ),
+        )
 
     def upsert_route_utterances(
         self,
         route_id: int,
         route_name: str,
-        utterances: List[str],
-        embeddings: List[List[float]],
+        utterances: list[str],
+        embeddings: list[list[float]],
         score_threshold: float,
-        route_hash: Optional[str] = None,  # 新增：路由哈希
-        model_name: Optional[str] = None,  # 新增：模型名称
-    ):
-        """插入或更新路由的utterances向量
-
-        Args:
-            route_id: 路由ID
-            route_name: 路由名称
-            utterances: 示例语句列表
-            embeddings: 对应的向量列表
-            score_threshold: 相似度阈值
-            route_hash: 路由配置的哈希值
-            model_name: 当前使用的 Embedding 模型名称
-        """
+        route_hash: str | None = None,
+        model_name: str | None = None,
+    ) -> None:
         if len(utterances) != len(embeddings):
-            raise ValueError("utterances和embeddings长度不匹配")
-
+            raise ValueError("utterances 和 embeddings 长度不匹配")
         points = []
         for utterance, embedding in zip(utterances, embeddings):
-            # 使用确定性UUID生成point ID
-            point_id = str(
-                uuid.uuid5(uuid.NAMESPACE_DNS, f"{route_id}:{route_name}:{utterance}")
-            )
-
             payload = {
                 self.ROUTE_ID_KEY: route_id,
                 self.ROUTE_NAME_KEY: route_name,
@@ -218,451 +140,63 @@ class IntentHubQdrantClient:
                 payload[self.ROUTE_HASH_KEY] = route_hash
             if model_name:
                 payload[self.MODEL_NAME_KEY] = model_name
-
-            points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
-
-        try:
+            points.append(
+                PointStruct(
+                    id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{route_id}:{route_name}:{utterance}")),
+                    vector=embedding,
+                    payload=payload,
+                )
+            )
+        if points:
             self.client.upsert(collection_name=self.collection_name, points=points)
-            logger.info(f"Updated route {route_name}: {len(points)} vectors")
-        except Exception as e:
-            logger.error(f"Failed to update vector points: {e}", exc_info=True)
-            raise
-
-    def delete_route(self, route_id: int):
-        """删除指定路由的所有向量点
-
-        Args:
-            route_id: 路由ID
-        """
-        try:
-            # 注意：Qdrant的FieldCondition需要匹配数值类型，这里使用MatchValue
-            from qdrant_client.models import MatchValue
-
-            self.client.delete(
-                collection_name=self.collection_name,
-                points_selector=Filter(
-                    must=[
-                        FieldCondition(
-                            key=self.ROUTE_ID_KEY, match=MatchValue(value=route_id)
-                        )
-                    ]
-                ),
-            )
-            logger.info(f"Deleted points for route ID {route_id}")
-        except Exception as e:
-            logger.error(f"Failed to delete points: {e}", exc_info=True)
-            raise
-
-    def get_route_vectors(self, route_id: int) -> List[Dict[str, Any]]:
-        """获取指定路由的所有向量点和载荷（排除负例向量）
-
-        Args:
-            route_id: 路由ID
-
-        Returns:
-            包含vector和payload的列表（仅包含正例向量）
-        """
-        try:
-            from qdrant_client.models import MatchValue
-
-            results = []
-            offset = None
-            batch_size = 100
-
-            while True:
-                result = self.client.scroll(
-                    collection_name=self.collection_name,
-                    scroll_filter=Filter(
-                        must=[
-                            FieldCondition(
-                                key=self.ROUTE_ID_KEY, match=MatchValue(value=route_id)
-                            )
-                        ],
-                        # 排除负例向量：is_negative 不为 True
-                        must_not=[
-                            FieldCondition(
-                                key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)
-                            )
-                        ],
-                    ),
-                    limit=batch_size,
-                    offset=offset,
-                    with_payload=True,
-                    with_vectors=True,
-                )
-
-                points, next_offset = result
-                for point in points:
-                    # 双重检查：确保不是负例向量（兼容旧数据，如果 is_negative 字段不存在，也认为是正例）
-                    payload = point.payload or {}
-                    is_negative = payload.get(self.IS_NEGATIVE_KEY, False)
-                    if not is_negative:
-                        results.append({"vector": point.vector, "payload": payload})
-
-                if next_offset is None:
-                    break
-                offset = next_offset
-
-            return results
-        except Exception as e:
-            logger.error(
-                f"Failed to get vectors for route {route_id}: {e}", exc_info=True
-            )
-            raise
-
-    def search(self, query_vector: List[float], top_k: int = 1) -> List[Dict[str, Any]]:
-        """搜索最相似的向量
-
-        Args:
-            query_vector: 查询向量
-            top_k: 返回Top K结果
-
-        Returns:
-            搜索结果列表，每个结果包含score和payload
-        """
-        try:
-            results = self.client.query_points(
-                collection_name=self.collection_name,
-                query=query_vector,
-                limit=top_k,
-                with_payload=True,
-            )
-
-            search_results = []
-            for point in results.points:
-                search_results.append(
-                    {
-                        "score": point.score,
-                        "payload": {
-                            self.ROUTE_ID_KEY: point.payload.get(self.ROUTE_ID_KEY),
-                            self.ROUTE_NAME_KEY: point.payload.get(self.ROUTE_NAME_KEY),
-                            self.UTTERANCE_KEY: point.payload.get(self.UTTERANCE_KEY),
-                            self.SCORE_THRESHOLD_KEY: point.payload.get(
-                                self.SCORE_THRESHOLD_KEY
-                            ),
-                        },
-                    }
-                )
-
-            return search_results
-        except Exception as e:
-            logger.error(f"Vector search failed: {e}", exc_info=True)
-            raise
-
-    def delete_all(self):
-        """清空Collection中的所有向量点"""
-        try:
-            self.client.delete_collection(self.collection_name)
-            self._ensure_collection()
-            logger.info(f"Collection cleared: {self.collection_name}")
-        except Exception as e:
-            logger.error(f"Failed to clear collection: {e}", exc_info=True)
-            raise
-
-    def is_ready(self) -> bool:
-        """检查Qdrant服务是否可用"""
-        try:
-            return self.client.collection_exists(self.collection_name)
-        except Exception:
-            return False
-
-    def has_data(self) -> bool:
-        """检查Collection中是否有数据"""
-        try:
-            info = self.client.get_collection(self.collection_name)
-            return info.points_count > 0
-        except Exception as e:
-            logger.error(f"Failed to check collection data: {e}", exc_info=True)
-            return False
-
-    def get_existing_route_ids(self) -> set[int]:
-        """获取Qdrant中所有现有的路由ID集合
-
-        Returns:
-            路由ID集合
-        """
-        try:
-            route_ids = set()
-            # 使用scroll方法遍历所有点，提取唯一的route_id
-            offset = None
-            batch_size = 100
-
-            while True:
-                result = self.client.scroll(
-                    collection_name=self.collection_name,
-                    limit=batch_size,
-                    offset=offset,
-                    with_payload=True,
-                    with_vectors=False,
-                )
-
-                points, next_offset = result
-
-                if not points:
-                    break
-
-                for point in points:
-                    route_id = point.payload.get(self.ROUTE_ID_KEY)
-                    if route_id is not None:
-                        route_ids.add(route_id)
-
-                offset = next_offset
-                if next_offset is None:
-                    break
-
-            logger.info(
-                f"从Qdrant获取到 {len(route_ids)} 个现有路由ID: {sorted(route_ids)}"
-            )
-            return route_ids
-        except Exception as e:
-            logger.error(f"Failed to fetch existing route IDs: {e}", exc_info=True)
-            raise
-
-    def get_existing_route_hashes(self) -> Dict[int, str]:
-        """获取Qdrant中所有现有的路由ID及其对应的哈希值
-
-        Returns:
-            {route_id: hash} 字典
-        """
-        try:
-            route_hashes = {}
-            offset = None
-            batch_size = 100
-
-            while True:
-                result = self.client.scroll(
-                    collection_name=self.collection_name,
-                    limit=batch_size,
-                    offset=offset,
-                    with_payload=True,
-                    with_vectors=False,
-                )
-
-                points, next_offset = result
-                if not points:
-                    break
-
-                for point in points:
-                    payload = point.payload or {}
-                    route_id = payload.get(self.ROUTE_ID_KEY)
-                    route_hash = payload.get(self.ROUTE_HASH_KEY)
-                    if route_id is not None and route_hash is not None:
-                        # 如果同一个 ID 有多个点，哈希应该是一致的，这里直接覆盖
-                        route_hashes[route_id] = route_hash
-
-                offset = next_offset
-                if next_offset is None:
-                    break
-
-            return route_hashes
-        except Exception as e:
-            logger.error(f"Failed to fetch existing route hashes: {e}", exc_info=True)
-            return {}
-
-    def get_collection_model_name(self) -> Optional[str]:
-        """获取集合中存储的模型名称（通过检查第一个点的 payload）
-
-        Returns:
-            模型名称或 None
-        """
-        try:
-            result = self.client.scroll(
-                collection_name=self.collection_name,
-                limit=1,
-                with_payload=True,
-                with_vectors=False,
-            )
-            points, _ = result
-            if points and points[0].payload:
-                return points[0].payload.get(self.MODEL_NAME_KEY)
-            return None
-        except Exception:
-            return None
-
-    def scroll_all_points(
-        self, with_vectors: bool = True, exclude_negative: bool = True
-    ) -> List[Dict[str, Any]]:
-        """遍历 collection 中所有点（用于可视化/诊断等离线分析场景）
-
-        Args:
-            with_vectors: 是否返回向量
-            exclude_negative: 是否排除负例向量，默认为 True（诊断时应该排除负例）
-
-        Returns:
-            列表元素结构: {"id": str|int, "vector": [...](可选), "payload": {...}}
-        """
-        try:
-            from qdrant_client.models import MatchValue
-
-            results: List[Dict[str, Any]] = []
-            offset = None
-            batch_size = 200
-
-            # 构建过滤条件
-            scroll_filter = None
-            if exclude_negative:
-                scroll_filter = Filter(
-                    must_not=[
-                        FieldCondition(
-                            key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)
-                        )
-                    ]
-                )
-
-            while True:
-                scroll_params = {
-                    "collection_name": self.collection_name,
-                    "limit": batch_size,
-                    "offset": offset,
-                    "with_payload": True,
-                    "with_vectors": with_vectors,
-                }
-                if scroll_filter:
-                    scroll_params["scroll_filter"] = scroll_filter
-
-                points, next_offset = self.client.scroll(**scroll_params)
-
-                for p in points:
-                    # 双重检查：确保不是负例向量（如果 exclude_negative 为 True）
-                    payload = p.payload or {}
-                    if exclude_negative and payload.get(self.IS_NEGATIVE_KEY, False):
-                        continue
-
-                    item: Dict[str, Any] = {"id": p.id, "payload": payload}
-                    if with_vectors:
-                        item["vector"] = p.vector
-                    results.append(item)
-
-                if next_offset is None:
-                    break
-                offset = next_offset
-
-            return results
-        except Exception as e:
-            logger.error(f"Failed to scroll all points: {e}", exc_info=True)
-            raise
 
     def upsert_route_negative_samples(
         self,
         route_id: int,
         route_name: str,
-        negative_samples: List[str],
-        embeddings: List[List[float]],
+        negative_samples: list[str],
+        embeddings: list[list[float]],
         negative_threshold: float,
-    ):
-        """插入或更新路由的负例向量
-
-        Args:
-            route_id: 路由ID
-            route_name: 路由名称
-            negative_samples: 负例语句列表
-            embeddings: 对应的向量列表
-            negative_threshold: 负例相似度阈值
-        """
+    ) -> None:
         if len(negative_samples) != len(embeddings):
-            raise ValueError("negative_samples和embeddings长度不匹配")
-
-        points = []
-        for negative_sample, embedding in zip(negative_samples, embeddings):
-            # 使用确定性UUID生成point ID，添加negative前缀以区分
-            point_id = str(
-                uuid.uuid5(
-                    uuid.NAMESPACE_DNS,
-                    f"negative:{route_id}:{route_name}:{negative_sample}",
-                )
+            raise ValueError("negative_samples 和 embeddings 长度不匹配")
+        points = [
+            PointStruct(
+                id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"negative:{route_id}:{route_name}:{text}")),
+                vector=embedding,
+                payload={
+                    self.ROUTE_ID_KEY: route_id,
+                    self.ROUTE_NAME_KEY: route_name,
+                    self.UTTERANCE_KEY: text,
+                    self.IS_NEGATIVE_KEY: True,
+                    self.NEGATIVE_THRESHOLD_KEY: negative_threshold,
+                },
             )
-
-            payload = {
-                self.ROUTE_ID_KEY: route_id,
-                self.ROUTE_NAME_KEY: route_name,
-                self.UTTERANCE_KEY: negative_sample,
-                self.IS_NEGATIVE_KEY: True,  # 标识为负例
-                self.NEGATIVE_THRESHOLD_KEY: negative_threshold,
-            }
-
-            points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
-
-        try:
+            for text, embedding in zip(negative_samples, embeddings)
+        ]
+        if points:
             self.client.upsert(collection_name=self.collection_name, points=points)
-            logger.info(f"Updated route {route_name}: {len(points)} negative vectors")
-        except Exception as e:
-            logger.error(f"Failed to update negative points: {e}", exc_info=True)
-            raise
 
-    def search_negative_samples(
-        self, query_vector: List[float], top_k: int = 10
-    ) -> List[Dict[str, Any]]:
-        """搜索与查询向量最相似的负例向量
+    def search(self, query_vector: list[float], top_k: int = 20) -> list[dict]:
+        result = self.client.query_points(
+            collection_name=self.collection_name,
+            query=query_vector,
+            limit=top_k,
+            query_filter=Filter(
+                must_not=[FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True))]
+            ),
+            with_payload=True,
+        )
+        return [{"score": point.score, "payload": point.payload or {}} for point in result.points]
 
-        Args:
-            query_vector: 查询向量
-            top_k: 返回Top K结果
-
-        Returns:
-            搜索结果列表，每个结果包含score和payload
-        """
-        try:
-            from qdrant_client.models import MatchValue
-
-            # 只搜索负例向量
-            results = self.client.query_points(
-                collection_name=self.collection_name,
-                query=query_vector,
-                limit=top_k,
-                query_filter=Filter(
-                    must=[
-                        FieldCondition(
-                            key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)
-                        )
-                    ]
-                ),
-                with_payload=True,
-            )
-
-            search_results = []
-            for point in results.points:
-                search_results.append(
-                    {
-                        "score": point.score,
-                        "payload": {
-                            self.ROUTE_ID_KEY: point.payload.get(self.ROUTE_ID_KEY),
-                            self.ROUTE_NAME_KEY: point.payload.get(self.ROUTE_NAME_KEY),
-                            self.UTTERANCE_KEY: point.payload.get(self.UTTERANCE_KEY),
-                            self.NEGATIVE_THRESHOLD_KEY: point.payload.get(
-                                self.NEGATIVE_THRESHOLD_KEY, 0.95
-                            ),
-                        },
-                    }
-                )
-
-            return search_results
-        except Exception as e:
-            logger.error(f"Negative vector search failed: {e}", exc_info=True)
-            raise
-
-    def delete_route_negative_samples(self, route_id: int):
-        """删除指定路由的所有负例向量点
-
-        Args:
-            route_id: 路由ID
-        """
-        try:
-            from qdrant_client.models import MatchValue
-
-            self.client.delete(
-                collection_name=self.collection_name,
-                points_selector=Filter(
-                    must=[
-                        FieldCondition(
-                            key=self.ROUTE_ID_KEY, match=MatchValue(value=route_id)
-                        ),
-                        FieldCondition(
-                            key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)
-                        ),
-                    ]
-                ),
-            )
-            logger.info(f"Deleted all negative points for route ID {route_id}")
-        except Exception as e:
-            logger.error(f"Failed to delete negative points: {e}", exc_info=True)
-            raise
+    def search_negative_samples(self, query_vector: list[float], top_k: int = 20) -> list[dict]:
+        result = self.client.query_points(
+            collection_name=self.collection_name,
+            query=query_vector,
+            limit=top_k,
+            query_filter=Filter(
+                must=[FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True))]
+            ),
+            with_payload=True,
+        )
+        return [{"score": point.score, "payload": point.payload or {}} for point in result.points]

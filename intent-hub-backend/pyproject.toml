@@ -5,8 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "intent-hub"
 version = "0.1.0"
-description = "基于向量相似度的静态路由系统"
-readme = "README.md"
+description = "基于向量相似度的 Agent 路由系统"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
@@ -28,35 +27,10 @@ dependencies = [
     "requests>=2.31.0",
     "pydantic>=2.0.0",
     "qdrant-client>=1.8.0",
-    "numpy>=1.24.0",
-    "scipy>=1.10.0",
-    "numba>=0.57.0",
-    "umap-learn>=0.5.3",
-    "langchain-core>=0.2.0",
-    "langchain-openai>=0.1.0",
-    "langchain-google-genai>=0.1.0",
 ]
 
 [project.optional-dependencies]
-local = [
-    "torch>=2.0.0",
-    "transformers>=4.30.0",
-    "sentencepiece>=0.1.99",
-]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
-]
-full = [
-    "intent-hub[local]",
-]
-
-[project.scripts]
-intent-hub = "intent_hub.cli:main"
-intenthub = "intent_hub.cli:main"
+dev = ["pytest>=7.0.0"]
 
 [tool.setuptools.packages.find]
 include = ["intent_hub*"]

@@ -10,12 +10,9 @@
     "build:prod": "vite build && tar -czf dist.tar.gz dist"
   },
   "dependencies": {
-    "@element-plus/icons-vue": "^2.3.2",
     "axios": "^1.13.2",
-    "echarts": "^5.6.0",
     "element-plus": "^2.13.0",
     "vue": "^3.5.24",
-    "vue-i18n": "^9.14.5",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {

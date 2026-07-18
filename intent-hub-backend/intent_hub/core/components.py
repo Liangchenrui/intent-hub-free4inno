@@ -1,85 +1,45 @@
-"""Backward-compatible component access built on tenant-scoped managers."""
+"""Lazy component container."""
 
-from typing import Optional
-
+from intent_hub.agent_store import AgentStore
 from intent_hub.config import Config
-from intent_hub.platform.models import TenantRecord
-from intent_hub.platform.workspace import TenantWorkspaceResolver
-from intent_hub.tenant.components import TenantComponentRegistry
-from intent_hub.tenant.context import TenantContext
+from intent_hub.encoder import QwenEmbeddingEncoder
+from intent_hub.qdrant_wrapper import IntentHubQdrantClient
 
 
 class ComponentManager:
-    """Compatibility wrapper that exposes the default tenant components."""
-
-    def __init__(
-        self,
-        encoder_factory=None,
-        qdrant_client_factory=None,
-        route_manager_factory=None,
-    ):
-        self._registry = TenantComponentRegistry(
-            encoder_factory=encoder_factory,
-            qdrant_client_factory=qdrant_client_factory,
-            route_manager_factory=route_manager_factory,
-        )
-
-    @property
-    def tenant_context(self) -> TenantContext:
-        tenant = TenantRecord(
-            tenant_id=Config.DEFAULT_TENANT_ID,
-            name="Default Tenant",
-            status="active",
-            qdrant_collection=Config.QDRANT_COLLECTION,
-            access_codes=[],
-            skill_sources=[],
-        )
-        workspace = TenantWorkspaceResolver(Config.DATA_DIR, tenant).resolve()
-        return TenantContext.from_tenant_record(tenant, workspace)
-
-    @property
-    def tenant_manager(self):
-        return self._registry.get(self.tenant_context)
+    def __init__(self, encoder_factory=None, qdrant_client_factory=None, store=None):
+        self.encoder_factory = encoder_factory or QwenEmbeddingEncoder
+        self.qdrant_client_factory = qdrant_client_factory or IntentHubQdrantClient
+        self.agent_store = store or AgentStore(Config.AGENTS_FILE)
+        self._encoder = None
+        self._qdrant_client = None
 
     @property
     def encoder(self):
-        return self.tenant_manager.encoder
+        if self._encoder is None:
+            self._encoder = self.encoder_factory(
+                service_url=Config.EMBEDDING_SERVICE_URL,
+                batch_size=Config.BATCH_SIZE,
+            )
+        return self._encoder
 
     @property
     def qdrant_client(self):
-        return self.tenant_manager.qdrant_client
+        if self._qdrant_client is None:
+            self._qdrant_client = self.qdrant_client_factory(
+                url=Config.QDRANT_URL,
+                collection_name=Config.QDRANT_COLLECTION,
+                dimensions=self.encoder.dimensions,
+                api_key=Config.QDRANT_API_KEY,
+            )
+        return self._qdrant_client
 
-    @property
-    def route_manager(self):
-        return self.tenant_manager.route_manager
-
-    def is_ready(self) -> bool:
-        try:
-            self.ensure_ready()
-            return True
-        except Exception:
-            return False
-
-    def reinit_components(self):
-        self._registry.clear(self.tenant_context.tenant_id)
-        self.ensure_ready()
-
-    def init_components(self, force: bool = False):
-        if force:
-            self._registry.clear(self.tenant_context.tenant_id)
-        self.ensure_ready()
-
-    def ensure_ready(self):
-        self.tenant_manager.ensure_ready()
+    def reset_qdrant(self) -> None:
+        self._qdrant_client = None
 
 
-_component_manager: Optional[ComponentManager] = None
+_component_manager = ComponentManager()
 
 
 def get_component_manager() -> ComponentManager:
-    """Return the singleton compatibility manager."""
-
-    global _component_manager
-    if _component_manager is None:
-        _component_manager = ComponentManager()
     return _component_manager

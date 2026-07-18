@@ -1,505 +1,141 @@
-"""Flask application entry point."""
+"""Minimal Intent Hub HTTP API."""
 
-from flask import Flask
+from functools import wraps
+
+from flask import Flask, jsonify, request
 from flask_compress import Compress
+from pydantic import ValidationError
 
-from intent_hub.auth import require_auth
+from intent_hub.auth import get_auth_manager, require_auth
+from intent_hub.config import Config
 from intent_hub.core.components import get_component_manager
+from intent_hub.models import LoginRequest, RouteRequest, ThresholdRequest
+from intent_hub.services.prediction_service import PredictionService
+from intent_hub.services.sync_service import SyncService
+from intent_hub.utils.logger import logger
+
 
 app = Flask(__name__)
 Compress(app)
 
 
-@app.route("/auth/login", methods=["POST"])
+def api_errors(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except ValidationError as error:
+            return jsonify({
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "请求参数错误",
+                    "detail": str(error),
+                },
+            }), 400
+        except ValueError as error:
+            return jsonify({
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "请求参数错误",
+                    "detail": str(error),
+                },
+            }), 400
+        except Exception as error:
+            logger.exception("API request failed: %s", request.path)
+            return jsonify({
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "服务异常",
+                    "detail": str(error),
+                },
+            }), 500
+
+    return wrapped
+
+
+@app.get("/health")
+def health():
+    return jsonify({"status": "ok"})
+
+
+@app.post("/auth/login")
+@api_errors
 def login():
-    """Login (no auth required)."""
-    from intent_hub.api import auth
+    payload = LoginRequest(**(request.get_json() or {}))
+    key = get_auth_manager().login(payload.username, payload.password)
+    if not key:
+        return jsonify({"error": "用户名或密码错误"}), 401
+    return jsonify({"api_key": key})
 
-    return auth.login()
 
-
-@app.route("/predict", methods=["POST"])
-def predict():
-    """Route prediction (Telestar auth)."""
-    from intent_hub.api import prediction
-
-    return prediction.predict()
-
-
-@app.route("/v1/me", methods=["GET"])
-def tenant_me():
-    """Tenant runtime identity."""
-    from intent_hub.api import tenant
-
-    return tenant.me()
-
-
-@app.route("/v1/route", methods=["POST"])
-def tenant_route():
-    """Tenant runtime route API."""
-    from intent_hub.api import tenant
-
-    return tenant.route()
-
-
-@app.route("/v1/dispatch", methods=["POST"])
-def tenant_dispatch():
-    """Tenant runtime dispatch API."""
-    from intent_hub.api import tenant
-
-    return tenant.dispatch()
-
-
-@app.route("/tenant/skill-sources", methods=["GET"])
-def tenant_skill_sources():
-    """List tenant skill sources."""
-    from intent_hub.api import tenant
-
-    return tenant.list_skill_sources()
-
-
-@app.route("/tenant/skill-sources", methods=["POST"])
-def tenant_create_skill_source():
-    """Create tenant skill source."""
-    from intent_hub.api import tenant
-
-    return tenant.create_skill_source()
-
-
-@app.route("/tenant/skill-sources/scan", methods=["POST"])
-def tenant_scan_skill_sources():
-    """Scan configured tenant skill sources."""
-    from intent_hub.api import tenant
-
-    return tenant.scan_skill_sources()
-
-
-@app.route("/tenant/skill-drafts", methods=["GET"])
-def tenant_skill_drafts():
-    """List tenant skill drafts."""
-    from intent_hub.api import tenant
-
-    return tenant.list_skill_drafts()
-
-
-@app.route("/tenant/skill-drafts/apply", methods=["POST"])
-def tenant_apply_skill_draft():
-    """Apply one tenant skill draft."""
-    from intent_hub.api import tenant
-
-    return tenant.apply_skill_draft()
-
-
-@app.route("/tenant/routes", methods=["GET"])
-def tenant_get_routes():
-    """List tenant routes."""
-    from intent_hub.api import tenant
-
-    return tenant.list_routes()
-
-
-@app.route("/tenant/routes/search", methods=["GET"])
-def tenant_search_routes():
-    """Search tenant routes."""
-    from intent_hub.api import tenant
-
-    return tenant.search_routes()
-
-
-@app.route("/tenant/routes", methods=["POST"])
-def tenant_create_route():
-    """Create tenant route."""
-    from intent_hub.api import tenant
-
-    return tenant.create_route()
-
-
-@app.route("/tenant/routes/<int:route_id>", methods=["PUT"])
-def tenant_update_route(route_id: int):
-    """Update tenant route by ID."""
-    from intent_hub.api import tenant
-
-    return tenant.update_route(route_id)
-
-
-@app.route("/tenant/routes/<int:route_id>", methods=["DELETE"])
-def tenant_delete_route(route_id: int):
-    """Delete tenant route by ID."""
-    from intent_hub.api import tenant
-
-    return tenant.delete_route(route_id)
-
-
-@app.route("/tenant/routes/generate-utterances", methods=["POST"])
-def tenant_generate_utterances():
-    """Generate utterances for tenant route."""
-    from intent_hub.api import tenant
-
-    return tenant.generate_utterances()
-
-
-@app.route("/tenant/routes/import-skill", methods=["POST"])
-def tenant_import_route_from_skill():
-    """Generate tenant route draft from SKILL.md content."""
-    from intent_hub.api import tenant
-
-    return tenant.import_route_from_skill()
-
-
-@app.route("/tenant/routes/import", methods=["POST"])
-def tenant_import_routes():
-    """Import tenant routes from JSON (merge/replace)."""
-    from intent_hub.api import tenant
-
-    return tenant.import_routes()
-
-
-@app.route("/tenant/routes/<int:route_id>/negative-samples", methods=["POST"])
-def tenant_add_negative_samples(route_id: int):
-    """Add tenant route negative samples."""
-    from intent_hub.api import tenant
-
-    return tenant.add_negative_samples(route_id)
-
-
-@app.route("/tenant/routes/<int:route_id>/negative-samples", methods=["DELETE"])
-def tenant_delete_negative_samples(route_id: int):
-    """Delete tenant route negative samples."""
-    from intent_hub.api import tenant
-
-    return tenant.delete_negative_samples(route_id)
-
-
-@app.route("/tenant/reindex", methods=["POST"])
-def tenant_reindex():
-    """Tenant reindex."""
-    from intent_hub.api import tenant
-
-    return tenant.reindex()
-
-
-@app.route("/tenant/routes/<int:route_id>/feedback/positive", methods=["POST"])
-def tenant_add_positive_feedback(route_id: int):
-    """Add tenant route positive feedback."""
-    from intent_hub.api import tenant
-
-    return tenant.add_positive_feedback(route_id)
-
-
-@app.route("/tenant/routes/<int:route_id>/feedback/positive", methods=["DELETE"])
-def tenant_delete_positive_feedback(route_id: int):
-    """Delete tenant route positive feedback."""
-    from intent_hub.api import tenant
-
-    return tenant.delete_positive_feedback(route_id)
-
-
-@app.route("/tenant/routes/<int:route_id>/feedback/negative", methods=["POST"])
-def tenant_add_negative_feedback(route_id: int):
-    """Add tenant route negative feedback."""
-    from intent_hub.api import tenant
-
-    return tenant.add_negative_feedback(route_id)
-
-
-@app.route("/tenant/routes/<int:route_id>/feedback/negative", methods=["DELETE"])
-def tenant_delete_negative_feedback(route_id: int):
-    """Delete tenant route negative feedback."""
-    from intent_hub.api import tenant
-
-    return tenant.delete_negative_feedback(route_id)
-
-
-@app.route("/tenant/reindex/sync-route", methods=["POST"])
-def tenant_sync_route():
-    """Tenant sync route(s) to vector DB."""
-    from intent_hub.api import tenant
-
-    return tenant.sync_route()
-
-
-@app.route("/tenant/diagnostics/overlap", methods=["GET"])
-def tenant_analyze_all_overlaps():
-    """Tenant overlap analysis for all routes."""
-    from intent_hub.api import tenant
-
-    return tenant.analyze_all_overlaps()
-
-
-@app.route("/tenant/diagnostics/overlap/<int:route_id>", methods=["GET"])
-def tenant_analyze_overlap(route_id: int):
-    """Tenant overlap analysis for one route."""
-    from intent_hub.api import tenant
-
-    return tenant.analyze_overlap(route_id)
-
-
-@app.route("/tenant/diagnostics/umap", methods=["GET"])
-def tenant_diagnostics_umap():
-    """Tenant UMAP point cloud data."""
-    from intent_hub.api import tenant
-
-    return tenant.umap_points()
-
-
-@app.route("/tenant/diagnostics/repair", methods=["POST"])
-def tenant_get_repair_suggestions():
-    """Tenant repair suggestions."""
-    from intent_hub.api import tenant
-
-    return tenant.get_repair_suggestions()
-
-
-@app.route("/tenant/diagnostics/apply-repair", methods=["POST"])
-def tenant_apply_repair():
-    """Apply tenant repair suggestions."""
-    from intent_hub.api import tenant
-
-    return tenant.apply_repair()
-
-
-@app.route("/tenant/settings", methods=["GET"])
-def tenant_get_settings():
-    """Get tenant settings."""
-    from intent_hub.api import tenant
-
-    return tenant.get_settings()
-
-
-@app.route("/tenant/settings", methods=["POST"])
-def tenant_update_settings():
-    """Update tenant settings."""
-    from intent_hub.api import tenant
-
-    return tenant.update_settings()
-
-
-@app.route("/admin/tenants", methods=["GET"])
-def list_tenants():
-    """List platform tenants."""
-    from intent_hub.api import admin
-
-    return admin.list_tenants()
-
-
-@app.route("/admin/tenants", methods=["POST"])
-def create_tenant():
-    """Create a tenant and initial access code."""
-    from intent_hub.api import admin
-
-    return admin.create_tenant()
-
-
-@app.route("/admin/tenants/<tenant_id>/access-codes", methods=["POST"])
-def create_access_code(tenant_id: str):
-    """Create a tenant access code."""
-    from intent_hub.api import admin
-
-    return admin.create_access_code(tenant_id)
-
-
-@app.route("/admin/tenants/<tenant_id>/access-codes/<code_id>/rotate", methods=["POST"])
-def rotate_access_code(tenant_id: str, code_id: str):
-    """Rotate one tenant access code."""
-    from intent_hub.api import admin
-
-    return admin.rotate_access_code(tenant_id, code_id)
-
-
-@app.route("/admin/tenants/<tenant_id>/access-codes/<code_id>/disable", methods=["POST"])
-def disable_access_code(tenant_id: str, code_id: str):
-    """Disable one tenant access code."""
-    from intent_hub.api import admin
-
-    return admin.disable_access_code(tenant_id, code_id)
-
-
-@app.route("/routes", methods=["GET"])
+@app.get("/agents")
 @require_auth
-def get_routes():
-    """List all routes."""
-    from intent_hub.api import routes
-
-    return routes.get_routes()
+def agents():
+    store = get_component_manager().agent_store
+    return jsonify([agent.model_dump() for agent in store.all()])
 
 
-@app.route("/routes/search", methods=["GET"])
+@app.patch("/agents/<int:agent_id>/thresholds")
 @require_auth
-def search_routes():
-    """Search routes."""
-    from intent_hub.api import routes
+@api_errors
+def update_agent_thresholds(agent_id: int):
+    payload = ThresholdRequest(**(request.get_json() or {}))
+    agent = SyncService(get_component_manager()).update_thresholds(
+        agent_id, payload.score_threshold, payload.negative_threshold
+    )
+    return jsonify(agent.model_dump())
 
-    return routes.search_routes()
 
-
-@app.route("/routes", methods=["POST"])
+@app.post("/sync")
 @require_auth
-def create_route():
-    """Create route."""
-    from intent_hub.api import routes
-
-    return routes.create_route()
+@api_errors
+def sync():
+    return jsonify(SyncService(get_component_manager()).sync())
 
 
-@app.route("/routes/<int:route_id>", methods=["PUT"])
+@app.get("/sync/status")
 @require_auth
-def update_route(route_id: int):
-    """Update route by ID."""
-    from intent_hub.api import routes
-
-    return routes.update_route(route_id)
+@api_errors
+def sync_status():
+    return jsonify(SyncService(get_component_manager()).status())
 
 
-@app.route("/routes/<int:route_id>", methods=["DELETE"])
+@app.post("/route")
 @require_auth
-def delete_route(route_id: int):
-    """Delete route by ID."""
-    from intent_hub.api import routes
+@api_errors
+def route():
+    payload = RouteRequest(**(request.get_json() or {}))
+    query = payload.query.strip()
+    if not query:
+        raise ValueError("query 不能为空")
+    return jsonify({
+        "success": True,
+        "data": PredictionService(get_component_manager()).route(query),
+        "error": None,
+    })
 
-    return routes.delete_route(route_id)
 
-
-@app.route("/routes/generate-utterances", methods=["POST"])
+@app.get("/settings")
 @require_auth
-def generate_utterances():
-    """Generate utterances from Agent info."""
-    from intent_hub.api import routes
-
-    return routes.generate_utterances()
+def settings():
+    return jsonify({"QDRANT_COLLECTION": Config.QDRANT_COLLECTION})
 
 
-@app.route("/routes/import-skill", methods=["POST"])
+@app.post("/settings")
 @require_auth
-def import_route_from_skill():
-    """Generate route draft from SKILL.md content."""
-    from intent_hub.api import routes
-
-    return routes.import_route_from_skill()
-
-
-@app.route("/routes/import", methods=["POST"])
-@require_auth
-def import_routes():
-    """Import routes from JSON (merge/replace)."""
-    from intent_hub.api import routes
-
-    return routes.import_routes()
-
-
-@app.route("/routes/<int:route_id>/negative-samples", methods=["POST"])
-@require_auth
-def add_negative_samples(route_id: int):
-    """Add Negative Utterances for route."""
-    from intent_hub.api import routes
-
-    return routes.add_negative_samples(route_id)
-
-
-@app.route("/routes/<int:route_id>/negative-samples", methods=["DELETE"])
-@require_auth
-def delete_negative_samples(route_id: int):
-    """Delete all Negative Utterances for route."""
-    from intent_hub.api import routes
-
-    return routes.delete_negative_samples(route_id)
-
-
-@app.route("/reindex", methods=["POST"])
-@require_auth
-def reindex_route():
-    """Reindex."""
-    from intent_hub.api import reindex
-
-    return reindex.reindex()
-
-
-@app.route("/reindex/sync-route", methods=["POST"])
-@require_auth
-def sync_route():
-    """Sync one or more routes to vector DB."""
-    from intent_hub.api import reindex
-
-    return reindex.sync_route()
-
-
-@app.route("/diagnostics/overlap", methods=["GET"])
-@require_auth
-def analyze_all_overlaps():
-    """Analyze overlap for all routes."""
-    from intent_hub.api import diagnostics
-
-    return diagnostics.analyze_all_overlaps()
-
-
-@app.route("/diagnostics/overlap/<int:route_id>", methods=["GET"])
-@require_auth
-def analyze_overlap(route_id: int):
-    """Analyze overlap for one route."""
-    from intent_hub.api import diagnostics
-
-    return diagnostics.analyze_overlap(route_id)
-
-
-@app.route("/diagnostics/umap", methods=["GET"])
-@require_auth
-def diagnostics_umap():
-    """UMAP point cloud data."""
-    from intent_hub.api import diagnostics
-
-    return diagnostics.umap_points()
-
-
-@app.route("/diagnostics/repair", methods=["POST"])
-@require_auth
-def get_repair_suggestions():
-    """Get LLM repair suggestions."""
-    from intent_hub.api import diagnostics
-
-    return diagnostics.get_repair_suggestions()
-
-
-@app.route("/diagnostics/apply-repair", methods=["POST"])
-@require_auth
-def apply_repair():
-    """Apply repair suggestions."""
-    from intent_hub.api import diagnostics
-
-    return diagnostics.apply_repair()
-
-
-@app.route("/settings", methods=["GET"])
-@require_auth
-def get_settings():
-    """Get system settings."""
-    from intent_hub.api import settings
-
-    return settings.get_settings()
-
-
-@app.route("/settings", methods=["POST"])
-@require_auth
+@api_errors
 def update_settings():
-    """Update system settings."""
-    from intent_hub.api import settings
-
-    return settings.update_settings()
+    collection = str((request.get_json() or {}).get("QDRANT_COLLECTION", ""))
+    Config.save_collection(collection)
+    get_component_manager().reset_qdrant()
+    return jsonify({"QDRANT_COLLECTION": Config.QDRANT_COLLECTION})
 
 
 def init_app():
-    """Initialize app (including components)."""
-    component_manager = get_component_manager()
-    component_manager.init_components()
-
-    try:
-        from intent_hub.services.diagnostic_service import DiagnosticService
-        from intent_hub.utils.logger import logger
-
-        diagnostic_service = DiagnosticService(component_manager)
-        diagnostic_service.run_async_diagnostics("full")
-        logger.info("Async full diagnostics started")
-    except Exception as e:
-        from intent_hub.utils.logger import logger
-
-        logger.error(f"Failed to start diagnostics: {e}")
-
     return app

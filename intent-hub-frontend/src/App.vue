@@ -1,25 +1,40 @@
 <template>
-  <el-config-provider :locale="elementLocale">
-    <router-view />
-  </el-config-provider>
+  <el-container class="app-shell">
+    <el-header v-if="!route.meta.public" class="app-header">
+      <div class="header-content">
+        <div class="brand">
+          <img src="@/assets/logo.png" alt="Intent Hub" />
+          <span class="brand-divider" />
+          <span class="brand-caption">Agent 路由控制台</span>
+        </div>
+        <div class="header-actions">
+          <span class="service-state"><i />服务控制台</span>
+          <el-button type="danger" plain @click="logout">退出登录</el-button>
+        </div>
+      </div>
+    </el-header>
+
+    <el-main v-if="!route.meta.public" class="main-wrapper">
+      <el-tabs :model-value="route.path" class="nav-tabs" @tab-change="navigate">
+        <el-tab-pane label="Agent 列表" name="/" />
+        <el-tab-pane label="路由测试" name="/test" />
+        <el-tab-pane label="系统设置" name="/settings" />
+      </el-tabs>
+      <router-view />
+    </el-main>
+    <router-view v-else />
+  </el-container>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
-import zhCn from 'element-plus/es/locale/lang/zh-cn';
-import en from 'element-plus/es/locale/lang/en';
+import { useRoute, useRouter } from 'vue-router';
 
-const elementLocale = ref(localStorage.getItem('locale') === 'en' ? en : zhCn);
+const route = useRoute();
+const router = useRouter();
 
-const handleLocaleChange = (event: CustomEvent) => {
-  elementLocale.value = event.detail.locale;
+const navigate = (path: string | number) => router.push(String(path));
+const logout = () => {
+  localStorage.removeItem('api_key');
+  router.push('/login');
 };
-
-onMounted(() => {
-  window.addEventListener('locale-change', handleLocaleChange as EventListener);
-});
-
-onUnmounted(() => {
-  window.removeEventListener('locale-change', handleLocaleChange as EventListener);
-});
 </script>

@@ -1,6 +1,0 @@
-include README.md
-include requirements.txt
-include LICENSE
-recursive-include intent_hub *.json
-recursive-exclude intent_hub/models *
-

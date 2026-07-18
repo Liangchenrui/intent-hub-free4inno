@@ -1,1003 +1,235 @@
 <template>
-  <el-container class="layout-container">
-    <el-header class="header-wrapper">
-      <div class="header-content">
-        <div class="brand">
-          <img src="@/assets/logo.png" alt="Intent Hub" class="logo-img" />
-        </div>
-        <div class="user-info">
-          <ModeSwitcher />
-          <LanguageSwitcher />
-          <el-button type="danger" @click="handleLogout">{{ $t('common.logout') }}</el-button>
+  <div class="page-intro">
+    <div>
+      <h1>Agent 管理</h1>
+      <p>查看上游 Agent 快照、语料与向量同步状态</p>
+    </div>
+  </div>
+
+  <el-card v-if="status" shadow="never" class="panel-card status-card">
+    <div class="status-summary">
+      <div class="status-copy">
+        <span class="status-dot" :class="{ warning: !status.synced }" />
+        <div>
+          <strong>{{ status.synced ? '向量数据已同步' : '向量数据需要同步' }}</strong>
+          <p>{{ status.synced ? '当前 Agent 快照与向量数据库一致' : '当前快照与向量数据库存在差异' }}</p>
         </div>
       </div>
-    </el-header>
-
-    <el-main class="main-wrapper">
-      <div class="page-header">
-        <el-tabs v-model="activeTab" class="nav-tabs" @tab-change="handleTabChange">
-          <el-tab-pane :label="$t('nav.list')" name="list"></el-tab-pane>
-          <el-tab-pane :label="$t('nav.test')" name="test"></el-tab-pane>
-          <el-tab-pane :label="$t('nav.diagnostics')" name="diagnostics"></el-tab-pane>
-          <el-tab-pane :label="$t('nav.settings')" name="settings"></el-tab-pane>
-        </el-tabs>
+      <div class="status-metrics">
+        <div><span>Agent 快照</span><strong>{{ status.agents_count }}</strong></div>
+        <div><span>Collection</span><strong class="collection-name">{{ status.collection }}</strong></div>
+        <div><span>向量点数</span><strong>{{ status.points_count }} / {{ status.expected_points }}</strong></div>
       </div>
+    </div>
+  </el-card>
 
-      <el-card shadow="never" class="content-card">
-        <div class="toolbar">
-          <div class="search-box">
-            <el-input
-              v-model="searchQuery"
-              :placeholder="$t('agent.searchPlaceholder')"
-              class="search-input"
-              clearable
-              @input="handleSearch"
-              @clear="handleSearch"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-          </div>
-          <div class="toolbar-actions">
-            <el-button
-              type="danger"
-              plain
-              @click="handleBatchDelete"
-              :disabled="selectedRouteIds.length === 0"
-              :loading="batchDeleting"
-            >
-              {{ $t('agent.batchDelete', { count: selectedRouteIds.length }) }}
-            </el-button>
-            <el-button 
-              @click="handleReindex" 
-              :loading="reindexing"
-              type="warning"
-              plain
-              :icon="Refresh"
-            >
-              {{ $t('agent.reindex') }}
-            </el-button>
-            <el-button
-              type="info"
-              plain
-              @click="handleExport"
-            >
-              {{ $t('agent.export') }}
-            </el-button>
-            <el-button
-              type="info"
-              plain
-              @click="triggerImport"
-              :loading="importing"
-            >
-              {{ $t('agent.import') }}
-            </el-button>
-            <el-button type="primary" :icon="Plus" @click="handleAdd">{{ $t('agent.add') }}</el-button>
-          </div>
-        </div>
+  <el-card shadow="never" class="panel-card content-card">
+    <div class="toolbar">
+      <el-input v-model="query" clearable placeholder="搜索 Agent 名称或描述">
+        <template #prefix><span class="search-mark">⌕</span></template>
+      </el-input>
+      <el-button type="primary" :loading="syncing" @click="sync">同步 Agent</el-button>
+    </div>
 
-        <input
-          ref="importFileInput"
-          type="file"
-          accept="application/json,.json"
-          style="display: none"
-          @change="handleImportFileChange"
-        />
-        <input
-          ref="skillFileInput"
-          type="file"
-          accept=".md,text/markdown,text/plain"
-          style="display: none"
-          @change="handleSkillFileChange"
-        />
-
-        <el-table 
-          ref="agentTableRef"
-          v-loading="loading"
-          :data="paginatedAgents"
-          style="width: 100%"
-          class="custom-table"
-          header-cell-class-name="table-header-cell"
-          row-key="id"
-          @selection-change="handleSelectionChange"
-        >
-          <el-table-column type="selection" width="48" align="center" />
-          <el-table-column prop="id" :label="$t('agent.id')" width="70" align="center" />
-          <el-table-column :label="$t('agent.nameDesc')" min-width="200">
-            <template #default="{ row }">
-              <div class="agent-info">
-                <div class="agent-name">{{ row.name }}</div>
-                <div class="agent-route-key">{{ row.route_key }}</div>
-                <div class="agent-description">{{ row.description || $t('agent.noDescription') }}</div>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column prop="score_threshold" :label="$t('agent.threshold')" width="100" align="center">
-            <template #default="{ row }">
-              <el-tag size="small" effect="light">{{ row.score_threshold }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column :label="$t('agent.utterances')" min-width="520">
-            <template #default="{ row }">
-              <div class="utterances-container">
-                <el-tag 
-                  v-for="(text, index) in row.utterances.slice(0, 10)" 
-                  :key="index" 
-                  class="utterance-tag"
-                  size="small"
-                  effect="plain"
-                  round
-                >
-                  {{ text }}
-                </el-tag>
-                <el-tooltip
-                  v-if="row.utterances.length > 10"
-                  placement="top"
-                  effect="dark"
-                >
-                  <template #content>
-                    <div class="tooltip-utterances">
-                      <div v-for="(text, idx) in row.utterances" :key="idx" class="tooltip-item">
-                        {{ text }}
-                      </div>
-                    </div>
-                  </template>
-                  <el-tag 
-                    size="small" 
-                    type="info" 
-                    effect="light" 
-                    round 
-                    class="more-tag"
-                  >
-                    +{{ row.utterances.length - 10 }}
-                  </el-tag>
-                </el-tooltip>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column :label="$t('agent.negativeSamples')" min-width="220">
-            <template #default="{ row }">
-              <div class="utterances-container">
-                <el-tag 
-                  v-for="(text, index) in (row.negative_samples || []).slice(0, 5)" 
-                  :key="index" 
-                  class="utterance-tag negative-tag"
-                  size="small"
-                  effect="plain"
-                  round
-                  type="warning"
-                >
-                  {{ text }}
-                </el-tag>
-                <el-tooltip
-                  v-if="(row.negative_samples || []).length > 5"
-                  placement="top"
-                  effect="dark"
-                >
-                  <template #content>
-                    <div class="tooltip-utterances">
-                      <div v-for="(text, idx) in (row.negative_samples || [])" :key="idx" class="tooltip-item">
-                        {{ text }}
-                      </div>
-                    </div>
-                  </template>
-                  <el-tag 
-                    size="small" 
-                    type="warning" 
-                    effect="light" 
-                    round 
-                    class="more-tag"
-                  >
-                    +{{ (row.negative_samples || []).length - 5 }}
-                  </el-tag>
-                </el-tooltip>
-                <span v-if="!row.negative_samples || row.negative_samples.length === 0" class="empty-text">
-                  {{ $t('common.empty') }}
-                </span>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column :label="$t('agent.actions')" width="150" align="center" fixed="right">
-            <template #default="{ row }">
-              <el-button link type="primary" @click="handleEdit(row)">{{ $t('common.edit') }}</el-button>
-              <el-divider direction="vertical" />
-              <el-button link type="danger" @click="handleDelete(row.id)">{{ $t('common.delete') }}</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div class="pagination-bar">
-          <el-pagination
-            background
-            layout="total, prev, pager, next"
-            :total="totalAgents"
-            :page-size="pageSize"
-            :current-page="currentPage"
-            @current-change="handlePageChange"
-          />
-        </div>
-      </el-card>
-    </el-main>
-
-    <el-dialog
-      v-model="showModal"
-      :title="isEdit ? $t('agent.editTitle') : $t('agent.addTitle')"
-      width="90%"
-      style="max-width: 650px"
-      destroy-on-close
-      class="custom-dialog"
+    <el-table
+      v-loading="loading"
+      :data="filtered"
+      class="agent-table"
+      header-cell-class-name="table-header-cell"
+      row-key="id"
     >
-        <el-form :model="editForm" label-position="top">
-        <div class="skill-import-bar">
-          <div class="skill-import-copy">
-            <div class="skill-import-title">{{ $t('agent.skillImportTitle') }}</div>
-            <div class="skill-import-desc">{{ $t('agent.skillImportDesc') }}</div>
+      <el-table-column prop="id" label="ID" width="86" align="center" />
+      <el-table-column label="名称与描述" min-width="260">
+        <template #default="{ row }">
+          <div class="agent-info">
+            <strong>{{ row.title }}</strong>
+            <span>{{ plainText(row.text) || '暂无描述' }}</span>
           </div>
-          <el-button
-            type="primary"
-            plain
-            :loading="importingSkill"
-            @click="triggerSkillImport"
-          >
-            {{ $t('agent.skillImportAction') }}
-          </el-button>
-        </div>
-        <el-form-item :label="$t('agent.nameLabel')" required>
-          <el-input v-model="editForm.name" :placeholder="$t('agent.namePlaceholder')" />
-        </el-form-item>
-        <el-form-item :label="$t('agent.routeKeyLabel')" required>
-          <el-input v-model="editForm.route_key" :placeholder="$t('agent.routeKeyPlaceholder')" />
-        </el-form-item>
-        <el-form-item :label="$t('agent.descLabel')">
-          <el-input 
-            v-model="editForm.description" 
-            type="textarea" 
-            :placeholder="$t('agent.descPlaceholder')" 
-            :rows="3" 
-          />
-        </el-form-item>
-        <el-form-item :label="$t('agent.thresholdLabel')">
-          <div class="threshold-container">
-            <el-slider 
-              v-model="editForm.score_threshold" 
-              :min="0" 
-              :max="1" 
-              :step="0.01"
-              style="flex: 1; margin-right: 20px"
-            />
-            <el-input-number 
-              v-model="editForm.score_threshold" 
-              :precision="2" 
-              :step="0.05" 
-              :min="0" 
-              :max="1"
-              size="small"
-            />
+        </template>
+      </el-table-column>
+      <el-table-column label="正向阈值" width="110" align="center">
+        <template #default="{ row }"><el-tag size="small" effect="light">{{ row.score_threshold }}</el-tag></template>
+      </el-table-column>
+      <el-table-column label="负向阈值" width="110" align="center">
+        <template #default="{ row }"><el-tag size="small" type="warning" effect="light">{{ row.negative_threshold }}</el-tag></template>
+      </el-table-column>
+      <el-table-column label="正向语料" min-width="260">
+        <template #default="{ row }">
+          <div class="corpus-list">
+            <el-tag v-for="text in row.utterances.slice(0, 3)" :key="text" size="small" effect="plain" round>{{ text }}</el-tag>
+            <el-tag v-if="row.utterances.length > 3" size="small" type="info" effect="light" round>+{{ row.utterances.length - 3 }}</el-tag>
+            <span v-if="!row.utterances.length" class="empty-text">暂无语料</span>
           </div>
-        </el-form-item>
-        <el-form-item>
-          <template #label>
-            <div class="label-row">
-              <span>{{ $t('agent.utteranceLabel') }}</span>
-              <div class="ai-gen-options">
-                <span class="gen-label">{{ $t('agent.genCount') }}:</span>
-                <el-input-number 
-                  v-model="genCount" 
-                  :min="1" 
-                  :max="20" 
-                  size="small"
-                  controls-position="right"
-                  class="gen-count-input"
-                />
-                <el-button 
-                  type="success" 
-                  size="small" 
-                  :loading="generating"
-                  @click="handleGenerateAI"
-                  :icon="MagicStick"
-                >
-                  {{ $t('agent.aiGen') }}
-                </el-button>
-              </div>
-            </div>
-          </template>
-          <el-input 
-            v-model="utterancesText" 
-            type="textarea" 
-            :placeholder="$t('agent.utterancePlaceholder')" 
-            :rows="10" 
-          />
-        </el-form-item>
-        <el-form-item :label="$t('agent.negativeThresholdLabel')">
-          <div class="threshold-container">
-            <el-slider 
-              v-model="editForm.negative_threshold" 
-              :min="0.8" 
-              :max="1" 
-              :step="0.01"
-              style="flex: 1; margin-right: 20px"
-            />
-            <el-input-number 
-              v-model="editForm.negative_threshold" 
-              :precision="2" 
-              :step="0.05" 
-              :min="0.8" 
-              :max="1"
-              size="small"
-            />
+        </template>
+      </el-table-column>
+      <el-table-column label="负向语料" min-width="220">
+        <template #default="{ row }">
+          <div class="corpus-list">
+            <el-tag v-for="text in row.negative_samples.slice(0, 2)" :key="text" size="small" type="warning" effect="plain" round>{{ text }}</el-tag>
+            <el-tag v-if="row.negative_samples.length > 2" size="small" type="info" effect="light" round>+{{ row.negative_samples.length - 2 }}</el-tag>
+            <span v-if="!row.negative_samples.length" class="empty-text">暂无语料</span>
           </div>
-        </el-form-item>
-        <el-form-item :label="$t('agent.negativeSamplesLabel')">
-          <el-input 
-            v-model="negativeSamplesText" 
-            type="textarea" 
-            :placeholder="$t('agent.negativeSamplesPlaceholder')" 
-            :rows="6" 
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="closeModal">{{ $t('common.cancel') }}</el-button>
-          <el-button type="primary" :loading="saving" @click="handleSave">
-            {{ $t('common.save') }}
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
-  </el-container>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="90" align="center" fixed="right">
+        <template #default="{ row }"><el-button link type="primary" @click="show(row)">查看详情</el-button></template>
+      </el-table-column>
+      <template #empty><el-empty description="暂无 Agent 数据" /></template>
+    </el-table>
+  </el-card>
+
+  <el-dialog v-model="detailsVisible" title="Agent 详情" width="720px" class="agent-dialog">
+    <el-form v-if="selected" label-position="top" class="detail-form">
+      <el-row :gutter="16">
+        <el-col :xs="24" :sm="12">
+          <el-form-item label="ID"><el-input :model-value="selected.id" disabled /></el-form-item>
+        </el-col>
+        <el-col :xs="24" :sm="12">
+          <el-form-item label="名称"><el-input :model-value="selected.title" disabled /></el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item label="描述"><el-input :model-value="plainText(selected.text)" type="textarea" :rows="4" disabled /></el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item label="正向语料"><el-input :model-value="selected.utterances.join('\n')" type="textarea" :rows="5" disabled /></el-form-item>
+        </el-col>
+        <el-col :xs="24" :sm="12">
+          <el-form-item label="正向阈值">
+            <el-input-number v-model="thresholds.score_threshold" :min="0" :max="1" :step="0.01" :precision="2" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item label="负向语料"><el-input :model-value="selected.negative_samples.join('\n')" type="textarea" :rows="5" disabled /></el-form-item>
+        </el-col>
+        <el-col :xs="24" :sm="12">
+          <el-form-item label="负向阈值">
+            <el-input-number v-model="thresholds.negative_threshold" :min="0" :max="1" :step="0.01" :precision="2" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+    </el-form>
+    <template #footer>
+      <el-button @click="detailsVisible = false">取消</el-button>
+      <el-button type="primary" :loading="savingThresholds" @click="saveThresholds">保存阈值</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { debounce } from 'lodash-es';
-import { useRouter } from 'vue-router';
-import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
-import { Search, Plus, Refresh, MagicStick } from '@element-plus/icons-vue';
-import {
-  clearTenantSession,
-  setActiveMode,
-  getRoutes,
-  searchRoutes,
-  deleteRoute,
-  updateRoute,
-  createRoute,
-  generateUtterances,
-  reindex,
-  importRoutes,
-  importRouteFromSkill,
-  type RouteConfig,
-  type GenerateUtterancesRequest
-} from '../api';
-import LanguageSwitcher from '../components/LanguageSwitcher.vue';
-import ModeSwitcher from '../components/ModeSwitcher.vue';
+import { computed, onMounted, ref } from 'vue';
+import { ElMessage } from 'element-plus';
+import { getAgents, getSyncStatus, syncAgents, updateAgentThresholds, type Agent, type SyncStatus } from '../api';
 
-const { t } = useI18n();
-
-const router = useRouter();
-const agents = ref<RouteConfig[]>([]);
+const agents = ref<Agent[]>([]);
+const query = ref('');
 const loading = ref(false);
-const saving = ref(false);
-const generating = ref(false);
-const reindexing = ref(false);
-const importing = ref(false);
-const importingSkill = ref(false);
-const batchDeleting = ref(false);
-const genCount = ref(5);
-const searchQuery = ref('');
-const activeTab = ref('list');
-const importFileInput = ref<HTMLInputElement | null>(null);
-const skillFileInput = ref<HTMLInputElement | null>(null);
-const agentTableRef = ref<any>(null);
-const selectedRouteIds = ref<number[]>([]);
-const currentPage = ref(1);
-const pageSize = 10;
-
-const totalAgents = computed(() => agents.value.length);
-const paginatedAgents = computed(() => {
-  const start = (currentPage.value - 1) * pageSize;
-  return agents.value.slice(start, start + pageSize);
+const syncing = ref(false);
+const detailsVisible = ref(false);
+const selected = ref<Agent>();
+const status = ref<SyncStatus>();
+const savingThresholds = ref(false);
+const thresholds = ref({ score_threshold: 0.8, negative_threshold: 0.95 });
+const plainText = (value: unknown) => {
+  if (value == null) return '';
+  return new DOMParser().parseFromString(String(value), 'text/html').body.textContent?.trim() || '';
+};
+const filtered = computed(() => {
+  const keyword = query.value.trim().toLowerCase();
+  return keyword
+    ? agents.value.filter((agent) => `${agent.title} ${agent.text}`.toLowerCase().includes(keyword))
+    : agents.value;
 });
 
-const syncTableSelection = async () => {
-  await nextTick();
-  const table = agentTableRef.value;
-  if (!table) {
-    return;
-  }
-  table.clearSelection();
-  paginatedAgents.value.forEach((row) => {
-    if (selectedRouteIds.value.includes(row.id)) {
-      table.toggleRowSelection(row, true);
-    }
-  });
-};
-
-const fetchAgents = async (query: string = '') => {
+const load = async () => {
   loading.value = true;
+  try { agents.value = (await getAgents()).data; }
+  catch (error: any) { ElMessage.error(error.response?.data?.detail || '获取 Agent 失败'); }
+  finally { loading.value = false; }
+};
+const loadStatus = async () => {
+  try { status.value = (await getSyncStatus()).data; }
+  catch (error: any) { ElMessage.error(error.response?.data?.detail || '获取同步状态失败'); }
+};
+const sync = async () => {
+  syncing.value = true;
   try {
-    const response = query.trim() 
-      ? await searchRoutes(query.trim())
-      : await getRoutes();
-    agents.value = response.data;
-    const maxPage = Math.max(1, Math.ceil(agents.value.length / pageSize));
-    if (currentPage.value > maxPage) {
-      currentPage.value = maxPage;
-    }
-    selectedRouteIds.value = selectedRouteIds.value.filter((id) => agents.value.some((agent) => agent.id === id));
-    await syncTableSelection();
-  } catch (error) {
-    ElMessage.error(t('agent.fetchError'));
-  } finally {
-    loading.value = false;
-  }
+    const { data } = await syncAgents();
+    await Promise.all([load(), loadStatus()]);
+    data.warning
+      ? ElMessage.warning(data.warning)
+      : ElMessage.success(`同步完成：${data.agents_count} 个 Agent`);
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '同步失败');
+    await Promise.all([load(), loadStatus()]);
+  } finally { syncing.value = false; }
 };
-
-// 防抖搜索处理
-const handleSearch = debounce(() => {
-  currentPage.value = 1;
-  fetchAgents(searchQuery.value);
-}, 300);
-
-onMounted(() => {
-  fetchAgents();
-});
-
-const handleLogout = async () => {
+const show = (agent: Agent) => {
+  selected.value = agent;
+  thresholds.value = {
+    score_threshold: agent.score_threshold,
+    negative_threshold: agent.negative_threshold,
+  };
+  detailsVisible.value = true;
+};
+const saveThresholds = async () => {
+  if (!selected.value) return;
+  savingThresholds.value = true;
   try {
-    await ElMessageBox.confirm(t('agent.logoutConfirm'), t('agent.logoutTitle'), { type: 'warning' });
-    clearTenantSession();
-    setActiveMode('tenant');
-    router.push('/login');
-  } catch (e) {}
+    selected.value = (await updateAgentThresholds(
+      selected.value.id,
+      thresholds.value.score_threshold,
+      thresholds.value.negative_threshold,
+    )).data;
+    await Promise.all([load(), loadStatus()]);
+    ElMessage.success('阈值已保存并同步到向量数据库');
+    detailsVisible.value = false;
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '阈值保存失败');
+  } finally { savingThresholds.value = false; }
 };
-
-const handleTabChange = (tabName: any) => {
-  if (tabName === 'test') {
-    router.push('/test');
-  } else if (tabName === 'diagnostics') {
-    router.push('/diagnostics');
-  } else if (tabName === 'settings') {
-    router.push('/settings');
-  }
-};
-
-watch(paginatedAgents, () => {
-  syncTableSelection();
-});
-
-const showModal = ref(false);
-const isEdit = ref(false);
-const originalRouteKey = ref('');
-const editForm = ref<Partial<RouteConfig>>({
-  id: 0,
-  name: '',
-  route_key: '',
-  description: '',
-  score_threshold: 0.75,
-  negative_threshold: 0.95,
-  utterances: [],
-  negative_samples: []
-});
-const utterancesText = ref('');
-const negativeSamplesText = ref('');
-
-const openModal = (agent?: RouteConfig) => {
-  if (agent) {
-    isEdit.value = true;
-    originalRouteKey.value = agent.route_key;
-    editForm.value = { ...agent };
-    utterancesText.value = agent.utterances.join('\n');
-    negativeSamplesText.value = (agent.negative_samples || []).join('\n');
-  } else {
-    isEdit.value = false;
-    originalRouteKey.value = '';
-    editForm.value = { 
-      id: 0, 
-      name: '', 
-      route_key: '',
-      description: '', 
-      score_threshold: 0.75, 
-      negative_threshold: 0.95,
-      utterances: [],
-      negative_samples: []
-    };
-    utterancesText.value = '';
-    negativeSamplesText.value = '';
-  }
-  showModal.value = true;
-};
-
-const closeModal = () => {
-  showModal.value = false;
-};
-
-const handleAdd = () => openModal();
-const handleEdit = (agent: RouteConfig) => openModal(agent);
-
-const handleReindex = async () => {
-  try {
-    await ElMessageBox.confirm(t('agent.reindexConfirm'), t('agent.reindexTitle'));
-    reindexing.value = true;
-    const response = await reindex(true);
-    const { message, routes_count, total_points } = response.data;
-    // 保存全量同步时间戳
-    localStorage.setItem('last_full_reindex', Date.now().toString());
-    ElMessage.success(`${message} (${t('nav.list')}: ${routes_count}, ${t('agent.utterances')}: ${total_points})`);
-    fetchAgents();
-  } catch (e) {} finally { reindexing.value = false; }
-};
-
-const triggerImport = () => {
-  if (importFileInput.value) {
-    // reset，确保选择同一个文件也能触发 change
-    importFileInput.value.value = '';
-    importFileInput.value.click();
-  }
-};
-
-const triggerSkillImport = () => {
-  if (skillFileInput.value) {
-    skillFileInput.value.value = '';
-    skillFileInput.value.click();
-  }
-};
-
-const handleExport = () => {
-  try {
-    const data = JSON.stringify(agents.value, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'routes_config.json';
-    link.click();
-    URL.revokeObjectURL(url);
-    ElMessage.success(t('common.success'));
-  } catch (error) {
-    ElMessage.error(t('common.error'));
-  }
-};
-
-const handleImportFileChange = async (evt: Event) => {
-  const input = evt.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-
-  importing.value = true;
-  try {
-    const text = await file.text();
-    const parsed = JSON.parse(text);
-
-    if (!Array.isArray(parsed)) {
-      return ElMessage.error(t('agent.importInvalidFormat'));
-    }
-
-    // 轻量前端校验：必须包含 name + utterances
-    for (const item of parsed) {
-      if (!item || typeof item !== 'object') {
-        return ElMessage.error(t('agent.importInvalidFormat'));
-      }
-      if (!('name' in item) || typeof item.name !== 'string' || !item.name.trim()) {
-        return ElMessage.error(t('agent.importInvalidFormat'));
-      }
-      if (!('route_key' in item) || typeof item.route_key !== 'string' || !item.route_key.trim()) {
-        return ElMessage.error(t('agent.importInvalidFormat'));
-      }
-      if (!('utterances' in item) || !Array.isArray(item.utterances) || item.utterances.length === 0) {
-        return ElMessage.error(t('agent.importInvalidFormat'));
-      }
-    }
-
-    const resp = await importRoutes({ routes: parsed, mode: 'merge' });
-    localStorage.removeItem('last_full_reindex');
-    ElMessage.success(
-      t('agent.importSuccess', {
-        created: resp.data.created,
-        updated: resp.data.updated,
-        total: resp.data.total
-      })
-    );
-    fetchAgents();
-  } catch (e: any) {
-    const detail = e?.response?.data?.detail || e?.message || '';
-    ElMessage.error(t('agent.importError', { detail }));
-  } finally {
-    importing.value = false;
-  }
-};
-
-const handleSkillFileChange = async (evt: Event) => {
-  const input = evt.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-
-  importingSkill.value = true;
-  try {
-    const skillContent = await file.text();
-    if (!skillContent.trim()) {
-      return ElMessage.warning(t('agent.skillImportEmpty'));
-    }
-
-    const response = await importRouteFromSkill({ skill_content: skillContent });
-    const draft = response.data;
-
-    editForm.value.name = draft.name;
-    editForm.value.route_key = draft.route_key;
-    editForm.value.description = draft.description;
-    utterancesText.value = draft.utterances.join('\n');
-
-    ElMessage.success(t('agent.skillImportSuccess'));
-  } catch (e: any) {
-    const detail = e?.response?.data?.detail || e?.message || '';
-    ElMessage.error(t('agent.skillImportError', { detail }));
-  } finally {
-    importingSkill.value = false;
-  }
-};
-
-const handleGenerateAI = async () => {
-  if (!editForm.value.name) return ElMessage.warning(t('agent.inputNameWarning'));
-  if (!editForm.value.route_key?.trim()) return ElMessage.warning(t('agent.routeKeyRequired'));
-  generating.value = true;
-  try {
-    const current = utterancesText.value.split('\n').filter(s => s.trim());
-    const requestData: GenerateUtterancesRequest = {
-      id: editForm.value.id || 0,
-      name: editForm.value.name,
-      route_key: editForm.value.route_key.trim(),
-      count: genCount.value,
-      utterances: current
-    };
-    
-    if (editForm.value.description) {
-      requestData.description = editForm.value.description;
-    }
-    
-    const response = await generateUtterances(requestData);
-    if (response.data.utterances && response.data.utterances.length > 0) {
-      utterancesText.value = response.data.utterances.join('\n');
-    }
-    ElMessage.success(t('agent.aiGenSuccess'));
-  } catch (e) { ElMessage.error(t('agent.aiGenError')); } finally { generating.value = false; }
-};
-
-const handleSave = async () => {
-  if (!editForm.value.name) return ElMessage.warning(t('agent.nameRequired'));
-  if (!editForm.value.route_key?.trim()) return ElMessage.warning(t('agent.routeKeyRequired'));
-  saving.value = true;
-  try {
-    const trimmedRouteKey = editForm.value.route_key.trim();
-    if (isEdit.value && originalRouteKey.value && originalRouteKey.value !== trimmedRouteKey) {
-      await ElMessageBox.confirm(
-        t('agent.routeKeyChangeWarning'),
-        t('agent.routeKeyChangeTitle'),
-        { type: 'warning' }
-      );
-    }
-
-    const data = {
-      ...editForm.value,
-      route_key: trimmedRouteKey,
-      utterances: utterancesText.value.split('\n').filter(s => s.trim()),
-      negative_samples: negativeSamplesText.value.split('\n').filter(s => s.trim()),
-      negative_threshold: editForm.value.negative_threshold || 0.95
-    } as RouteConfig;
-    isEdit.value ? await updateRoute(data.id, data) : await createRoute(data);
-    // 新增或修改路由后都需要重置全量同步标记
-    localStorage.removeItem('last_full_reindex');
-    if (isEdit.value) {
-      ElMessage.warning(t('agent.syncWarning'));
-    } else {
-      ElMessage.warning(t('agent.addWarning'));
-    }
-    ElMessage.success(t('agent.saveSuccess'));
-    closeModal();
-    currentPage.value = 1;
-    fetchAgents(searchQuery.value);
-  } catch (e: any) {
-    const detail = e?.response?.data?.detail;
-    ElMessage.error(detail || t('agent.saveError'));
-  } finally { saving.value = false; }
-};
-
-const handleDelete = async (id: number) => {
-  try {
-    await ElMessageBox.confirm(t('agent.deleteConfirm'), t('agent.deleteTitle'), { type: 'error' });
-    await deleteRoute(id);
-    localStorage.removeItem('last_full_reindex');
-    ElMessage.success(t('agent.deleteSuccess'));
-    selectedRouteIds.value = selectedRouteIds.value.filter((item) => item !== id);
-    fetchAgents(searchQuery.value);
-  } catch (e) {}
-};
-
-const handleSelectionChange = (selection: RouteConfig[]) => {
-  const pageIds = paginatedAgents.value.map((item) => item.id);
-  const selectedOnPage = selection.map((item) => item.id);
-  selectedRouteIds.value = [
-    ...selectedRouteIds.value.filter((id) => !pageIds.includes(id)),
-    ...selectedOnPage,
-  ];
-};
-
-const handlePageChange = (page: number) => {
-  currentPage.value = page;
-};
-
-const handleBatchDelete = async () => {
-  if (selectedRouteIds.value.length === 0) {
-    return;
-  }
-
-  try {
-    const deleteCount = selectedRouteIds.value.length;
-    await ElMessageBox.confirm(
-      t('agent.batchDeleteConfirm', { count: deleteCount }),
-      t('agent.batchDeleteTitle'),
-      { type: 'error' }
-    );
-    batchDeleting.value = true;
-
-    for (const id of [...selectedRouteIds.value]) {
-      await deleteRoute(id);
-    }
-
-    localStorage.removeItem('last_full_reindex');
-    selectedRouteIds.value = [];
-    ElMessage.success(t('agent.batchDeleteSuccess', { count: deleteCount }));
-    await fetchAgents(searchQuery.value);
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      const detail = e?.response?.data?.detail;
-      ElMessage.error(detail || t('agent.batchDeleteError'));
-    }
-  } finally {
-    batchDeleting.value = false;
-  }
-};
+onMounted(() => Promise.all([load(), loadStatus()]));
 </script>
 
 <style scoped>
-.layout-container {
-  min-height: 100vh;
-  background-color: #f5f7fa;
+.status-card { margin-bottom: 18px; }
+.status-card :deep(.el-card__body) { padding: 18px 22px; }
+.status-summary, .status-copy, .status-metrics { display: flex; align-items: center; }
+.status-summary { justify-content: space-between; gap: 28px; }
+.status-copy { gap: 14px; min-width: 230px; }
+.status-copy strong { display: block; margin-bottom: 4px; font-size: 15px; }
+.status-copy p { margin: 0; color: #909399; font-size: 12px; }
+.status-dot { width: 10px; height: 10px; flex: 0 0 auto; border-radius: 50%; background: #67c23a; box-shadow: 0 0 0 5px #eaf7e5; }
+.status-dot.warning { background: #e6a23c; box-shadow: 0 0 0 5px #fdf3e4; }
+.status-metrics { flex: 1; justify-content: flex-end; }
+.status-metrics > div { min-width: 130px; padding: 2px 26px; border-left: 1px solid #ebeef5; }
+.status-metrics span, .status-metrics strong { display: block; }
+.status-metrics span { margin-bottom: 6px; color: #909399; font-size: 12px; }
+.status-metrics strong { color: #303133; font-size: 17px; }
+.status-metrics .collection-name { max-width: 220px; overflow: hidden; font-family: Consolas, monospace; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.content-card :deep(.el-card__body) { padding: 22px 24px; }
+.search-mark { color: #909399; font-size: 20px; line-height: 1; transform: rotate(-20deg); }
+.agent-info { display: flex; flex-direction: column; gap: 5px; padding: 7px 0; }
+.agent-info strong { color: #303133; font-size: 14px; }
+.agent-info span { max-width: 440px; overflow: hidden; color: #909399; font-size: 12px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.corpus-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0; }
+.corpus-list :deep(.el-tag) { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.empty-text { color: #b1b3b8; font-size: 12px; font-style: italic; }
+:deep(.table-header-cell) { height: 48px; color: #606266; background: #f8f9fb !important; font-weight: 700; }
+:deep(.agent-table .el-table__row:hover > td) { background: #f7faff !important; }
+:deep(.agent-dialog) { max-width: calc(100vw - 32px); border-radius: 14px; }
+:deep(.agent-dialog .el-dialog__header) { padding-bottom: 16px; border-bottom: 1px solid #f0f0f0; }
+:deep(.agent-dialog .el-dialog__footer) { padding-top: 16px; border-top: 1px solid #f0f0f0; }
+.detail-form :deep(.el-input-number) { width: 100%; }
+
+@media (max-width: 900px) {
+  .status-summary { align-items: flex-start; flex-direction: column; }
+  .status-metrics { width: 100%; justify-content: flex-start; }
+  .status-metrics > div:first-child { padding-left: 0; border-left: 0; }
 }
 
-.header-wrapper {
-  background-color: #fff;
-  border-bottom: 1px solid #e6e8eb;
-  padding: 0 40px;
-  height: 64px !important;
-  display: flex;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.header-content {
-  width: 95%;
-  max-width: 1400px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo-img {
-  height: 40px;
-  width: auto;
-}
-
-.main-wrapper {
-  width: 95%;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px 0;
-}
-
-.page-header {
-  margin-bottom: 24px;
-}
-
-.nav-tabs :deep(.el-tabs__header) {
-  margin-bottom: 0;
-}
-
-.nav-tabs :deep(.el-tabs__item) {
-  min-width: 120px;
-  padding: 0 5%;
-  justify-content: center;
-  font-size: 15px;
-}
-
-.content-card {
-  border: none;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
-}
-
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 40%;
-}
-
-.search-input {
-  width: 100%;
-}
-
-.toolbar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.agent-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.agent-name {
-  font-weight: 600;
-  color: #303133;
-}
-
-.agent-description {
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.4;
-}
-
-.agent-route-key {
-  font-size: 12px;
-  color: #409eff;
-  font-family: 'Courier New', Courier, monospace;
-}
-
-.utterances-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 0;
-}
-
-.utterance-tag {
-  height: auto !important;
-  padding: 4px 10px;
-  white-space: normal;
-  text-align: left;
-  line-height: 1.5;
-}
-
-.more-tag {
-  cursor: pointer;
-}
-
-.tooltip-utterances {
-  max-width: 300px;
-  max-height: 400px;
-  overflow-y: auto;
-  padding: 4px;
-}
-
-.tooltip-item {
-  padding: 4px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.tooltip-item:last-child {
-  border-bottom: none;
-}
-
-.negative-tag {
-  border-color: #e6a23c;
-}
-
-.empty-text {
-  color: #909399;
-  font-size: 12px;
-  font-style: italic;
-}
-
-.threshold-container {
-  display: flex;
-  align-items: center;
-  background: #f8f9fb;
-  padding: 8px 16px;
-  border-radius: 8px;
-}
-
-.skill-import-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-  padding: 14px 16px;
-  background: #f8f9fb;
-  border: 1px dashed #d7deea;
-  border-radius: 12px;
-}
-
-.skill-import-copy {
-  min-width: 0;
-}
-
-.skill-import-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.skill-import-desc {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #606266;
-  line-height: 1.5;
-}
-
-.label-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-}
-
-.ai-gen-options {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.gen-label {
-  font-size: 12px;
-  color: #606266;
-}
-
-.gen-count-input {
-  width: 90px;
-}
-
-.pagination-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
-}
-
-:deep(.table-header-cell) {
-  background-color: #f8f9fb !important;
-  color: #606266;
-  font-weight: 700;
-}
-
-:deep(.custom-dialog) {
-  border-radius: 16px;
-}
-
-:deep(.el-dialog__header) {
-  margin-right: 0;
-  border-bottom: 1px solid #f0f0f0;
-  padding-bottom: 16px;
+@media (max-width: 600px) {
+  .status-metrics { align-items: stretch; flex-direction: column; gap: 12px; }
+  .status-metrics > div { padding: 0; border-left: 0; }
+  .content-card :deep(.el-card__body) { padding: 16px; }
 }
 </style>

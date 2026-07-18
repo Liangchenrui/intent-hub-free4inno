@@ -4,10 +4,10 @@ from intent_hub.config import Config
 from intent_hub.utils.logger import suppress_health_check_logs, logger
 
 if __name__ == "__main__":
-    logger.info("Initializing Intent Hub components...")
+    logger.info("Initializing Intent Hub...")
     try:
         app = init_app()
-        logger.info("Components initialized.")
+        logger.info("Intent Hub initialized.")
     except Exception as e:
         logger.error(f"Component initialization failed: {e}")
         import traceback

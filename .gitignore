@@ -99,6 +99,7 @@ intent-hub-backend/data/**
 !intent-hub-backend/data/platform/*.example
 !intent-hub-backend/data/tenants/default/
 !intent-hub-backend/data/tenants/default/*.example
+!intent-hub-backend/data/default_route.txt
 
 # Test artifacts
 pytest-cache-files-*/

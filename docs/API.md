@@ -4,7 +4,7 @@ Except `GET /health` and `POST /auth/login`, send `Authorization: Bearer <api_ke
 
 - `POST /auth/login` — body: `{"username":"admin","password":"..."}`.
 - `GET /agents` — return the latest synchronized Agent snapshot.
-- `POST /sync` — fetch every upstream Agent detail and rebuild the configured collection.
+- `POST /sync` — incrementally synchronize changed Agents. Send `{"mode":"full"}` for a validated blue-green rebuild and atomic alias switch.
 - `POST /route` — body: `{"query":"用户问题"}`. Always returns `success`, `data`, and `error`. `data` contains fixed `matched`, `agent`, `score`, and `text` fields.
 - `GET /settings` — return the collection name.
 - `POST /settings` — body: `{"QDRANT_COLLECTION":"collection"}`.

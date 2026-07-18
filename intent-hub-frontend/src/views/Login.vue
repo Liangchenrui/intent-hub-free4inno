@@ -42,7 +42,7 @@ const submit = async () => {
 </script>
 
 <style scoped>
-.login-page { position: relative; min-height: 100vh; display: grid; place-items: center; overflow: hidden; background: #f5f7fa; }
+.login-page { position: relative; width: 100%; min-height: 100vh; display: grid; place-items: center; overflow: hidden; background: #f5f7fa; }
 .login-backdrop { position: absolute; inset: 0; pointer-events: none; }
 .login-backdrop::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(#e8edf5 1px, transparent 1px), linear-gradient(90deg, #e8edf5 1px, transparent 1px); background-size: 40px 40px; opacity: .45; mask-image: linear-gradient(to bottom, #000, transparent 82%); }
 .login-backdrop span { position: absolute; width: 280px; height: 280px; border: 70px solid rgba(51, 127, 242, .07); border-radius: 50%; }

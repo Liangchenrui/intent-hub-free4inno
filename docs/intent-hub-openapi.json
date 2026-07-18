@@ -176,9 +176,17 @@
     "/sync": {
       "post": {
         "tags": ["Synchronization"],
-        "summary": "Fetch upstream Agents and rebuild the vector index",
+        "summary": "Synchronize upstream Agents incrementally or with a blue-green rebuild",
         "operationId": "syncAgents",
         "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/SyncRequest"}
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Synchronization result",
@@ -429,13 +437,25 @@
       },
       "SyncResult": {
         "type": "object",
-        "required": ["agents_count", "indexed_agents_count", "positive_points", "negative_points"],
+        "required": ["mode", "agents_count", "indexed_agents_count", "changed_agents", "deleted_agents", "unchanged_agents", "positive_points", "negative_points"],
         "properties": {
+          "mode": {"type": "string", "enum": ["incremental", "full"]},
           "agents_count": {"type": "integer"},
           "indexed_agents_count": {"type": "integer"},
+          "changed_agents": {"type": "integer"},
+          "deleted_agents": {"type": "integer"},
+          "unchanged_agents": {"type": "integer"},
           "positive_points": {"type": "integer"},
           "negative_points": {"type": "integer"},
+          "collection": {"type": "string"},
+          "physical_collection": {"type": "string"},
           "warning": {"type": "string"}
+        }
+      },
+      "SyncRequest": {
+        "type": "object",
+        "properties": {
+          "mode": {"type": "string", "enum": ["incremental", "full"], "default": "incremental"}
         }
       },
       "SyncStatus": {

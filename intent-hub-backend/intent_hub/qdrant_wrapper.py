@@ -6,9 +6,14 @@ import uuid
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
+    CreateAlias,
+    CreateAliasOperation,
+    DeleteAlias,
+    DeleteAliasOperation,
     Distance,
     FieldCondition,
     Filter,
+    MatchAny,
     MatchValue,
     PayloadSchemaType,
     PointStruct,
@@ -56,6 +61,72 @@ class IntentHubQdrantClient:
         if self.client.collection_exists(self.collection_name):
             self.client.delete_collection(self.collection_name)
         self._ensure_collection()
+
+    @staticmethod
+    def point_ids(
+        route_id: int,
+        route_name: str,
+        utterances: list[str],
+        negative_samples: list[str],
+        *,
+        legacy: bool = False,
+    ) -> set[str]:
+        if legacy:
+            positive = (f"{route_id}:{route_name}:{text}" for text in utterances)
+            negative = (f"negative:{route_id}:{route_name}:{text}" for text in negative_samples)
+        else:
+            positive = (f"positive:{route_id}:{text}" for text in utterances)
+            negative = (f"negative:{route_id}:{text}" for text in negative_samples)
+        return {str(uuid.uuid5(uuid.NAMESPACE_DNS, value)) for value in (*positive, *negative)}
+
+    def delete_points(self, point_ids: set[str]) -> None:
+        if point_ids:
+            self.client.delete(
+                collection_name=self.collection_name,
+                points_selector=list(point_ids),
+                wait=True,
+            )
+
+    def delete_routes(self, route_ids: set[int]) -> None:
+        if route_ids:
+            self.client.delete(
+                collection_name=self.collection_name,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(
+                            key=self.ROUTE_ID_KEY,
+                            match=MatchAny(any=sorted(route_ids)),
+                        )
+                    ]
+                ),
+                wait=True,
+            )
+
+    def upsert_routes(self, routes: list[dict], batch_size: int = 128) -> None:
+        points = []
+        for route in routes:
+            points.extend(self._route_points(**route))
+        for start in range(0, len(points), batch_size):
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points[start : start + batch_size],
+                wait=True,
+            )
+
+    def switch_alias(self, alias_name: str) -> None:
+        aliases = self.client.get_aliases().aliases
+        operations = []
+        if any(alias.alias_name == alias_name for alias in aliases):
+            operations.append(DeleteAliasOperation(delete_alias=DeleteAlias(alias_name=alias_name)))
+        operations.append(
+            CreateAliasOperation(
+                create_alias=CreateAlias(
+                    collection_name=self.collection_name,
+                    alias_name=alias_name,
+                )
+            )
+        )
+        self.client.update_collection_aliases(change_aliases_operations=operations)
 
     def points_count(self) -> int:
         return int(self.client.get_collection(self.collection_name).points_count or 0)
@@ -116,18 +187,49 @@ class IntentHubQdrantClient:
             ),
         )
 
-    def upsert_route_utterances(
+    def _route_points(
         self,
         route_id: int,
         route_name: str,
         utterances: list[str],
-        embeddings: list[list[float]],
+        positive_embeddings: list[list[float]],
+        negative_samples: list[str],
+        negative_embeddings: list[list[float]],
         score_threshold: float,
-        route_hash: str | None = None,
-        model_name: str | None = None,
-    ) -> None:
-        if len(utterances) != len(embeddings):
+        negative_threshold: float,
+        route_hash: str,
+        model_name: str,
+    ) -> list[PointStruct]:
+        if len(utterances) != len(positive_embeddings):
             raise ValueError("utterances 和 embeddings 长度不匹配")
+        if len(negative_samples) != len(negative_embeddings):
+            raise ValueError("negative_samples 和 embeddings 长度不匹配")
+        return self._positive_points(
+            route_id,
+            route_name,
+            utterances,
+            positive_embeddings,
+            score_threshold,
+            route_hash,
+            model_name,
+        ) + self._negative_points(
+            route_id,
+            route_name,
+            negative_samples,
+            negative_embeddings,
+            negative_threshold,
+        )
+
+    def _positive_points(
+        self,
+        route_id,
+        route_name,
+        utterances,
+        embeddings,
+        score_threshold,
+        route_hash,
+        model_name,
+    ) -> list[PointStruct]:
         points = []
         for utterance, embedding in zip(utterances, embeddings):
             payload = {
@@ -142,27 +244,24 @@ class IntentHubQdrantClient:
                 payload[self.MODEL_NAME_KEY] = model_name
             points.append(
                 PointStruct(
-                    id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{route_id}:{route_name}:{utterance}")),
+                    id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"positive:{route_id}:{utterance}")),
                     vector=embedding,
                     payload=payload,
                 )
             )
-        if points:
-            self.client.upsert(collection_name=self.collection_name, points=points)
+        return points
 
-    def upsert_route_negative_samples(
+    def _negative_points(
         self,
-        route_id: int,
-        route_name: str,
-        negative_samples: list[str],
-        embeddings: list[list[float]],
-        negative_threshold: float,
-    ) -> None:
-        if len(negative_samples) != len(embeddings):
-            raise ValueError("negative_samples 和 embeddings 长度不匹配")
-        points = [
+        route_id,
+        route_name,
+        negative_samples,
+        embeddings,
+        negative_threshold,
+    ) -> list[PointStruct]:
+        return [
             PointStruct(
-                id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"negative:{route_id}:{route_name}:{text}")),
+                id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"negative:{route_id}:{text}")),
                 vector=embedding,
                 payload={
                     self.ROUTE_ID_KEY: route_id,
@@ -174,8 +273,6 @@ class IntentHubQdrantClient:
             )
             for text, embedding in zip(negative_samples, embeddings)
         ]
-        if points:
-            self.client.upsert(collection_name=self.collection_name, points=points)
 
     def search(self, query_vector: list[float], top_k: int = 20) -> list[dict]:
         result = self.client.query_points(

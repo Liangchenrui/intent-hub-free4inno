@@ -96,7 +96,8 @@ def update_agent_thresholds(agent_id: int):
 @require_auth
 @api_errors
 def sync():
-    return jsonify(SyncService(get_component_manager()).sync())
+    mode = str((request.get_json(silent=True) or {}).get("mode", "incremental"))
+    return jsonify(SyncService(get_component_manager()).sync(mode=mode))
 
 
 @app.get("/sync/status")

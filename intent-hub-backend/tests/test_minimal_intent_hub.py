@@ -6,6 +6,7 @@ from intent_hub.agent_source import AgentSource
 from intent_hub.app import app
 from intent_hub.config import Config
 from intent_hub.models import Agent
+from intent_hub.qdrant_wrapper import IntentHubQdrantClient
 from intent_hub.services.prediction_service import PredictionService
 from intent_hub.services.sync_service import SyncService
 
@@ -86,18 +87,38 @@ def test_sync_keeps_existing_qdrant_payload_inputs():
     )
 
     class Encoder:
+        calls = 0
+
         def encode(self, texts):
+            self.calls += 1
             return [[float(index)] for index, _ in enumerate(texts)]
 
     class Qdrant:
-        def delete_all(self):
-            self.deleted = True
+        routes = []
+        upsert_calls = 0
 
-        def upsert_route_utterances(self, **kwargs):
-            self.positive = kwargs
+        def delete_routes(self, route_ids):
+            self.deleted_routes = route_ids
 
-        def upsert_route_negative_samples(self, **kwargs):
-            self.negative = kwargs
+        def upsert_routes(self, routes, batch_size):
+            self.routes = routes
+            self.upsert_calls += 1
+
+        def point_ids(self, *args, **kwargs):
+            return set()
+
+        def delete_points(self, point_ids):
+            self.deleted_points = point_ids
+
+        def index_summary(self):
+            return {
+                "points_count": sum(
+                    len(route["utterances"]) + len(route["negative_samples"])
+                    for route in self.routes
+                ),
+                "route_ids": sorted(route["route_id"] for route in self.routes),
+                "route_hashes": {route["route_id"]: route["route_hash"] for route in self.routes},
+            }
 
     qdrant = Qdrant()
     store = SimpleNamespace(
@@ -108,27 +129,114 @@ def test_sync_keeps_existing_qdrant_payload_inputs():
     components = SimpleNamespace(encoder=Encoder(), qdrant_client=qdrant, agent_store=store)
     source = SimpleNamespace(fetch_all=lambda: [agent])
 
-    result = SyncService(components, source).sync()
+    with TemporaryDirectory() as directory:
+        state_path = Path(directory) / "sync.db"
+        service = SyncService(components, source, state_path=state_path)
+        result = service.sync()
 
-    assert qdrant.positive["route_id"] == 7
-    assert qdrant.positive["route_name"] == "天气 Agent"
-    assert qdrant.positive["utterances"] == ["查天气"]
-    assert qdrant.positive["score_threshold"] == 0.8
-    assert qdrant.negative["negative_threshold"] == 0.95
-    assert result == {
-        "agents_count": 1,
-        "indexed_agents_count": 1,
-        "positive_points": 1,
-        "negative_points": 1,
-    }
-    qdrant.index_summary = lambda: {
-        "points_count": 2,
-        "route_ids": [7],
-        "route_hashes": {7: qdrant.positive["route_hash"]},
-    }
-    assert SyncService(components, source).status()["synced"] is True
-    empty_result = SyncService(components, SimpleNamespace(fetch_all=lambda: [])).sync()
-    assert empty_result["warning"] == "上游没有包含指定标签的 Agent"
+        route = qdrant.routes[0]
+        assert route["route_id"] == 7
+        assert route["route_name"] == "天气 Agent"
+        assert route["utterances"] == ["查天气"]
+        assert route["score_threshold"] == 0.8
+        assert route["negative_threshold"] == 0.95
+        assert result["changed_agents"] == 1
+        assert result["positive_points"] == 1
+        assert result["negative_points"] == 1
+
+        encoder_calls = components.encoder.calls
+        assert service.sync()["changed_agents"] == 0
+        assert components.encoder.calls == encoder_calls
+        assert service.status()["synced"] is True
+
+        empty_result = SyncService(
+            components,
+            SimpleNamespace(fetch_all=lambda: []),
+            state_path=state_path,
+        ).sync()
+        assert empty_result["warning"] == "上游没有包含指定标签的 Agent，已保留现有索引"
+
+
+def test_incremental_sync_blocks_abnormal_mass_deletion():
+    agents = [
+        Agent(id=index, title=str(index), utterances=[str(index)], details={"id": index})
+        for index in range(10)
+    ]
+    store = SimpleNamespace(all=lambda: agents)
+    components = SimpleNamespace(agent_store=store)
+    source = SimpleNamespace(fetch_all=lambda: agents[:1])
+
+    with TemporaryDirectory() as directory:
+        service = SyncService(components, source, state_path=Path(directory) / "sync.db")
+        try:
+            service.sync()
+        except ValueError as error:
+            assert "超过安全阈值" in str(error)
+        else:
+            raise AssertionError("mass deletion should be blocked")
+
+
+def test_full_sync_builds_and_switches_alias(monkeypatch):
+    agent = Agent(id=7, title="天气 Agent", utterances=["查天气"], details={"id": 7})
+
+    class Encoder:
+        dimensions = 1
+
+        def encode(self, texts):
+            return [[1.0] for _ in texts]
+
+    class Target:
+        def upsert_routes(self, routes, batch_size):
+            self.routes = routes
+
+        def index_summary(self):
+            route = self.routes[0]
+            return {
+                "points_count": 1,
+                "route_ids": [7],
+                "route_hashes": {7: route["route_hash"]},
+            }
+
+        def switch_alias(self, alias):
+            self.alias = alias
+
+    target = Target()
+    store = SimpleNamespace(
+        agents=[],
+        replace=lambda agents: setattr(store, "agents", agents),
+        all=lambda: store.agents,
+    )
+    components = SimpleNamespace(
+        encoder=Encoder(),
+        agent_store=store,
+        create_qdrant=lambda collection: target,
+        reset_qdrant=lambda: None,
+    )
+
+    with TemporaryDirectory() as directory:
+        monkeypatch.setattr(Config, "QDRANT_COLLECTION", "agents")
+        monkeypatch.setattr(Config, "SETTINGS_FILE", Path(directory) / "settings.json")
+        monkeypatch.setattr(Config, "DATA_DIR", Path(directory))
+        result = SyncService(
+            components,
+            SimpleNamespace(fetch_all=lambda: [agent]),
+            state_path=Path(directory) / "sync.db",
+        ).sync(mode="full")
+
+    assert target.alias == "agents__active"
+    assert result["collection"] == "agents__active"
+    assert result["physical_collection"].startswith("agents__")
+
+
+def test_point_ids_do_not_change_when_agent_title_changes():
+    first = IntentHubQdrantClient.point_ids(7, "旧名称", ["查天气"], ["写代码"])
+    renamed = IntentHubQdrantClient.point_ids(7, "新名称", ["查天气"], ["写代码"])
+    legacy = IntentHubQdrantClient.point_ids(
+        7, "旧名称", ["查天气"], ["写代码"], legacy=True
+    )
+
+    assert first == renamed
+    assert first != legacy
 
 
 def test_route_returns_best_agent_or_default_file(monkeypatch):

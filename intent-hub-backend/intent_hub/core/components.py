@@ -26,13 +26,16 @@ class ComponentManager:
     @property
     def qdrant_client(self):
         if self._qdrant_client is None:
-            self._qdrant_client = self.qdrant_client_factory(
-                url=Config.QDRANT_URL,
-                collection_name=Config.QDRANT_COLLECTION,
-                dimensions=self.encoder.dimensions,
-                api_key=Config.QDRANT_API_KEY,
-            )
+            self._qdrant_client = self.create_qdrant(Config.QDRANT_COLLECTION)
         return self._qdrant_client
+
+    def create_qdrant(self, collection_name: str):
+        return self.qdrant_client_factory(
+            url=Config.QDRANT_URL,
+            collection_name=collection_name,
+            dimensions=self.encoder.dimensions,
+            api_key=Config.QDRANT_API_KEY,
+        )
 
     def reset_qdrant(self) -> None:
         self._qdrant_client = None

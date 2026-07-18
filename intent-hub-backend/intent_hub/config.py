@@ -15,6 +15,7 @@ class Config:
     DATA_DIR = BACKEND_ROOT / "data"
     SETTINGS_FILE = DATA_DIR / "settings.json"
     AGENTS_FILE = DATA_DIR / "agents.json"
+    SYNC_STATE_FILE = DATA_DIR / "sync_state.db"
     DEFAULT_ROUTE_FILE = DATA_DIR / "default_route.txt"
 
     AGENT_API_URL = "https://yuanfang.bupt.edu.cn/ac/api"
@@ -27,6 +28,8 @@ class Config:
     EMBEDDING_SERVICE_URL = "http://192.168.33.1:30122"
     EMBEDDING_MODEL_NAME = "BAAI/bge-m3"
     BATCH_SIZE = 32
+    QDRANT_WRITE_BATCH_SIZE = 128
+    MAX_DELETE_RATIO = 0.2
 
     SCORE_THRESHOLD = 0.8
     NEGATIVE_THRESHOLD = 0.95
@@ -55,4 +58,3 @@ class Config:
 
 
 Config.load()
-

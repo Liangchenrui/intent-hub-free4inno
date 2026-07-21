@@ -27,6 +27,8 @@ dependencies = [
     "requests>=2.31.0",
     "pydantic>=2.0.0",
     "qdrant-client>=1.8.0",
+    "numpy>=1.24.0",
+    "umap-learn>=0.5.3",
 ]
 
 [project.optional-dependencies]

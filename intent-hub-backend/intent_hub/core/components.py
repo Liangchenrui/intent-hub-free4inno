@@ -10,7 +10,7 @@ class ComponentManager:
     def __init__(self, encoder_factory=None, qdrant_client_factory=None, store=None):
         self.encoder_factory = encoder_factory or QwenEmbeddingEncoder
         self.qdrant_client_factory = qdrant_client_factory or IntentHubQdrantClient
-        self.agent_store = store or AgentStore(Config.AGENTS_FILE)
+        self.agent_store = store or AgentStore(Config.AGENTS_DB_FILE, legacy_path=Config.AGENTS_FILE)
         self._encoder = None
         self._qdrant_client = None
 
@@ -38,6 +38,10 @@ class ComponentManager:
         )
 
     def reset_qdrant(self) -> None:
+        self._qdrant_client = None
+
+    def reinit_components(self) -> None:
+        self._encoder = None
         self._qdrant_client = None
 
 

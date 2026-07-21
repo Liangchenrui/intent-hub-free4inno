@@ -16,9 +16,10 @@
 
     <el-main v-if="!route.meta.public" class="main-wrapper">
       <el-tabs :model-value="route.path" class="nav-tabs" @tab-change="navigate">
-        <el-tab-pane label="Agent 列表" name="/" />
-        <el-tab-pane label="路由测试" name="/test" />
-        <el-tab-pane label="系统设置" name="/settings" />
+        <el-tab-pane label="列表" name="/" />
+        <el-tab-pane label="测试" name="/test" />
+        <el-tab-pane label="诊断" name="/diagnostics" />
+        <el-tab-pane label="设置" name="/settings" />
       </el-tabs>
       <router-view />
     </el-main>

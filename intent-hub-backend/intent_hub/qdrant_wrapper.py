@@ -297,3 +297,32 @@ class IntentHubQdrantClient:
             with_payload=True,
         )
         return [{"score": point.score, "payload": point.payload or {}} for point in result.points]
+
+    @staticmethod
+    def _point_dict(point) -> dict:
+        vector = point.vector
+        if isinstance(vector, dict):
+            vector = next(iter(vector.values()), None)
+        return {"id": str(point.id), "vector": vector, "payload": point.payload or {}}
+
+    def get_route_vectors(self, route_id: int, exclude_negative: bool = False) -> list[dict]:
+        must_not = [FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True))] if exclude_negative else None
+        points, offset = self.client.scroll(
+            collection_name=self.collection_name, limit=256,
+            scroll_filter=Filter(must=[FieldCondition(key=self.ROUTE_ID_KEY, match=MatchValue(value=route_id))], must_not=must_not),
+            with_payload=True, with_vectors=True,
+        )
+        result = [self._point_dict(point) for point in points]
+        while offset is not None:
+            points, offset = self.client.scroll(collection_name=self.collection_name, limit=256, offset=offset, scroll_filter=Filter(must=[FieldCondition(key=self.ROUTE_ID_KEY, match=MatchValue(value=route_id))], must_not=must_not), with_payload=True, with_vectors=True)
+            result.extend(self._point_dict(point) for point in points)
+        return result
+
+    def scroll_all_points(self, with_vectors: bool = True, exclude_negative: bool = False) -> list[dict]:
+        route_filter = Filter(must_not=[FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True))]) if exclude_negative else None
+        result, offset = [], None
+        while True:
+            points, offset = self.client.scroll(collection_name=self.collection_name, limit=256, offset=offset, scroll_filter=route_filter, with_payload=True, with_vectors=with_vectors)
+            result.extend(self._point_dict(point) for point in points)
+            if offset is None:
+                return result

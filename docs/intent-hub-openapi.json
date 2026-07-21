@@ -136,6 +136,25 @@
         }
       }
     },
+    "/agents/{agent_id}/diff": {
+      "get": {
+        "tags": ["Agents"],
+        "summary": "Compare local Agent content with its latest upstream snapshot",
+        "operationId": "getAgentDiff",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"name": "agent_id", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Field-level comparison",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentDiff"}}}
+          },
+          "400": {"$ref": "#/components/responses/InvalidRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
     "/agents/{agent_id}/thresholds": {
       "patch": {
         "tags": ["Agents"],
@@ -424,7 +443,30 @@
           "negative_samples": {"type": "array", "items": {"type": "string"}},
           "score_threshold": {"type": "number", "minimum": 0, "maximum": 1},
           "negative_threshold": {"type": "number", "minimum": 0, "maximum": 1},
-          "details": {"type": "object", "additionalProperties": true}
+          "details": {"type": "object", "additionalProperties": true},
+          "upstream_present": {"type": "boolean", "nullable": true},
+          "comparison": {"$ref": "#/components/schemas/AgentComparison"}
+        }
+      },
+      "AgentComparison": {
+        "type": "object",
+        "required": ["status", "diff_fields", "diff_count", "override_fields", "locked_equal_fields"],
+        "properties": {
+          "status": {"type": "string", "enum": ["same", "local_modified", "locked_equal", "upstream_missing", "local_only", "snapshot_unknown"]},
+          "diff_fields": {"type": "array", "items": {"type": "string"}},
+          "diff_count": {"type": "integer"},
+          "override_fields": {"type": "array", "items": {"type": "string"}},
+          "locked_equal_fields": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "AgentDiff": {
+        "type": "object",
+        "required": ["agent_id", "comparison", "fields"],
+        "properties": {
+          "agent_id": {"type": "integer"},
+          "compared_at": {"type": "string", "format": "date-time", "nullable": true},
+          "comparison": {"$ref": "#/components/schemas/AgentComparison"},
+          "fields": {"type": "object", "additionalProperties": true}
         }
       },
       "ThresholdRequest": {

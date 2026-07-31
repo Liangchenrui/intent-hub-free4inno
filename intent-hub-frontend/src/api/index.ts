@@ -1,25 +1,12 @@
 import axios from 'axios';
 
 const api = axios.create({ baseURL: '/api' });
+const AUTH_CODE = 'telestar';
 
 api.interceptors.request.use((config) => {
-  const key = localStorage.getItem('api_key');
-  if (key && config.url !== '/auth/login') {
-    config.headers.Authorization = `Bearer ${key}`;
-  }
+  config.headers.Authorization = `Bearer ${AUTH_CODE}`;
   return config;
 });
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401 && error.config?.url !== '/auth/login') {
-      localStorage.removeItem('api_key');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  },
-);
 
 export interface Agent {
   id: number;
@@ -109,8 +96,6 @@ export interface Settings {
   INSTANCE_THRESHOLD_AMBIGUOUS: number;
 }
 
-export const login = (username: string, password: string) =>
-  api.post<{ api_key: string }>('/auth/login', { username, password });
 export const getAgents = () => api.get<Agent[]>('/agents');
 export const getAgentDiff = (id: number) => api.get<AgentDiffDetail>(`/agents/${id}/diff`);
 export const createAgent = (data: Partial<Agent>) => api.post<Agent>('/agents', data);

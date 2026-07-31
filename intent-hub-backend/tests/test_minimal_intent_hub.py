@@ -63,21 +63,21 @@ def test_agent_source_fetches_search_and_details():
     assert len(session.calls) == 4
 
 
-def test_api_requires_login_and_exposes_collection():
+def test_api_requires_static_auth_code_and_exposes_collection():
     client = app.test_client()
     assert client.get("/agents").status_code == 401
-    login_response = client.post(
-        "/auth/login",
-        json={"username": Config.DEFAULT_USERNAME, "password": Config.DEFAULT_PASSWORD},
+    assert client.get("/agents", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert client.post("/auth/login").status_code == 404
+    response = client.get(
+        "/settings", headers={"Authorization": f"Bearer {Config.AUTH_CODE}"}
     )
-    key = login_response.get_json()["api_key"]
-    response = client.get("/settings", headers={"Authorization": f"Bearer {key}"})
     assert response.status_code == 200
     settings = response.get_json()
     assert settings["QDRANT_COLLECTION"] == Config.QDRANT_COLLECTION
     assert "QDRANT_URL" in settings
     assert "LLM_PROVIDER" in settings
     assert "UTTERANCE_GENERATION_PROMPT" in settings
+    assert client.get("/settings", headers={"X-API-Key": Config.AUTH_CODE}).status_code == 200
 
 
 def test_sync_keeps_existing_qdrant_payload_inputs():
@@ -304,15 +304,10 @@ def test_route_api_uses_consistent_error_envelope():
         },
     }
 
-    login_response = client.post(
-        "/auth/login",
-        json={"username": Config.DEFAULT_USERNAME, "password": Config.DEFAULT_PASSWORD},
-    )
-    key = login_response.get_json()["api_key"]
     invalid = client.post(
         "/route",
         json={"query": ""},
-        headers={"Authorization": f"Bearer {key}"},
+        headers={"Authorization": f"Bearer {Config.AUTH_CODE}"},
     )
     assert invalid.status_code == 400
     payload = invalid.get_json()

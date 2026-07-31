@@ -1,8 +1,7 @@
 # API
 
-Except `GET /health` and `POST /auth/login`, send `Authorization: Bearer <api_key>`.
+Except `GET /health`, send `Authorization: Bearer telestar` (or `X-API-Key: telestar`).
 
-- `POST /auth/login` — body: `{"username":"admin","password":"..."}`.
 - `GET /agents` — return all local SQLite Agents, including inactive records and a lightweight upstream comparison summary.
 - `GET /agents/<id>/diff` — return field-level local/latest-upstream differences; corpus fields contain added, removed, and unchanged counts.
 - `POST /agents/pull` — fetch upstream Agents into SQLite without writing vectors. The result distinguishes created, upstream-changed, unchanged, preserved overrides, and upstream-missing records.

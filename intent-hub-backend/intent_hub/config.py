@@ -50,8 +50,7 @@ class Config:
     AGENT_REPAIR_PROMPT = DEFAULT_AGENT_REPAIR_PROMPT
     REGION_THRESHOLD_SIGNIFICANT = 0.85
     INSTANCE_THRESHOLD_AMBIGUOUS = 0.92
-    DEFAULT_USERNAME = "admin"
-    DEFAULT_PASSWORD = "123456"
+    AUTH_CODE = "telestar"
 
     @classmethod
     def load(cls) -> None:

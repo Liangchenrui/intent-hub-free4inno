@@ -7,11 +7,11 @@ from flask_compress import Compress
 from pydantic import ValidationError
 
 from intent_hub.agent_compare import comparison_detail, comparison_summary
-from intent_hub.auth import get_auth_manager, require_auth
+from intent_hub.auth import require_auth
 from intent_hub.config import Config
 from intent_hub.core.components import get_component_manager
 from intent_hub.models import (
-    AgentCreate, AgentUpdate, ApplyRepairRequest, LoginRequest, MergeAgentsRequest,
+    AgentCreate, AgentUpdate, ApplyRepairRequest, MergeAgentsRequest,
     RecommendationRequest, RepairRequest, RouteRequest, ThresholdRequest,
 )
 from intent_hub.services.diagnostic_service import DiagnosticService
@@ -69,16 +69,6 @@ def api_errors(function):
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
-
-
-@app.post("/auth/login")
-@api_errors
-def login():
-    payload = LoginRequest(**(request.get_json() or {}))
-    key = get_auth_manager().login(payload.username, payload.password)
-    if not key:
-        return jsonify({"error": "用户名或密码错误"}), 401
-    return jsonify({"api_key": key})
 
 
 @app.get("/agents")

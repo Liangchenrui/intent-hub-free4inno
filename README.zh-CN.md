@@ -16,7 +16,6 @@ npm install
 npm run dev
 ```
 
-前端仅包含登录、Agent 同步与列表、路由测试和 Qdrant Collection 设置。
+前端包含 Agent 同步与列表、路由测试、语义诊断和运行设置。
 
 接口说明见 [USER_GUIDE.md](USER_GUIDE.md) 与 [docs/API.md](docs/API.md)。
-

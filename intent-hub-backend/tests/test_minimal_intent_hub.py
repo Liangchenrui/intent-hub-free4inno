@@ -108,12 +108,6 @@ def test_sync_keeps_existing_qdrant_payload_inputs():
             self.routes = routes
             self.upsert_calls += 1
 
-        def point_ids(self, *args, **kwargs):
-            return set()
-
-        def delete_points(self, point_ids):
-            self.deleted_points = point_ids
-
         def index_summary(self):
             return {
                 "points_count": sum(

@@ -126,6 +126,4 @@ pytest-cache-files-*/
 
 # Local screenshots and archives
 ScreenShot_*.png
-intent-hub-cli/发布命令.md
-intent-hub-frontend/dist.tar.gz
 intent-hub-frontend/dist.tar.gz

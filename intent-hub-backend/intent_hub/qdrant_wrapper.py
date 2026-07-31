@@ -57,11 +57,6 @@ class IntentHubQdrantClient:
                 if "already exists" not in str(error).lower():
                     raise
 
-    def delete_all(self) -> None:
-        if self.client.collection_exists(self.collection_name):
-            self.client.delete_collection(self.collection_name)
-        self._ensure_collection()
-
     @staticmethod
     def point_ids(
         route_id: int,
@@ -78,14 +73,6 @@ class IntentHubQdrantClient:
             positive = (f"positive:{route_id}:{text}" for text in utterances)
             negative = (f"negative:{route_id}:{text}" for text in negative_samples)
         return {str(uuid.uuid5(uuid.NAMESPACE_DNS, value)) for value in (*positive, *negative)}
-
-    def delete_points(self, point_ids: set[str]) -> None:
-        if point_ids:
-            self.client.delete(
-                collection_name=self.collection_name,
-                points_selector=list(point_ids),
-                wait=True,
-            )
 
     def delete_routes(self, route_ids: set[int]) -> None:
         if route_ids:
@@ -128,9 +115,6 @@ class IntentHubQdrantClient:
         )
         self.client.update_collection_aliases(change_aliases_operations=operations)
 
-    def points_count(self) -> int:
-        return int(self.client.get_collection(self.collection_name).points_count or 0)
-
     def index_summary(self) -> dict:
         route_ids = set()
         route_hashes = {}
@@ -159,33 +143,6 @@ class IntentHubQdrantClient:
             "route_ids": sorted(route_ids),
             "route_hashes": route_hashes,
         }
-
-    def update_route_thresholds(
-        self,
-        route_id: int,
-        score_threshold: float,
-        negative_threshold: float,
-        route_hash: str,
-    ) -> None:
-        route_filter = FieldCondition(key=self.ROUTE_ID_KEY, match=MatchValue(value=route_id))
-        self.client.set_payload(
-            collection_name=self.collection_name,
-            payload={self.SCORE_THRESHOLD_KEY: score_threshold, self.ROUTE_HASH_KEY: route_hash},
-            points=Filter(
-                must=[route_filter],
-                must_not=[FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True))],
-            ),
-        )
-        self.client.set_payload(
-            collection_name=self.collection_name,
-            payload={self.NEGATIVE_THRESHOLD_KEY: negative_threshold},
-            points=Filter(
-                must=[
-                    route_filter,
-                    FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)),
-                ]
-            ),
-        )
 
     def _route_points(
         self,

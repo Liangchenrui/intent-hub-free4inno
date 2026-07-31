@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview",
-    "build:prod": "vite build && tar -czf dist.tar.gz dist"
+    "preview": "vite preview"
   },
   "dependencies": {
     "axios": "^1.13.2",

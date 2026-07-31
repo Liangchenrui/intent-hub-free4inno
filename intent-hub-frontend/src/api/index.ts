@@ -104,14 +104,8 @@ export const deleteAgent = (id: number) => api.delete<Agent>(`/agents/${id}`);
 export const restoreAgentFields = (id: number, fields: string[]) => api.post<Agent>(`/agents/${id}/restore-fields`, { fields });
 export const recommendCorpus = (id: number, data: { polarity: 'positive' | 'negative'; count: number; title?: string; text?: string; utterances?: string[]; negative_samples?: string[] }) =>
   api.post<{ items: string[]; polarity: string }>(`/agents/${id}/recommendations`, data, { timeout: 120000 });
-export const updateAgentThresholds = (
-  id: number,
-  score_threshold: number,
-  negative_threshold: number,
-) => api.patch<Agent>(`/agents/${id}/thresholds`, { score_threshold, negative_threshold });
 export const pullAgents = () => api.post('/agents/pull', {}, { timeout: 120000 });
 export const syncVectors = (mode: 'incremental' | 'full' = 'incremental', agent_ids?: number[]) => api.post('/vectors/sync', { mode, agent_ids }, { timeout: 600000 });
-export const syncAgents = () => syncVectors();
 export const getSyncStatus = () => api.get<SyncStatus>('/sync/status');
 export const route = (query: string) => api.post<RouteResult>('/route', { query });
 export const getSettings = () => api.get<Settings>('/settings');

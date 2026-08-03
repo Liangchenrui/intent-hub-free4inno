@@ -232,28 +232,40 @@ class IntentHubQdrantClient:
         ]
 
     def search(self, query_vector: list[float], top_k: int = 20) -> list[dict]:
-        result = self.client.query_points(
-            collection_name=self.collection_name,
-            query=query_vector,
-            limit=top_k,
-            query_filter=Filter(
+        return self._search_grouped(
+            query_vector,
+            top_k,
+            Filter(
                 must_not=[FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True))]
             ),
-            with_payload=True,
         )
-        return [{"score": point.score, "payload": point.payload or {}} for point in result.points]
 
     def search_negative_samples(self, query_vector: list[float], top_k: int = 20) -> list[dict]:
-        result = self.client.query_points(
-            collection_name=self.collection_name,
-            query=query_vector,
-            limit=top_k,
-            query_filter=Filter(
+        return self._search_grouped(
+            query_vector,
+            top_k,
+            Filter(
                 must=[FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True))]
             ),
+        )
+
+    def _search_grouped(
+        self, query_vector: list[float], top_k: int, query_filter: Filter
+    ) -> list[dict]:
+        result = self.client.query_points_groups(
+            collection_name=self.collection_name,
+            query=query_vector,
+            group_by=self.ROUTE_ID_KEY,
+            group_size=1,
+            limit=top_k,
+            query_filter=query_filter,
             with_payload=True,
         )
-        return [{"score": point.score, "payload": point.payload or {}} for point in result.points]
+        return [
+            {"score": group.hits[0].score, "payload": group.hits[0].payload or {}}
+            for group in result.groups
+            if group.hits
+        ]
 
     @staticmethod
     def _point_dict(point) -> dict:

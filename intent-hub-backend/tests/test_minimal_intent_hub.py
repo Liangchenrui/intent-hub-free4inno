@@ -237,12 +237,18 @@ def test_point_ids_do_not_change_when_agent_title_changes():
     assert first != legacy
 
 
-def test_route_returns_best_agent_or_default_file(monkeypatch):
-    agent = Agent(
+def test_route_returns_all_agents_by_descending_score_or_default_file(monkeypatch):
+    weather_agent = Agent(
         id=7,
         title="天气 Agent",
         utterances=["查天气"],
         details={"id": 7, "title": "天气 Agent"},
+    )
+    travel_agent = Agent(
+        id=8,
+        title="旅行 Agent",
+        utterances=["旅行建议"],
+        details={"id": 8, "title": "旅行 Agent"},
     )
 
     class Encoder:
@@ -250,23 +256,30 @@ def test_route_returns_best_agent_or_default_file(monkeypatch):
             return [1.0]
 
     class Qdrant:
-        def search_negative_samples(self, vector):
+        def search_negative_samples(self, vector, top_k=20):
             return []
 
-        def search(self, vector):
+        def search(self, vector, top_k=20):
             return self.results
 
     qdrant = Qdrant()
-    store = SimpleNamespace(get=lambda agent_id: agent if agent_id == 7 else None)
+    agents = {7: weather_agent, 8: travel_agent}
+    store = SimpleNamespace(get=agents.get, active=lambda: list(agents.values()))
     service = PredictionService(
         SimpleNamespace(encoder=Encoder(), qdrant_client=qdrant, agent_store=store)
     )
 
-    qdrant.results = [{"score": 0.91, "payload": {"route_id": 7}}]
+    qdrant.results = [
+        {"score": 0.86, "payload": {"route_id": 8}},
+        {"score": 0.91, "payload": {"route_id": 7}},
+        {"score": 0.88, "payload": {"route_id": 7}},
+    ]
     assert service.route("天气") == {
         "matched": True,
-        "agent": {"id": 7, "title": "天气 Agent"},
-        "score": 0.91,
+        "agents": [
+            {"agent": {"id": 7, "title": "天气 Agent"}, "score": 0.91},
+            {"agent": {"id": 8, "title": "旅行 Agent"}, "score": 0.86},
+        ],
         "text": None,
     }
 
@@ -277,8 +290,7 @@ def test_route_returns_best_agent_or_default_file(monkeypatch):
         qdrant.results = [{"score": 0.79, "payload": {"route_id": 7}}]
         assert service.route("未知问题") == {
             "matched": False,
-            "agent": None,
-            "score": None,
+            "agents": [],
             "text": "交给调用方处理",
         }
 

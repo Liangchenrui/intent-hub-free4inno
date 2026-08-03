@@ -1,4 +1,4 @@
-"""Return the single highest-scoring Agent or the default text."""
+"""Return every Agent that reaches its routing threshold."""
 
 from intent_hub.config import Config
 
@@ -9,32 +9,44 @@ class PredictionService:
 
     def route(self, query: str) -> dict:
         vector = self.components.encoder.encode_single(query)
-        excluded = {
-            result["payload"].get("route_id")
-            for result in self.components.qdrant_client.search_negative_samples(vector)
-            if result["score"]
-            >= (
-                self.components.agent_store.get(result["payload"].get("route_id")).negative_threshold
-                if self.components.agent_store.get(result["payload"].get("route_id"))
-                else Config.NEGATIVE_THRESHOLD
-            )
-        }
-        for result in self.components.qdrant_client.search(vector):
+        agents = {agent.id: agent for agent in self.components.agent_store.active()}
+        result_limit = max(1, len(agents))
+        excluded = set()
+        for result in self.components.qdrant_client.search_negative_samples(
+            vector, top_k=result_limit
+        ):
+            agent_id = result["payload"].get("route_id")
+            agent = agents.get(agent_id)
+            threshold = agent.negative_threshold if agent else Config.NEGATIVE_THRESHOLD
+            if result["score"] >= threshold:
+                excluded.add(agent_id)
+
+        matches_by_agent = {}
+        for result in self.components.qdrant_client.search(vector, top_k=result_limit):
             agent_id = result["payload"].get("route_id")
             if agent_id in excluded:
                 continue
-            agent = self.components.agent_store.get(agent_id)
+            agent = agents.get(agent_id)
             if agent and result["score"] >= agent.score_threshold:
-                return {
-                    "matched": True,
-                    "agent": agent.details,
-                    "score": float(result["score"]),
-                    "text": None,
-                }
+                score = float(result["score"])
+                current = matches_by_agent.get(agent_id)
+                if current is None or score > current["score"]:
+                    matches_by_agent[agent_id] = {
+                        "agent": agent.details,
+                        "score": score,
+                    }
+
+        matches = sorted(matches_by_agent.values(), key=lambda item: item["score"], reverse=True)
+        if matches:
+            return {
+                "matched": True,
+                "agents": matches,
+                "text": None,
+            }
+
         return {
             "matched": False,
-            "agent": None,
-            "score": None,
+            "agents": [],
             "text": self._default_text(),
         }
 

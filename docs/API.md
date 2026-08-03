@@ -11,7 +11,7 @@ Except `GET /health`, send `Authorization: Bearer telestar` (or `X-API-Key: tele
 - `POST /vectors/sync` — synchronize active local Agents to Qdrant. Send `{"mode":"full"}` for a validated blue-green rebuild.
 - `POST /sync` — deprecated compatibility alias for `POST /vectors/sync`; it no longer pulls upstream data.
 - `GET /sync/status` — return local pull time, pending changes, vector sync time, and point counts.
-- `POST /route` — body: `{"query":"用户问题"}`. Always returns `success`, `data`, and `error`. `data` contains fixed `matched`, `agent`, `score`, and `text` fields.
+- `POST /route` — body: `{"query":"用户问题"}`. Always returns `success`, `data`, and `error`. `data.agents` contains every Agent that reaches its threshold as `{agent, score}` entries, ordered by descending score; it is empty when no Agent matches.
 - `GET /settings`, `POST /settings` — read or update Qdrant, Embedding, LLM, prompt, and diagnostic settings.
 - `/diagnostics/overlap`, `/diagnostics/umap`, `/diagnostics/repair`, `/diagnostics/apply-repair`, `/diagnostics/merge` — semantic diagnosis and local repair workflow.
 - `GET /health` — health check.

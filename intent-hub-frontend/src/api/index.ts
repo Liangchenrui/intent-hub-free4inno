@@ -54,8 +54,10 @@ export interface AgentDiffDetail {
 
 export interface RouteData {
   matched: boolean;
-  agent: { id: number; title: string } | null;
-  score: number | null;
+  agents: Array<{
+    agent: { id: number; title: string };
+    score: number;
+  }>;
   text: string | null;
 }
 

@@ -17,13 +17,21 @@
         <strong>未命中 Agent</strong>
         <p>{{ result.text }}</p>
       </div>
-      <el-card v-else shadow="never" class="match-card">
+      <template v-else>
+      <el-card
+        v-for="(match, index) in result.agents"
+        :key="match.agent.id"
+        shadow="never"
+        class="match-card"
+      >
         <div class="result-info">
           <div class="match-main">
-            <el-tag type="success" effect="dark" size="small">最佳匹配</el-tag>
+            <el-tag type="success" :effect="index === 0 ? 'dark' : 'plain'" size="small">
+              {{ index === 0 ? '最佳匹配' : `匹配 ${index + 1}` }}
+            </el-tag>
             <div>
-              <strong>{{ result.agent?.title }}</strong>
-              <span>Agent ID: {{ result.agent?.id }}</span>
+              <strong>{{ match.agent.title }}</strong>
+              <span>Agent ID: {{ match.agent.id }}</span>
             </div>
           </div>
           <el-tag type="success" effect="plain">已通过阈值</el-tag>
@@ -31,12 +39,12 @@
         <div class="score-row">
           <span>相关分数</span>
           <el-progress
-            :percentage="scorePercentage"
+            :percentage="scorePercentage(match.score)"
             :stroke-width="12"
             :show-text="false"
             status="success"
           />
-          <strong>{{ result.score?.toFixed(4) ?? '--' }}</strong>
+          <strong>{{ match.score.toFixed(4) }}</strong>
         </div>
         <div class="feedback-actions">
           <span>将本次问题加入该 Agent 的语料</span>
@@ -45,10 +53,10 @@
             title="加入正向语料"
             aria-label="加入正向语料"
             class="feedback-button"
-            :class="{ 'is-active': feedbackState === 'positive' }"
-            :loading="feedbackPending && feedbackState === 'positive'"
-            :disabled="feedbackPending"
-            @click="handleFeedback('positive')"
+            :class="{ 'is-active': feedbackStates[match.agent.id] === 'positive' }"
+            :loading="feedbackPendingAgent === match.agent.id && feedbackStates[match.agent.id] === 'positive'"
+            :disabled="feedbackPendingAgent !== undefined"
+            @click="handleFeedback(match.agent.id, 'positive')"
           >
             <span class="thumb-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none"><path d="M7 21V9M14.7 4.2 11.9 9H19a2 2 0 0 1 1.94 2.5l-1.4 5A2 2 0 0 1 17.62 18H7V9.8a2 2 0 0 1 .58-1.4l4.83-4.95a1.15 1.15 0 0 1 1.93 1.11Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -59,10 +67,10 @@
             title="加入负向语料"
             aria-label="加入负向语料"
             class="feedback-button"
-            :class="{ 'is-active': feedbackState === 'negative' }"
-            :loading="feedbackPending && feedbackState === 'negative'"
-            :disabled="feedbackPending"
-            @click="handleFeedback('negative')"
+            :class="{ 'is-active': feedbackStates[match.agent.id] === 'negative' }"
+            :loading="feedbackPendingAgent === match.agent.id && feedbackStates[match.agent.id] === 'negative'"
+            :disabled="feedbackPendingAgent !== undefined"
+            @click="handleFeedback(match.agent.id, 'negative')"
           >
             <span class="thumb-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none"><path d="M17 3v12M9.3 19.8 12.1 15H5a2 2 0 0 1-1.94-2.5l1.4-5A2 2 0 0 1 6.38 6H17v8.2a2 2 0 0 1-.58 1.4l-4.83 4.95a1.15 1.15 0 0 1-1.93-1.11Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -70,12 +78,13 @@
           </el-button>
         </div>
       </el-card>
+      </template>
     </div>
   </el-card>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getAgents, route, updateAgent, type RouteData } from '../api';
 
@@ -85,9 +94,9 @@ const query = ref('');
 const submittedQuery = ref('');
 const loading = ref(false);
 const result = ref<RouteData>();
-const feedbackState = ref<Feedback>();
-const feedbackPending = ref(false);
-const scorePercentage = computed(() => Math.min(100, Math.max(0, Math.round((result.value?.score ?? 0) * 100))));
+const feedbackStates = ref<Record<number, Feedback | undefined>>({});
+const feedbackPendingAgent = ref<number>();
+const scorePercentage = (score: number) => Math.min(100, Math.max(0, Math.round(score * 100)));
 
 const submit = async () => {
   const text = query.value.trim();
@@ -97,21 +106,20 @@ const submit = async () => {
     const response = (await route(text)).data;
     result.value = response.data || undefined;
     submittedQuery.value = text;
-    feedbackState.value = undefined;
+    feedbackStates.value = {};
   }
   catch (error: any) { ElMessage.error(error.response?.data?.error?.detail || '查询失败'); }
   finally { loading.value = false; }
 };
 
-const handleFeedback = async (type: Feedback) => {
-  const agentId = result.value?.agent?.id;
+const handleFeedback = async (agentId: number, type: Feedback) => {
   const text = submittedQuery.value;
-  if (!agentId || !text || feedbackPending.value) return;
+  if (!agentId || !text || feedbackPendingAgent.value !== undefined) return;
 
-  const previous = feedbackState.value;
+  const previous = feedbackStates.value[agentId];
   const next = previous === type ? undefined : type;
-  feedbackState.value = next;
-  feedbackPending.value = true;
+  feedbackStates.value = { ...feedbackStates.value, [agentId]: next };
+  feedbackPendingAgent.value = agentId;
   try {
     const agent = (await getAgents()).data.find(item => item.id === agentId);
     if (!agent) throw new Error('Agent 不存在');
@@ -124,10 +132,10 @@ const handleFeedback = async (type: Feedback) => {
     ElMessage.success(`已${action}，向量数据需单独同步`);
   }
   catch (error: any) {
-    feedbackState.value = previous;
+    feedbackStates.value = { ...feedbackStates.value, [agentId]: previous };
     ElMessage.error(error.response?.data?.error?.detail || error.message || '反馈失败');
   }
-  finally { feedbackPending.value = false; }
+  finally { feedbackPendingAgent.value = undefined; }
 };
 </script>
 
@@ -143,6 +151,7 @@ const handleFeedback = async (type: Feedback) => {
 .fallback strong { display: block; margin-bottom: 6px; }
 .fallback p { margin: 0; font-size: 13px; line-height: 1.6; }
 .match-card { border: 1px solid #d9ecff; border-left: 4px solid #67c23a; background: #f5fbf2; }
+.match-card + .match-card { margin-top: 12px; }
 .match-card :deep(.el-card__body) { padding: 20px 22px; }
 .result-info, .match-main, .score-row, .feedback-actions { display: flex; align-items: center; }
 .result-info { justify-content: space-between; gap: 20px; }

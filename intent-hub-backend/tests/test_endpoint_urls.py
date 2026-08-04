@@ -21,7 +21,17 @@ class FakeEmbeddingResponse:
         return {"output": {"embeddings": [{"text_index": 0, "embedding": [0.1, 0.2]}]}}
 
 
-def test_qdrant_complete_url_is_passed_without_default_port(monkeypatch):
+@pytest.mark.parametrize(
+    "url,expected_port",
+    [
+        ("http://qdrant.example.com/custom", 80),
+        ("https://cluster.cloud.qdrant.io/custom", 443),
+        ("https://cluster.cloud.qdrant.io:6333/custom", 6333),
+    ],
+)
+def test_qdrant_complete_url_uses_url_port_instead_of_sdk_default(
+    monkeypatch, url, expected_port
+):
     created = {}
 
     def factory(**kwargs):
@@ -29,11 +39,10 @@ def test_qdrant_complete_url_is_passed_without_default_port(monkeypatch):
         return FakeQdrantSdk(**kwargs)
 
     monkeypatch.setattr("intent_hub.qdrant_wrapper.QdrantClient", factory)
-    url = "https://cluster.cloud.qdrant.io:6333/custom"
-
     IntentHubQdrantClient(url=url, collection_name="routes", dimensions=2)
 
     assert created["url"] == url
+    assert created["port"] == expected_port
     assert "host" not in created
 
 

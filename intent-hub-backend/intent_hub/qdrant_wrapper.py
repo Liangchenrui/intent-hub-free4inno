@@ -61,9 +61,19 @@ class IntentHubQdrantClient:
 
         try:
             clean_url = self.url
+            # qdrant-client defaults to port 6333 even when a complete URL is
+            # supplied without an explicit port. Preserve normal HTTP(S)
+            # gateway semantics instead of silently bypassing the configured
+            # reverse proxy.
+            sdk_port = parsed_url.port or (443 if parsed_url.scheme == "https" else 80)
 
             logger.info(f"Initializing Qdrant client (URL mode) with: {clean_url}")
-            self.client = QdrantClient(url=clean_url, api_key=api_key, timeout=timeout)
+            self.client = QdrantClient(
+                url=clean_url,
+                port=sdk_port,
+                api_key=api_key,
+                timeout=timeout,
+            )
             logger.info(f"Qdrant initialized (URL mode): {clean_url}")
         except Exception as e:
             if "SSL" in str(e) or "EOF" in str(e):

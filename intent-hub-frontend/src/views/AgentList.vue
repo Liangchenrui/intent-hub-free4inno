@@ -564,7 +564,11 @@ const handleReindex = async () => {
     const { message, routes_count, total_points } = response.data;
     ElMessage.success(`${message} (${t('nav.list')}: ${routes_count}, ${t('agent.utterances')}: ${total_points})`);
     fetchAgents();
-  } catch (e) {} finally { reindexing.value = false; }
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail || e?.response?.data?.error || e?.message || t('agent.reindexError');
+    ElMessage.error(t('agent.reindexErrorDetail', { detail }));
+    await fetchAgents(searchQuery.value, true);
+  } finally { reindexing.value = false; }
 };
 
 const triggerImport = () => {

@@ -253,8 +253,10 @@ const handleReindex = async () => {
       const { message, routes_count, total_points } = response.data;
       await refreshRouteSyncState();
       ElMessage.success(`${message} (${t('nav.list')}: ${routes_count}, ${t('agent.utterances')}: ${total_points})`);
-    } catch (error) {
-      ElMessage.error(t('test.reindexError'));
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail || error?.response?.data?.error || error?.message || t('test.reindexError');
+      ElMessage.error(t('test.reindexErrorDetail', { detail }));
+      await refreshRouteSyncState();
     } finally {
       reindexing.value = false;
     }

@@ -163,6 +163,8 @@ export default {
     saveError: '保存失败',
     deleteSuccess: '删除成功',
     reindexSuccess: '同步完成',
+    reindexError: '同步失败',
+    reindexErrorDetail: '同步失败：{detail}',
     aiGenSuccess: 'AI 生成成功',
     aiGenError: 'AI 生成失败',
     inputNameWarning: '请先输入意图名称',
@@ -208,6 +210,7 @@ export default {
     syncFirstWarning: '请先完成同步后再进行测试',
     predictError: '预测接口请求失败',
     reindexError: '同步失败',
+    reindexErrorDetail: '同步失败：{detail}',
   },
   settings: {
     qdrantCollection: 'Qdrant Collection',

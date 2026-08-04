@@ -163,6 +163,8 @@ export default {
     saveError: 'Save failed',
     deleteSuccess: 'Deleted successfully',
     reindexSuccess: 'Sync completed',
+    reindexError: 'Sync failed',
+    reindexErrorDetail: 'Sync failed: {detail}',
     aiGenSuccess: 'AI generation completed',
     aiGenError: 'AI generation failed',
     inputNameWarning: 'Please enter an intent name first',
@@ -208,6 +210,7 @@ export default {
     syncFirstWarning: 'Please sync before testing',
     predictError: 'Predict API request failed',
     reindexError: 'Sync failed',
+    reindexErrorDetail: 'Sync failed: {detail}',
   },
   settings: {
     qdrantCollection: 'Qdrant Collection',

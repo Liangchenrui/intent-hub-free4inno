@@ -82,20 +82,11 @@ class RouteService:
         Raises:
             ValueError: 如果ID不为0且路由不存在
         """
-        self.component_manager.ensure_ready()
         route_manager = self.component_manager.route_manager
         route.route_key = self._normalize_and_validate_route_key(route.route_key)
 
         if route.id == 0:
-            routes = route_manager.get_all_routes()
-            valid_ids = [r.id for r in routes if r.id != 0]
-
-            if not valid_ids:
-                new_id = 1
-            else:
-                new_id = max(valid_ids) + 1
-
-            route.id = new_id
+            route.id = route_manager.allocate_route_id()
             self._ensure_route_key_unique(route.route_key)
             logger.info(
                 f"ID 0 detected, creating new route with ID: {route.id}"
@@ -109,7 +100,7 @@ class RouteService:
             logger.info(f"Updating route ID: {route.id}")
 
         route.source = route.source or RouteConfig.RouteSource(type="web_manual")
-        route.sync = route.sync or RouteConfig.RouteSync(status="pending")
+        self._mark_changed(route, previous=route_manager.get_route(route.id))
         route_manager.add_route(route)
         logger.info(f"Route saved: {route.name} (ID: {route.id})")
 
@@ -128,12 +119,14 @@ class RouteService:
         Raises:
             ValueError: 如果路由不存在
         """
-        self.component_manager.ensure_ready()
         route_manager = self.component_manager.route_manager
+        previous = route_manager.get_route(route_id)
+        if previous is None:
+            raise ValueError(f"Route ID {route_id} does not exist")
         route.route_key = self._normalize_and_validate_route_key(route.route_key)
         self._ensure_route_key_unique(route.route_key, exclude_route_id=route_id)
         route.source = route.source or RouteConfig.RouteSource(type="web_manual")
-        route.sync = route.sync or RouteConfig.RouteSync(status="pending")
+        self._mark_changed(route, previous=previous)
 
         if not route_manager.update_route(route_id, route):
             raise ValueError(f"Route ID {route_id} does not exist")
@@ -150,13 +143,21 @@ class RouteService:
         Raises:
             ValueError: 如果路由不存在
         """
-        self.component_manager.ensure_ready()
-
         route_manager = self.component_manager.route_manager
 
         if not route_manager.delete_route(route_id):
             raise ValueError(f"Route ID {route_id} does not exist")
         logger.info(f"Route deleted: ID {route_id}")
+
+    def save_imported_route(self, route: RouteConfig) -> RouteConfig:
+        """Create or update a route with an explicit ID during JSON import."""
+        route_manager = self.component_manager.route_manager
+        route.route_key = self._normalize_and_validate_route_key(route.route_key)
+        previous = route_manager.get_route(route.id)
+        self._ensure_route_key_unique(route.route_key, exclude_route_id=route.id)
+        self._mark_changed(route, previous=previous)
+        route_manager.add_route(route)
+        return route
 
     def generate_utterances(self, req: GenerateUtterancesRequest) -> RouteConfig:
         """根据 Agent 信息生成提问列表（不执行持久化，由前端决定是否保存）
@@ -358,3 +359,20 @@ class RouteService:
             route_key, exclude_route_id=exclude_route_id
         ):
             raise ValueError(f"route_key '{route_key}' already exists")
+
+    @staticmethod
+    def _mark_changed(route: RouteConfig, previous: RouteConfig | None) -> None:
+        """Assign a new local version and preserve only prior sync history."""
+        previous_sync = previous.sync if previous is not None else None
+        previous_version = previous_sync.version if previous_sync is not None else 0
+        route.sync = RouteConfig.RouteSync(
+            status="pending",
+            version=previous_version + 1,
+            synced_version=previous_sync.synced_version if previous_sync is not None else 0,
+            last_synced_at=previous_sync.last_synced_at if previous_sync is not None else None,
+            manual_overrides=(
+                list(previous_sync.manual_overrides)
+                if previous_sync is not None
+                else list(route.sync.manual_overrides if route.sync is not None else [])
+            ),
+        )

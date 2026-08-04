@@ -10,7 +10,7 @@ Intent Hub 是单工作区意图路由服务，包含 Flask 后端和 Vue 3 管�
 ## 主要接口
 
 - 路由管理：`/routes`、`/routes/search`、`/routes/{id}`
-- 索引：`/reindex`、`/reindex/sync-route`
+- 索引：自动路由级同步、`/reindex`、`/reindex/sync-route`、`/sync-tasks`
 - 诊断：`/diagnostics/*`
 - 设置：`/settings`
 - 路由预测：`/predict`

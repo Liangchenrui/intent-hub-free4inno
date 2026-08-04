@@ -26,11 +26,12 @@ class DummyEncoder:
 
 
 class DummyQdrantClient:
-    def __init__(self, url: str, collection_name: str, dimensions: int, api_key=None):
+    def __init__(self, url: str, collection_name: str, dimensions: int, api_key=None, timeout=30):
         self.url = url
         self.collection_name = collection_name
         self.dimensions = dimensions
         self.api_key = api_key
+        self.timeout = timeout
 
 
 def test_component_manager_uses_single_workspace(test_dir, monkeypatch):

@@ -8,6 +8,7 @@ _EXPORTS = {
     "PredictionService": ("intent_hub.services.prediction_service", "PredictionService"),
     "RouteService": ("intent_hub.services.route_service", "RouteService"),
     "SyncService": ("intent_hub.services.sync_service", "SyncService"),
+    "SyncTaskService": ("intent_hub.services.sync_task_service", "SyncTaskService"),
 }
 
 __all__ = list(_EXPORTS.keys())

@@ -1,5 +1,7 @@
 """同步服务 - 处理索引同步业务逻辑"""
 
+from datetime import datetime, timezone
+from threading import RLock
 from typing import Any, Dict
 
 from intent_hub.config import Config
@@ -9,6 +11,8 @@ from intent_hub.utils.logger import logger
 
 class SyncService:
     """同步服务类 - 处理索引同步的核心业务逻辑"""
+
+    execution_lock = RLock()
 
     def __init__(self, component_manager: ComponentManager):
         """初始化同步服务
@@ -59,6 +63,7 @@ class SyncService:
         failed_routes = []
         for route in config_routes:
             try:
+                expected_version = route.sync.version if route.sync else 0
                 # 处理正例向量
                 embeddings = encoder.encode(route.utterances)
                 qdrant_client.upsert_route_utterances(
@@ -88,8 +93,9 @@ class SyncService:
                 else:
                     # 确保删除可能存在的旧负例向量
                     qdrant_client.delete_route_negative_samples(route.id)
+                synced_route = self._mark_synced_if_current(route.id, expected_version)
                 qdrant_client.upsert_route_metadata(
-                    route=route,
+                    route=synced_route or route,
                     route_hash=route_manager.compute_route_hash(route),
                     model_name=Config.EMBEDDING_MODEL_NAME,
                 )
@@ -101,13 +107,13 @@ class SyncService:
                     {"route_id": route.id, "route_name": route.name, "error": str(e)}
                 )
 
-        # 全量同步后同步启动全量诊断，确保数据一致性
+        # Diagnostics is a separate background phase and never delays index readiness.
         try:
             from intent_hub.services.diagnostic_service import DiagnosticService
 
             diag_service = DiagnosticService(self.component_manager)
-            diag_service.analyze_all_overlaps(use_cache=False)
-            logger.info("Full diagnostics completed after full sync")
+            diag_service.run_async_diagnostics("full")
+            logger.info("Full diagnostics scheduled after full sync")
         except Exception as e:
             logger.error(f"Failed to run full diagnostics after full sync: {e}")
 
@@ -161,6 +167,7 @@ class SyncService:
 
         for route in config_routes:
             local_hash = route_manager.compute_route_hash(route)
+            expected_version = route.sync.version if route.sync else 0
             qdrant_hash = qdrant_route_hashes.get(route.id)
             
             is_new_route = route.id not in existing_route_ids
@@ -202,13 +209,15 @@ class SyncService:
                         embeddings=negative_embeddings,
                         negative_threshold=negative_threshold,
                     )
+                synced_route = self._mark_synced_if_current(route.id, expected_version)
             else:
                 skipped_count += 1
+                synced_route = route
 
             # Always backfill the complete recovery record, including for unchanged
             # legacy routes that predate metadata points.
             qdrant_client.upsert_route_metadata(
-                route=route,
+                route=synced_route or route,
                 route_hash=local_hash,
                 model_name=Config.EMBEDDING_MODEL_NAME,
             )
@@ -224,14 +233,14 @@ class SyncService:
             except Exception as e:
                 logger.error(f"Failed to clear diagnostic cache for deleted routes: {e}")
 
-        # 增量同步后，如果有任何变化，同步启动全量诊断确保最新
+        # Refresh diagnostics asynchronously after index writes are complete.
         if new_count > 0 or updated_count > 0 or deleted_count > 0:
             try:
                 from intent_hub.services.diagnostic_service import DiagnosticService
 
                 diag_service = DiagnosticService(self.component_manager)
-                diag_service.analyze_all_overlaps(use_cache=False)
-                logger.info("Full diagnostics completed after incremental sync")
+                diag_service.run_async_diagnostics("full")
+                logger.info("Full diagnostics scheduled after incremental sync")
             except Exception as e:
                 logger.error(f"Failed to run full diagnostics after incremental sync: {e}")
 
@@ -273,6 +282,7 @@ class SyncService:
             raise ValueError(f"Route ID {route_id} not found")
 
         logger.info(f"Syncing route: {route.name} (ID: {route_id})")
+        expected_version = route.sync.version if route.sync else 0
 
         # 先删除旧的向量点（包括正例和负例）
         qdrant_client.delete_route(route_id)
@@ -306,8 +316,9 @@ class SyncService:
             )
             total_negative_points = len(negative_samples)
 
+        synced_route = self._mark_synced_if_current(route.id, expected_version)
         qdrant_client.upsert_route_metadata(
-            route=route,
+            route=synced_route or route,
             route_hash=route_manager.compute_route_hash(route),
             model_name=Config.EMBEDDING_MODEL_NAME,
         )
@@ -323,6 +334,29 @@ class SyncService:
             "total_points": total_points,
             "total_negative_points": total_negative_points,
         }
+
+    def _mark_synced_if_current(self, route_id: int, expected_version: int):
+        """Only acknowledge the exact route version that was just indexed."""
+        route_manager = self.component_manager.route_manager
+        current = route_manager.get_route(route_id)
+        if current is None:
+            return None
+        current_version = current.sync.version if current.sync else 0
+        if current_version != expected_version:
+            logger.info(
+                "Route %s advanced from version %s to %s during sync; leaving it pending",
+                route_id,
+                expected_version,
+                current_version,
+            )
+            return None
+        return route_manager.update_sync_state(
+            route_id,
+            status="synced",
+            synced_version=expected_version,
+            last_synced_at=datetime.now(timezone.utc).isoformat(),
+            error=None,
+        )
 
     def sync_routes(self, route_ids: list) -> Dict[str, Any]:
         """同步多个路由到向量数据库

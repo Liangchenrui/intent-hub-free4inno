@@ -73,7 +73,20 @@ export interface RouteSourceMeta {
 export interface RouteSyncMeta {
   status?: string;
   last_synced_at?: string | null;
+  version?: number;
+  synced_version?: number;
+  task_id?: string | null;
+  error?: string | null;
   manual_overrides?: string[];
+}
+
+export interface SyncTask {
+  id: string;
+  kind: 'route_sync' | 'full_reindex';
+  route_ids: number[];
+  status: string;
+  attempts: number;
+  error?: string | null;
 }
 
 export interface RouteConfig {
@@ -131,6 +144,10 @@ export const createRoute = (data: RouteConfig) => api.post<RouteConfig>('/routes
 export const updateRoute = (id: number, data: Partial<RouteConfig>) =>
   api.put<RouteConfig>(`/routes/${id}`, data);
 export const deleteRoute = (id: number) => api.delete<{ message: string }>(`/routes/${id}`);
+export const getSyncTasks = (activeOnly: boolean = false) =>
+  api.get<SyncTask[]>('/sync-tasks', { params: { active: activeOnly } });
+export const retrySyncTask = (taskId: string) =>
+  api.post<SyncTask>(`/sync-tasks/${taskId}/retry`);
 export const generateUtterances = (data: GenerateUtterancesRequest) =>
   api.post<RouteConfig>('/routes/generate-utterances', data);
 export const importRouteFromSkill = (data: ImportSkillRouteRequest) =>

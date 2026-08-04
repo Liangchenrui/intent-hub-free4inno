@@ -574,7 +574,6 @@ class DiagnosticService:
 
     def apply_repair(self, route_id: int, utterances: List[str]) -> bool:
         """应用修复建议（仅更新本地 routes_config.json，不自动同步向量）"""
-        self.component_manager.ensure_ready()
         route_manager = self.component_manager.route_manager
 
         route = route_manager.get_route(route_id)
@@ -583,6 +582,8 @@ class DiagnosticService:
 
         # 1. 更新 route_manager (内存/文件)
         route.utterances = utterances
-        route_manager.update_route(route.id, route)
+        from intent_hub.services.route_service import RouteService
+
+        RouteService(self.component_manager).update_route(route.id, route)
 
         return True

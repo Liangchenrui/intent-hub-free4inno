@@ -3,6 +3,7 @@ from intent_hub.core.components import get_component_manager
 from intent_hub.services.diagnostic_service import DiagnosticService
 from intent_hub.utils.error_handler import handle_errors
 from intent_hub.models import RepairRequest, ApplyRepairRequest
+from intent_hub.services.sync_task_service import get_sync_task_service
 
 @handle_errors
 def analyze_overlap(route_id):
@@ -74,4 +75,6 @@ def apply_repair():
     diagnostic_service = DiagnosticService(component_manager)
 
     success = diagnostic_service.apply_repair(data.route_id, data.utterances)
+    if success:
+        get_sync_task_service(component_manager).enqueue_routes([data.route_id])
     return jsonify({"success": success}), 200

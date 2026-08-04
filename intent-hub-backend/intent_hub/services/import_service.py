@@ -17,7 +17,6 @@ class ImportService:
         mode: str = "merge",
         import_origin: str = "api_import",
     ) -> dict:
-        self.component_manager.ensure_ready()
         mode = (mode or "merge").strip().lower()
         if mode not in ("merge", "replace"):
             raise ValueError("mode 仅支持 'merge' 或 'replace'")
@@ -40,8 +39,8 @@ class ImportService:
                 continue
 
             is_update = prepared.id in existing_ids
-            route_manager.add_route(prepared)
-            imported_ids.append(prepared.id)
+            saved_route = self.route_service.save_imported_route(prepared)
+            imported_ids.append(saved_route.id)
             if is_update:
                 updated += 1
             else:
@@ -63,6 +62,7 @@ class ImportService:
             "removed": removed,
             "total": len(imported_ids),
             "conflicts": [],
+            "affected_route_ids": list(dict.fromkeys(imported_ids + to_remove if mode == "replace" else imported_ids)),
         }
 
     def _validate_payload(
@@ -125,6 +125,5 @@ class ImportService:
             import_origin=route.source.import_origin if route.source and route.source.import_origin else import_origin,
             managed_fields=route.source.managed_fields if route.source else [],
         )
-        route.sync = route.sync or RouteConfig.RouteSync(status="pending")
         route.lifecycle_status = route.lifecycle_status or "active"
         return route

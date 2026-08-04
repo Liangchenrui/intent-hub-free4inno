@@ -41,6 +41,7 @@ class ComponentManager:
                 collection_name=Config.QDRANT_COLLECTION,
                 dimensions=self.encoder.dimensions,
                 api_key=Config.QDRANT_API_KEY,
+                timeout=Config.QDRANT_TIMEOUT_SECONDS,
             )
         return self._qdrant_client
 
@@ -79,6 +80,10 @@ class ComponentManager:
     def ensure_ready(self):
         _ = self.route_manager
         _ = self.qdrant_client
+
+    def ensure_routes_ready(self):
+        """Initialize only local route storage; never touch remote services."""
+        return self.route_manager
 
 
 _component_manager: Optional[ComponentManager] = None

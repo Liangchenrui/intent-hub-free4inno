@@ -172,13 +172,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { ChatLineRound } from '@element-plus/icons-vue';
 import {
   clearSession,
+  getRoutes,
   deleteNegativeRouteFeedback,
   deletePositiveRouteFeedback,
   predict,
@@ -186,6 +187,7 @@ import {
   submitNegativeRouteFeedback,
   submitPositiveRouteFeedback,
   type PredictResult,
+  type RouteConfig,
 } from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 
@@ -201,9 +203,30 @@ const reindexing = ref(false);
 const feedbackState = ref<Record<number, 'positive' | 'negative' | undefined>>({});
 const feedbackPending = ref<Record<number, boolean | undefined>>({});
 
-// 检查是否已完成全量同步
+const routes = ref<RouteConfig[]>([]);
+const routesLoaded = ref(false);
+
+const refreshRouteSyncState = async () => {
+  try {
+    routes.value = (await getRoutes()).data;
+    routesLoaded.value = true;
+  } catch (_) {
+    routesLoaded.value = false;
+  }
+};
+
+let syncPollTimer: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  refreshRouteSyncState();
+  syncPollTimer = setInterval(() => {
+    if (!hasFullReindex.value) refreshRouteSyncState();
+  }, 2000);
+});
+onBeforeUnmount(() => syncPollTimer && clearInterval(syncPollTimer));
+
+// Backend route versions are the source of truth for index readiness.
 const hasFullReindex = computed(() => {
-  return !!localStorage.getItem('last_full_reindex');
+  return routesLoaded.value && routes.value.every(route => route.sync?.status === 'synced');
 });
 
 const handleLogout = () => {
@@ -228,8 +251,7 @@ const handleReindex = async () => {
     try {
       const response = await reindex(true);
       const { message, routes_count, total_points } = response.data;
-      // 保存全量同步时间戳
-      localStorage.setItem('last_full_reindex', Date.now().toString());
+      await refreshRouteSyncState();
       ElMessage.success(`${message} (${t('nav.list')}: ${routes_count}, ${t('agent.utterances')}: ${total_points})`);
     } catch (error) {
       ElMessage.error(t('test.reindexError'));
@@ -244,9 +266,7 @@ const handleReindex = async () => {
 const handleTest = async () => {
   if (!queryText.value.trim()) return ElMessage.warning(t('test.inputQueryWarning'));
 
-  // 检查是否已完成全量同步
-  const lastReindex = localStorage.getItem('last_full_reindex');
-  if (!lastReindex) {
+  if (!hasFullReindex.value) {
     ElMessage.warning(t('test.syncFirstWarning'));
     return;
   }

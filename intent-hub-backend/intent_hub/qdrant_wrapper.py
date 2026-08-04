@@ -39,6 +39,7 @@ class IntentHubQdrantClient:
         collection_name: str,
         dimensions: int,
         api_key: Optional[str] = None,
+        timeout: int = 30,
     ):
         """初始化Qdrant客户端
 
@@ -62,7 +63,7 @@ class IntentHubQdrantClient:
             clean_url = self.url
 
             logger.info(f"Initializing Qdrant client (URL mode) with: {clean_url}")
-            self.client = QdrantClient(url=clean_url, api_key=api_key, timeout=600)
+            self.client = QdrantClient(url=clean_url, api_key=api_key, timeout=timeout)
             logger.info(f"Qdrant initialized (URL mode): {clean_url}")
         except Exception as e:
             if "SSL" in str(e) or "EOF" in str(e):

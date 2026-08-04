@@ -113,6 +113,9 @@ class Config:
     SETTINGS_FILE_PATH: str = str(DATA_DIR / "settings.json")
     # 诊断缓存文件路径
     DIAGNOSTICS_CACHE_PATH: str = str(DATA_DIR / "diagnostics_cache.json")
+    SYNC_TASKS_PATH: str = str(DATA_DIR / "sync_tasks.json")
+    SYNC_MAX_ATTEMPTS: int = 5
+    QDRANT_TIMEOUT_SECONDS: int = 30
 
     # 认证配置
     API_KEYS: Optional[str] = None

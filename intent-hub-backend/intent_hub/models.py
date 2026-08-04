@@ -24,10 +24,14 @@ class RouteConfig(BaseModel):
         managed_fields: List[str] = Field(default_factory=list, description="受来源托管的字段")
 
     class RouteSync(BaseModel):
-        status: Literal["pending", "synced", "stale", "error"] = Field(
+        status: Literal["pending", "queued", "syncing", "synced", "stale", "error"] = Field(
             default="pending", description="同步状态"
         )
         last_synced_at: Optional[str] = Field(default=None, description="最近同步时间")
+        version: int = Field(default=0, ge=0, description="本地路由版本")
+        synced_version: int = Field(default=0, ge=0, description="已写入向量库的版本")
+        task_id: Optional[str] = Field(default=None, description="当前后台同步任务 ID")
+        error: Optional[str] = Field(default=None, description="最近一次同步错误")
         manual_overrides: List[str] = Field(default_factory=list, description="人工覆盖字段")
 
     id: int = Field(..., description="路由ID")

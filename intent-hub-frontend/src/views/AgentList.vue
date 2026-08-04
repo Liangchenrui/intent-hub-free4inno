@@ -109,6 +109,23 @@
                 <div class="agent-name">{{ row.name }}</div>
                 <div class="agent-route-key">{{ row.route_key }}</div>
                 <div class="agent-description">{{ row.description || $t('agent.noDescription') }}</div>
+                <el-tooltip v-if="row.sync?.error" :content="row.sync.error" placement="top">
+                  <el-tag size="small" :type="syncTagType(row.sync?.status)" class="sync-tag">
+                    {{ syncLabel(row.sync?.status) }}
+                  </el-tag>
+                </el-tooltip>
+                <el-tag v-else size="small" :type="syncTagType(row.sync?.status)" class="sync-tag">
+                  {{ syncLabel(row.sync?.status) }}
+                </el-tag>
+                <el-button
+                  v-if="row.sync?.status === 'error' && row.sync?.task_id"
+                  link
+                  type="primary"
+                  size="small"
+                  @click="handleRetrySync(row)"
+                >
+                  {{ $t('agent.syncRetry') }}
+                </el-button>
               </div>
             </template>
           </el-table-column>
@@ -348,7 +365,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { debounce } from 'lodash-es';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -365,6 +382,7 @@ import {
   reindex,
   importRoutes,
   importRouteFromSkill,
+  retrySyncTask,
   type RouteConfig,
   type GenerateUtterancesRequest
 } from '../api';
@@ -411,8 +429,8 @@ const syncTableSelection = async () => {
   });
 };
 
-const fetchAgents = async (query: string = '') => {
-  loading.value = true;
+const fetchAgents = async (query: string = '', silent: boolean = false) => {
+  if (!silent) loading.value = true;
   try {
     const response = query.trim() 
       ? await searchRoutes(query.trim())
@@ -425,9 +443,9 @@ const fetchAgents = async (query: string = '') => {
     selectedRouteIds.value = selectedRouteIds.value.filter((id) => agents.value.some((agent) => agent.id === id));
     await syncTableSelection();
   } catch (error) {
-    ElMessage.error(t('agent.fetchError'));
+    if (!silent) ElMessage.error(t('agent.fetchError'));
   } finally {
-    loading.value = false;
+    if (!silent) loading.value = false;
   }
 };
 
@@ -437,9 +455,35 @@ const handleSearch = debounce(() => {
   fetchAgents(searchQuery.value);
 }, 300);
 
+let syncPollTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
   fetchAgents();
+  syncPollTimer = setInterval(() => {
+    if (agents.value.some(agent => ['pending', 'queued', 'syncing'].includes(agent.sync?.status || 'pending'))) {
+      fetchAgents(searchQuery.value, true);
+    }
+  }, 2000);
 });
+onBeforeUnmount(() => syncPollTimer && clearInterval(syncPollTimer));
+
+const syncLabel = (status?: string) => t(`agent.syncStatus.${status || 'pending'}`);
+const syncTagType = (status?: string) => {
+  if (status === 'synced') return 'success';
+  if (status === 'error') return 'danger';
+  if (status === 'stale') return 'warning';
+  return 'info';
+};
+
+const handleRetrySync = async (route: RouteConfig) => {
+  if (!route.sync?.task_id) return;
+  try {
+    await retrySyncTask(route.sync.task_id);
+    ElMessage.success(t('agent.syncRetryQueued'));
+    await fetchAgents(searchQuery.value, true);
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || t('agent.syncRetryError'));
+  }
+};
 
 const handleLogout = async () => {
   try {
@@ -518,8 +562,6 @@ const handleReindex = async () => {
     reindexing.value = true;
     const response = await reindex(true);
     const { message, routes_count, total_points } = response.data;
-    // 保存全量同步时间戳
-    localStorage.setItem('last_full_reindex', Date.now().toString());
     ElMessage.success(`${message} (${t('nav.list')}: ${routes_count}, ${t('agent.utterances')}: ${total_points})`);
     fetchAgents();
   } catch (e) {} finally { reindexing.value = false; }
@@ -587,7 +629,6 @@ const handleImportFileChange = async (evt: Event) => {
     }
 
     const resp = await importRoutes({ routes: parsed, mode: 'merge' });
-    localStorage.removeItem('last_full_reindex');
     ElMessage.success(
       t('agent.importSuccess', {
         created: resp.data.created,
@@ -681,14 +722,7 @@ const handleSave = async () => {
       negative_threshold: editForm.value.negative_threshold || 0.95
     } as RouteConfig;
     isEdit.value ? await updateRoute(data.id, data) : await createRoute(data);
-    // 新增或修改路由后都需要重置全量同步标记
-    localStorage.removeItem('last_full_reindex');
-    if (isEdit.value) {
-      ElMessage.warning(t('agent.syncWarning'));
-    } else {
-      ElMessage.warning(t('agent.addWarning'));
-    }
-    ElMessage.success(t('agent.saveSuccess'));
+    ElMessage.success(t('agent.saveQueued'));
     closeModal();
     currentPage.value = 1;
     fetchAgents(searchQuery.value);
@@ -702,7 +736,6 @@ const handleDelete = async (id: number) => {
   try {
     await ElMessageBox.confirm(t('agent.deleteConfirm'), t('agent.deleteTitle'), { type: 'error' });
     await deleteRoute(id);
-    localStorage.removeItem('last_full_reindex');
     ElMessage.success(t('agent.deleteSuccess'));
     selectedRouteIds.value = selectedRouteIds.value.filter((item) => item !== id);
     fetchAgents(searchQuery.value);
@@ -740,7 +773,6 @@ const handleBatchDelete = async () => {
       await deleteRoute(id);
     }
 
-    localStorage.removeItem('last_full_reindex');
     selectedRouteIds.value = [];
     ElMessage.success(t('agent.batchDeleteSuccess', { count: deleteCount }));
     await fetchAgents(searchQuery.value);

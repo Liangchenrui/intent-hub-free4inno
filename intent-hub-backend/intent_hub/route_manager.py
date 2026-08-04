@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import tempfile
 from pathlib import Path
 from threading import RLock
 from typing import Dict, List, Optional
@@ -37,6 +38,8 @@ class RouteManager:
 
         self._routes_cache: Dict[int, RouteConfig] = {}
         self._lock = RLock()
+        self._sequence_path = f"{self.config_path}.sequence"
+        self._last_route_id = 0
 
         logger.info(f"Routes config path: {self.config_path}")
 
@@ -45,6 +48,10 @@ class RouteManager:
             os.makedirs(config_dir, exist_ok=True)
 
         self._load_from_file()
+        self._last_route_id = max(
+            self._read_route_sequence(),
+            max(self._routes_cache.keys(), default=0),
+        )
 
     def _load_from_file(self):
         """从文件加载路由配置"""
@@ -78,7 +85,7 @@ class RouteManager:
                 logger.error(f"Failed to create empty routes config: {e}")
 
     def _save_to_file(self):
-        """保存路由配置到文件"""
+        """Atomically persist route configuration."""
         try:
             routes_data = [
                 route.model_dump()
@@ -86,8 +93,17 @@ class RouteManager:
                 else route.dict()
                 for route in self._routes_cache.values()
             ]
-            with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(routes_data, f, ensure_ascii=False, indent=2)
+            config_dir = os.path.dirname(self.config_path) or "."
+            fd, temp_path = tempfile.mkstemp(prefix="routes-", suffix=".tmp", dir=config_dir)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(routes_data, f, ensure_ascii=False, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(temp_path, self.config_path)
+            finally:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
             logger.info(f"Routes config saved: {self.config_path}")
         except Exception as e:
             logger.error(f"Failed to save routes config: {e}", exc_info=True)
@@ -118,6 +134,7 @@ class RouteManager:
         """Atomically replace the local route list and persist it once."""
         with self._lock:
             self._routes_cache = {route.id: route for route in routes}
+            self._observe_route_id(max(self._routes_cache.keys(), default=0))
             self._save_to_file()
             logger.info(f"Replaced local routes: {len(routes)} routes")
 
@@ -194,6 +211,7 @@ class RouteManager:
             if route.id in self._routes_cache:
                 logger.warning(f"Route ID {route.id} already exists, updating")
             self._routes_cache[route.id] = route
+            self._observe_route_id(route.id)
             self._save_to_file()
             logger.info(f"Route added/updated: {route.name} (ID: {route.id})")
             return True
@@ -226,7 +244,7 @@ class RouteManager:
             return True
 
     def delete_route(self, route_id: int) -> bool:
-        """删除路由配置，并重排ID保证连续
+        """Delete a route while preserving all other stable IDs.
 
         Args:
             route_id: 路由ID
@@ -242,17 +260,47 @@ class RouteManager:
             route_name = self._routes_cache[route_id].name
             del self._routes_cache[route_id]
 
-            # 重排ID：保证序号连续从1开始
-            sorted_routes = sorted(self._routes_cache.values(), key=lambda x: x.id)
-            new_cache = {}
-            for i, route in enumerate(sorted_routes, 1):
-                route.id = i
-                new_cache[i] = route
-            self._routes_cache = new_cache
-
             self._save_to_file()
-            logger.info(f"Route deleted: {route_name} (ID: {route_id}), IDs reordered")
+            logger.info(f"Route deleted: {route_name} (ID: {route_id})")
             return True
+
+    def allocate_route_id(self) -> int:
+        """Return a durable, monotonically increasing route ID."""
+        with self._lock:
+            self._last_route_id += 1
+            self._write_route_sequence()
+            return self._last_route_id
+
+    def _observe_route_id(self, route_id: int) -> None:
+        if route_id > self._last_route_id:
+            self._last_route_id = route_id
+            self._write_route_sequence()
+
+    def _read_route_sequence(self) -> int:
+        try:
+            return int(Path(self._sequence_path).read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            return 0
+
+    def _write_route_sequence(self) -> None:
+        sequence_path = Path(self._sequence_path)
+        sequence_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = sequence_path.with_suffix(sequence_path.suffix + ".tmp")
+        temp_path.write_text(str(self._last_route_id), encoding="utf-8")
+        os.replace(temp_path, sequence_path)
+
+    def update_sync_state(self, route_id: int, **changes) -> Optional[RouteConfig]:
+        """Update sync metadata without changing the index-content version."""
+        with self._lock:
+            route = self._routes_cache.get(route_id)
+            if route is None:
+                return None
+            route.sync = route.sync or RouteConfig.RouteSync()
+            for key, value in changes.items():
+                if hasattr(route.sync, key):
+                    setattr(route.sync, key, value)
+            self._save_to_file()
+            return route
 
     def get_score_threshold(self, route_id: int) -> Optional[float]:
         """获取路由的相似度阈值
@@ -294,17 +342,8 @@ class RouteManager:
             "negative_samples": sorted(getattr(route, "negative_samples", [])),
             "score_threshold": route.score_threshold,
             "negative_threshold": getattr(route, "negative_threshold", 0.95),
-            "source": (
-                route.source.model_dump()
-                if getattr(route, "source", None) is not None
-                else None
-            ),
-            "sync": (
-                route.sync.model_dump()
-                if getattr(route, "sync", None) is not None
-                else None
-            ),
             "lifecycle_status": getattr(route, "lifecycle_status", "active"),
+            "embedding_model": Config.EMBEDDING_MODEL_NAME,
         }
         route_json = json.dumps(route_data, ensure_ascii=False, sort_keys=True)
         return hashlib.md5(route_json.encode("utf-8")).hexdigest()

@@ -152,6 +152,24 @@ def sync_route():
     return reindex.sync_route()
 
 
+@app.route("/sync-tasks", methods=["GET"])
+@require_auth
+def list_sync_tasks():
+    """List persistent background synchronization tasks."""
+    from intent_hub.api import reindex
+
+    return reindex.list_sync_tasks()
+
+
+@app.route("/sync-tasks/<task_id>/retry", methods=["POST"])
+@require_auth
+def retry_sync_task(task_id: str):
+    """Retry a failed background synchronization task."""
+    from intent_hub.api import reindex
+
+    return reindex.retry_sync_task(task_id)
+
+
 @app.route("/diagnostics/overlap", methods=["GET"])
 @require_auth
 def analyze_all_overlaps():
@@ -234,20 +252,11 @@ def update_settings():
 
 
 def init_app():
-    """Initialize app (including components)."""
+    """Initialize local storage and start remote work in the background."""
     component_manager = get_component_manager()
-    component_manager.init_components()
+    component_manager.ensure_routes_ready()
+    from intent_hub.services.sync_task_service import get_sync_task_service
 
-    try:
-        from intent_hub.services.diagnostic_service import DiagnosticService
-        from intent_hub.utils.logger import logger
-
-        diagnostic_service = DiagnosticService(component_manager)
-        diagnostic_service.run_async_diagnostics("full")
-        logger.info("Async full diagnostics started")
-    except Exception as e:
-        from intent_hub.utils.logger import logger
-
-        logger.error(f"Failed to start diagnostics: {e}")
+    get_sync_task_service(component_manager)
 
     return app

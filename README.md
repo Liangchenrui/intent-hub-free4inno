@@ -10,7 +10,7 @@ Intent Hub is a single-workspace intent-routing service with a Flask backend and
 ## Main APIs
 
 - Routes: `/routes`, `/routes/search`, `/routes/{id}`
-- Indexing: `/reindex`, `/reindex/sync-route`
+- Indexing: automatic route sync, `/reindex`, `/reindex/sync-route`, `/sync-tasks`
 - Diagnostics: `/diagnostics/*`
 - Settings: `/settings`
 - Prediction: `/predict`

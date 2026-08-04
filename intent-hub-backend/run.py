@@ -4,10 +4,10 @@ from intent_hub.config import Config
 from intent_hub.utils.logger import suppress_health_check_logs, logger
 
 if __name__ == "__main__":
-    logger.info("Initializing Intent Hub components...")
+    logger.info("Initializing Intent Hub local storage...")
     try:
         app = init_app()
-        logger.info("Components initialized.")
+        logger.info("Local storage initialized; remote sync runs in the background.")
     except Exception as e:
         logger.error(f"Component initialization failed: {e}")
         import traceback

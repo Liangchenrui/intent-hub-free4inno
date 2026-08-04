@@ -14,6 +14,7 @@ from intent_hub.models import (
 )
 from intent_hub.services.route_service import RouteService
 from intent_hub.services.import_service import ImportService
+from intent_hub.services.sync_task_service import get_sync_task_service
 from intent_hub.utils.error_handler import handle_errors, validate_request
 from intent_hub.utils.logger import logger
 
@@ -46,13 +47,12 @@ def search_routes():
 @handle_errors
 @validate_request(RouteConfig)
 def create_route(route: RouteConfig):
-    """新增路由配置（含向量生成）"""
+    """Persist a route and enqueue background vector synchronization."""
     component_manager = get_component_manager()
-    component_manager.ensure_ready()
-
     route_service = RouteService(component_manager)
     try:
         created_route = route_service.create_route(route)
+        get_sync_task_service(component_manager).enqueue_routes([created_route.id])
     except ValueError as e:
         return jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()), 400
 
@@ -79,12 +79,11 @@ def update_route(route_id: int):
         ), 400
 
     component_manager = get_component_manager()
-    component_manager.ensure_ready()
-
     route_service = RouteService(component_manager)
 
     try:
         updated_route = route_service.update_route(route_id, route)
+        get_sync_task_service(component_manager).enqueue_routes([updated_route.id])
         return jsonify(updated_route.dict()), 200
     except ValueError as e:
         error = "路由不存在" if "does not exist" in str(e) else "请求参数错误"
@@ -96,12 +95,11 @@ def update_route(route_id: int):
 def delete_route(route_id: int):
     """删除指定路由"""
     component_manager = get_component_manager()
-    component_manager.ensure_ready()
-
     route_service = RouteService(component_manager)
 
     try:
         route_service.delete_route(route_id)
+        get_sync_task_service(component_manager).enqueue_routes([route_id])
         return jsonify({"message": f"路由 {route_id} 已删除"}), 200
     except ValueError as e:
         return jsonify(ErrorResponse(error="路由不存在", detail=str(e)).dict()), 404
@@ -161,7 +159,7 @@ def import_routes():
     说明：
     - 该接口接受 JSON 请求体，不走 multipart 上传；前端读取文件后直接把解析结果发过来。
     - 对每条路由做 Pydantic 校验；失败则整体返回 400，并给出错误详情。
-    - 导入后会同步 Qdrant 正例/负例向量，并触发增量诊断更新。
+    - 导入先持久化本地配置，再由后台任务同步 Qdrant 和刷新诊断。
     """
     data = request.get_json()
     if not data:
@@ -192,8 +190,6 @@ def import_routes():
         )
 
     component_manager = get_component_manager()
-    component_manager.ensure_ready()
-
     import_service = ImportService(component_manager)
     try:
         result = import_service.import_routes(
@@ -201,6 +197,9 @@ def import_routes():
             mode=mode,
             import_origin="api_import",
         )
+        affected_ids = result.pop("affected_route_ids", [])
+        if affected_ids:
+            get_sync_task_service(component_manager).enqueue_routes(affected_ids)
     except ValueError as e:
         return jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()), 400
 
@@ -241,8 +240,6 @@ def add_negative_samples(route_id: int):
         ), 400
 
     component_manager = get_component_manager()
-    component_manager.ensure_ready()
-
     route_manager = component_manager.route_manager
     route = route_manager.get_route(route_id)
     if not route:
@@ -255,7 +252,8 @@ def add_negative_samples(route_id: int):
     # 更新路由配置
     route.negative_samples = new_negative_samples
     route.negative_threshold = req.negative_threshold
-    route_manager.add_route(route)
+    RouteService(component_manager).update_route(route_id, route)
+    get_sync_task_service(component_manager).enqueue_routes([route_id])
 
     return jsonify({
         "message": f"成功为路由 {route_id} 添加 {len(req.negative_samples)} 个负例样本",
@@ -268,8 +266,6 @@ def add_negative_samples(route_id: int):
 def delete_negative_samples(route_id: int):
     """删除路由的所有负例样本"""
     component_manager = get_component_manager()
-    component_manager.ensure_ready()
-
     route_manager = component_manager.route_manager
     route = route_manager.get_route(route_id)
     if not route:
@@ -277,7 +273,8 @@ def delete_negative_samples(route_id: int):
 
     # 更新路由配置
     route.negative_samples = []
-    route_manager.add_route(route)
+    RouteService(component_manager).update_route(route_id, route)
+    get_sync_task_service(component_manager).enqueue_routes([route_id])
 
     return jsonify({
         "message": f"成功删除路由 {route_id} 的所有负例样本",
@@ -302,7 +299,6 @@ def _update_feedback(route_id: int, field: str, add: bool):
         return jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()), 400
 
     manager = get_component_manager()
-    manager.ensure_ready()
     route = manager.route_manager.get_route(route_id)
     if not route:
         return jsonify(ErrorResponse(error="路由不存在", detail=f"路由ID {route_id} 不存在").dict()), 404
@@ -313,7 +309,8 @@ def _update_feedback(route_id: int, field: str, add: bool):
     elif not add:
         values = [item for item in values if item != text]
     setattr(route, field, values)
-    manager.route_manager.add_route(route)
+    RouteService(manager).update_route(route_id, route)
+    get_sync_task_service(manager).enqueue_routes([route_id])
     count_key = "total_utterances" if field == "utterances" else "total_negative_samples"
     return jsonify({"message": "反馈已更新", "route_id": route_id, count_key: len(values)}), 200
 

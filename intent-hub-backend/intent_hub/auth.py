@@ -1,15 +1,15 @@
 """认证模块 - 管理API Key的生成、验证和存储"""
 
+import hmac
 import time
 import uuid
 from functools import wraps
 from typing import Any, Dict, Optional, Set
 
-from flask import g, jsonify, request
+from flask import jsonify, request
 from intent_hub.utils.logger import logger
 
 from intent_hub.models import ErrorResponse
-from intent_hub.services.tenant_auth_service import TenantAuthService
 
 
 class AuthManager:
@@ -200,7 +200,6 @@ class AuthManager:
 
 
 _auth_manager: Optional[AuthManager] = None
-_tenant_auth_service: Optional[TenantAuthService] = None
 
 
 def get_auth_manager() -> AuthManager:
@@ -209,14 +208,6 @@ def get_auth_manager() -> AuthManager:
     if _auth_manager is None:
         _auth_manager = AuthManager()
     return _auth_manager
-
-
-def get_tenant_auth_service() -> TenantAuthService:
-    """获取租户 access_code 鉴权服务实例。"""
-    global _tenant_auth_service
-    if _tenant_auth_service is None:
-        _tenant_auth_service = TenantAuthService()
-    return _tenant_auth_service
 
 
 def extract_api_key() -> Optional[str]:
@@ -284,7 +275,7 @@ def require_telestar_auth(f):
     """Telestar 认证装饰器 - 要求请求必须提供自定义的 Predict key
 
     支持以下优先级的认证方式：
-    1. 配置中的 PREDICT_AUTH_KEY (支持 Bearer, X-API-Key 或 原始格式)
+    1. 配置中的 PREDICT_AUTH_KEY（静态路由密钥，与 intentHub-BUPT 的 AUTH_CODE 模式一致）
     2. 如果启用了普通认证，则支持有效的 API Key
     如果配置中 PREDICT_AUTH_KEY 为空且未启用普通认证，则跳过认证
     """
@@ -306,20 +297,13 @@ def require_telestar_auth(f):
         # 提取原始 Authorization header (兼容某些旧调用者)
         raw_auth = request.headers.get("Authorization", "").strip()
 
-        # 0. 允许直接使用租户 access_code 访问兼容接口
-        if api_key:
-            try:
-                tenant_context, tenant, code = get_tenant_auth_service().authenticate_access_code(api_key)
-                g.tenant_context = tenant_context
-                g.current_tenant = tenant
-                g.current_access_code = code
-                return f(*args, **kwargs)
-            except ValueError:
-                pass
-
-        # 1. 验证 Predict Key
+        # 1. 验证独立的路由接口密钥（与 intentHub-BUPT 分支一致）
         if predict_key:
-            if api_key == predict_key or raw_auth == predict_key:
+            if (
+                api_key and hmac.compare_digest(api_key, predict_key)
+            ) or (
+                raw_auth and hmac.compare_digest(raw_auth, predict_key)
+            ):
                 return f(*args, **kwargs)
 
         # 2. 验证普通 API Key (为了方便前端测试)
@@ -341,35 +325,5 @@ def require_telestar_auth(f):
                 detail=error_detail,
             ).dict()
         ), 401
-
-    return decorated_function
-
-
-def require_tenant_access(f):
-    """Require a valid tenant access code and attach tenant context to flask.g."""
-
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        access_code = extract_api_key()
-        if not access_code:
-            return jsonify(
-                ErrorResponse(
-                    error="Authentication failed",
-                    detail="Missing access code. Provide Authorization: Bearer <code> or X-API-Key: <code>",
-                ).dict()
-            ), 401
-
-        tenant_auth_service = get_tenant_auth_service()
-        try:
-            tenant_context, tenant, code = tenant_auth_service.authenticate_access_code(access_code)
-        except ValueError as e:
-            return jsonify(
-                ErrorResponse(error="Authentication failed", detail=str(e)).dict()
-            ), 401
-
-        g.tenant_context = tenant_context
-        g.current_tenant = tenant
-        g.current_access_code = code
-        return f(*args, **kwargs)
 
     return decorated_function

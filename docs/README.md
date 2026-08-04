@@ -14,4 +14,4 @@ python -m scripts.api_docs check
 python -m scripts.api_docs update-api-md
 ```
 
-子项目仅在需要独立分发或发布说明时保留局部文档，例如 `intent-hub-cli/README.md` 与 `intent-hub-cli/PUBLISH.md`。
+子项目仅在需要独立说明时保留局部文档。

@@ -24,6 +24,46 @@
 
       <el-card shadow="never" class="settings-card" v-loading="loading">
         <el-form :model="settings" label-position="top" class="settings-form">
+          <el-divider content-position="left">Infrastructure</el-divider>
+          <el-form-item label="Qdrant URL">
+            <el-input v-model="settings.QDRANT_URL" placeholder="http://app.qdrant.free4inno.com" />
+          </el-form-item>
+          <el-form-item :label="$t('settings.qdrantCollection')">
+            <el-select
+              v-model="settings.QDRANT_COLLECTION"
+              filterable
+              allow-create
+              default-first-option
+              :loading="collectionsLoading"
+              :placeholder="$t('settings.qdrantCollectionPlaceholder')"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="collection in qdrantCollections"
+                :key="collection"
+                :label="collection"
+                :value="collection"
+              />
+            </el-select>
+            <div class="field-hint">{{ $t('settings.qdrantCollectionHint') }}</div>
+            <el-button
+              class="collection-import-button"
+              type="primary"
+              plain
+              :loading="importingRoutes"
+              :disabled="!settings.QDRANT_COLLECTION"
+              @click="handleImportCollection"
+            >
+              {{ $t('settings.importCollectionRoutes') }}
+            </el-button>
+          </el-form-item>
+          <el-form-item label="Embedding Service URL">
+            <el-input v-model="settings.EMBEDDING_SERVICE_URL" placeholder="http://embedding.free4inno.com" />
+          </el-form-item>
+          <el-form-item label="Route API Key">
+            <el-input v-model="settings.PREDICT_AUTH_KEY" type="password" show-password />
+          </el-form-item>
+
           <el-divider :content-position="'left'">{{ $t('settings.llmTitle') }}</el-divider>
           <el-form-item :label="$t('settings.llmProvider')">
             <el-select v-model="settings.LLM_PROVIDER" style="width: 100%">
@@ -122,12 +162,6 @@
             </el-col>
           </el-row>
 
-          <el-divider content-position="left">Skill Sources</el-divider>
-          <div class="skill-actions">
-            <el-button @click="goSkillSources">管理 Skill Sources</el-button>
-            <el-button @click="goSkillDrafts">查看扫描结果</el-button>
-          </div>
-
           <div class="form-actions">
             <el-button type="primary" :loading="saving" @click="handleSave">{{ $t('settings.save') }}</el-button>
             <el-button @click="fetchSettings(true)">{{ $t('settings.reset') }}</el-button>
@@ -143,7 +177,13 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getSettings, updateSettings, type TenantSettings } from '../api';
+import {
+  getQdrantCollections,
+  getSettings,
+  importRoutesFromQdrant,
+  updateSettings,
+  type SystemSettings,
+} from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 
 const { t } = useI18n();
@@ -152,9 +192,14 @@ const router = useRouter();
 const activeTab = ref('settings');
 const loading = ref(false);
 const saving = ref(false);
+const collectionsLoading = ref(false);
+const qdrantCollections = ref<string[]>([]);
+const importingRoutes = ref(false);
 
-const settings = ref<TenantSettings>({
-  EMBEDDING_SERVICE_URL: '',
+const settings = ref<SystemSettings>({
+  QDRANT_URL: 'http://app.qdrant.free4inno.com',
+  PREDICT_AUTH_KEY: null,
+  EMBEDDING_SERVICE_URL: 'http://embedding.free4inno.com',
   EMBEDDING_MODEL_NAME: '',
   EMBEDDING_DEVICE: 'cpu',
   LLM_PROVIDER: 'deepseek',
@@ -172,7 +217,11 @@ const settings = ref<TenantSettings>({
   INSTANCE_THRESHOLD_AMBIGUOUS: 0.92
 });
 
-const normalizeTenantSettings = (data: any): TenantSettings => ({
+const normalizeSettings = (data: any): SystemSettings => ({
+  QDRANT_URL: data.QDRANT_URL ?? '',
+  QDRANT_COLLECTION: data.QDRANT_COLLECTION ?? '',
+  QDRANT_API_KEY: data.QDRANT_API_KEY ?? null,
+  PREDICT_AUTH_KEY: data.PREDICT_AUTH_KEY ?? null,
   EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
   EMBEDDING_MODEL_NAME: data.EMBEDDING_MODEL_NAME ?? '',
   EMBEDDING_DEVICE: data.EMBEDDING_DEVICE ?? 'cpu',
@@ -195,7 +244,12 @@ const fetchSettings = async (showResetMessage = false) => {
   loading.value = true;
   try {
     const response = await getSettings();
-    settings.value = normalizeTenantSettings(response.data as any);
+    settings.value = normalizeSettings(response.data as any);
+    if (settings.value.PREDICT_AUTH_KEY) {
+      localStorage.setItem('predict_auth_key', settings.value.PREDICT_AUTH_KEY);
+    } else {
+      localStorage.removeItem('predict_auth_key');
+    }
     if (showResetMessage) {
       ElMessage.success(t('settings.resetSuccess'));
     }
@@ -206,9 +260,48 @@ const fetchSettings = async (showResetMessage = false) => {
   }
 };
 
-const prepareSettingsForSubmit = (data: TenantSettings): Partial<TenantSettings> => {
+const fetchQdrantCollections = async () => {
+  collectionsLoading.value = true;
+  try {
+    const response = await getQdrantCollections();
+    qdrantCollections.value = response.data.items;
+  } catch (error) {
+    qdrantCollections.value = [];
+  } finally {
+    collectionsLoading.value = false;
+  }
+};
+
+const handleImportCollection = async () => {
+  const collection = settings.value.QDRANT_COLLECTION?.trim();
+  if (!collection) return;
+  try {
+    await ElMessageBox.confirm(
+      t('settings.importCollectionConfirm', { collection }),
+      t('settings.importCollectionTitle'),
+      {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
+        type: 'warning',
+      }
+    );
+    importingRoutes.value = true;
+    await updateSettings(prepareSettingsForSubmit(settings.value));
+    const response = await importRoutesFromQdrant(collection);
+    ElMessage.success(response.data.message);
+    router.push('/');
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || t('settings.importCollectionError'));
+    }
+  } finally {
+    importingRoutes.value = false;
+  }
+};
+
+const prepareSettingsForSubmit = (data: SystemSettings): Partial<SystemSettings> => {
   const result: any = { ...data };
-  const nullableFields: (keyof TenantSettings)[] = [
+  const nullableFields: (keyof SystemSettings)[] = [
     'LLM_API_KEY',
     'LLM_BASE_URL',
     'LLM_MODEL'
@@ -234,7 +327,12 @@ const handleSave = async () => {
     ElMessage.success(response.data.message || t('settings.saveSuccess'));
     // 更新时只更新所有已知字段
     if (response.data.settings) {
-      settings.value = normalizeTenantSettings(response.data.settings as any);
+      settings.value = normalizeSettings(response.data.settings as any);
+      if (settings.value.PREDICT_AUTH_KEY) {
+        localStorage.setItem('predict_auth_key', settings.value.PREDICT_AUTH_KEY);
+      } else {
+        localStorage.removeItem('predict_auth_key');
+      }
     }
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -259,14 +357,6 @@ const handleTabChange = (tabName: any) => {
   } else if (tabName === 'diagnostics') {
     router.push('/diagnostics');
   }
-};
-
-const goSkillSources = () => {
-  router.push('/skills/sources');
-};
-
-const goSkillDrafts = () => {
-  router.push('/skills/drafts');
 };
 
 const getApiKeyPlaceholder = () => {
@@ -304,6 +394,7 @@ const getBaseUrlPlaceholder = () => {
 
 onMounted(() => {
   fetchSettings();
+  fetchQdrantCollections();
 });
 </script>
 
@@ -311,6 +402,16 @@ onMounted(() => {
 .layout-container {
   min-height: 100vh;
   background-color: #f5f7fa;
+}
+
+.field-hint {
+  margin-top: 4px;
+  color: #909399;
+  font-size: 12px;
+}
+
+.collection-import-button {
+  margin-top: 10px;
 }
 
 .header-wrapper {

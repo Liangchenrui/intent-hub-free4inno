@@ -8,6 +8,4 @@ def test_config_defaults():
     assert Config.DEFAULT_ROUTE_NAME == "none"
     assert Config.DEFAULT_ROUTE_KEY == "fallback.default"
     assert Config.BATCH_SIZE == 32
-    assert Config.DEFAULT_TENANT_ID == "default"
-    assert Config.PLATFORM_DATA_DIR == Config.DATA_DIR / "platform"
-    assert Config.TENANTS_DATA_DIR == Config.DATA_DIR / "tenants"
+    assert Config.ROUTES_CONFIG_PATH.endswith("data\\routes.json") or Config.ROUTES_CONFIG_PATH.endswith("data/routes.json")

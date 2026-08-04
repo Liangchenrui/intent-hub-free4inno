@@ -45,7 +45,6 @@ class RouteService:
         Returns:
             路由配置列表
         """
-        self.component_manager.ensure_ready()
         route_manager = self.component_manager.route_manager
 
         routes = route_manager.get_all_routes()
@@ -64,7 +63,6 @@ class RouteService:
         Returns:
             匹配的路由配置列表
         """
-        self.component_manager.ensure_ready()
         route_manager = self.component_manager.route_manager
 
         routes = route_manager.search_routes(query)

@@ -3,14 +3,12 @@
 from importlib import import_module
 
 _EXPORTS = {
-    "admin": ("intent_hub.api.admin", None),
     "auth": ("intent_hub.api.auth", None),
     "prediction": ("intent_hub.api.prediction", None),
     "routes": ("intent_hub.api.routes", None),
     "reindex": ("intent_hub.api.reindex", None),
     "settings": ("intent_hub.api.settings", None),
     "diagnostics": ("intent_hub.api.diagnostics", None),
-    "tenant": ("intent_hub.api.tenant", None),
 }
 
 __all__ = list(_EXPORTS.keys())

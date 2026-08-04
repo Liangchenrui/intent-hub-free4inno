@@ -182,6 +182,7 @@ class RepairRequest(BaseModel):
 
     source_route_id: int = Field(..., description="源路由ID")
     target_route_id: int = Field(..., description="目标路由ID")
+    language: Literal["zh", "en"] = Field(default="zh", description="诊断意见输出语言")
 
 
 class ApplyRepairRequest(BaseModel):

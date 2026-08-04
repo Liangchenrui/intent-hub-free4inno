@@ -1,6 +1,7 @@
 """Qdrant客户端封装模块"""
 
 import uuid
+from urllib.parse import urlsplit
 from typing import Any, Dict, List, Optional
 
 from qdrant_client import QdrantClient
@@ -14,6 +15,7 @@ from qdrant_client.models import (
 )
 
 from intent_hub.utils.logger import logger
+from intent_hub.models import RouteConfig
 
 
 class IntentHubQdrantClient:
@@ -28,6 +30,8 @@ class IntentHubQdrantClient:
     SCORE_THRESHOLD_KEY = "score_threshold"
     IS_NEGATIVE_KEY = "is_negative"  # 标识是否为负例向量
     NEGATIVE_THRESHOLD_KEY = "negative_threshold"  # 负例阈值
+    IS_ROUTE_METADATA_KEY = "is_route_metadata"
+    ROUTE_CONFIG_KEY = "route_config"
 
     def __init__(
         self,
@@ -44,64 +48,22 @@ class IntentHubQdrantClient:
             dimensions: 向量维度
             api_key: API密钥（可选）
         """
-        # 彻底清洗 URL：去除空格、结尾斜杠
+        # QDRANT_URL is a complete URL. Never split it into host/port fields or
+        # let the SDK silently append its default port.
         self.url = url.strip().rstrip("/") if url else ""
+        parsed_url = urlsplit(self.url)
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+            raise ValueError("QDRANT_URL must be a complete http(s) URL")
         self.collection_name = collection_name
         self.dimensions = dimensions
         self.api_key = api_key
 
         try:
-            # 针对 Qdrant Cloud 环境，如果检测到 SSL 错误，尝试在代码层级绕过代理
-            import os
-
             clean_url = self.url
 
-            # 如果是特定的外部地址，强制清理环境中的代理设置，防止 httpcore/httpx 走代理
-            if clean_url and (
-                ".qdrant.io" in clean_url or "free4inno.com" in clean_url
-            ):
-                host_only = (
-                    clean_url.replace("https://", "")
-                    .replace("http://", "")
-                    .split(":")[0]
-                ).strip()
-
-                no_proxy = os.environ.get("NO_PROXY", "")
-                if host_only not in no_proxy:
-                    os.environ["NO_PROXY"] = (
-                        f"{no_proxy},{host_only}" if no_proxy else host_only
-                    )
-                    logger.info(f"Added {host_only} to NO_PROXY")
-
-            # 根据配置决定使用 url 还是 host 模式
-            if clean_url and (
-                clean_url.startswith("http://")
-                or clean_url.startswith("https://")
-                or clean_url.startswith("grpc://")
-            ):
-                # 智能修复：如果是 Qdrant Cloud 地址且带了 6333 端口，云端通常使用 443
-                if ".cloud.qdrant.io" in clean_url and ":6333" in clean_url:
-                    logger.warning(
-                        "Qdrant Cloud with port 6333 detected. Correcting to HTTPS (443)..."
-                    )
-                    clean_url = clean_url.replace(":6333", "")
-
-                logger.info(f"Initializing Qdrant client (URL mode) with: {clean_url}")
-                self.client = QdrantClient(url=clean_url, api_key=api_key, timeout=600)
-                logger.info(f"Qdrant initialized (URL mode): {clean_url}")
-            else:
-                # Host 模式初始化
-                self.client = QdrantClient(
-                    host=clean_url if clean_url else None,
-                    api_key=api_key,
-                    https=True
-                    if (api_key and clean_url and ".qdrant.io" in clean_url)
-                    else None,
-                    timeout=30,
-                )
-                logger.info(
-                    f"Qdrant initialized (Host mode): {clean_url if clean_url else 'default'}"
-                )
+            logger.info(f"Initializing Qdrant client (URL mode) with: {clean_url}")
+            self.client = QdrantClient(url=clean_url, api_key=api_key, timeout=600)
+            logger.info(f"Qdrant initialized (URL mode): {clean_url}")
         except Exception as e:
             if "SSL" in str(e) or "EOF" in str(e):
                 logger.error(
@@ -118,8 +80,10 @@ class IntentHubQdrantClient:
             try:
                 exists = self.client.collection_exists(self.collection_name)
             except Exception as e:
-                logger.warning(f"Error checking collection {self.collection_name}: {e}")
-                exists = False
+                logger.error(f"Error checking collection {self.collection_name}: {e}")
+                raise RuntimeError(
+                    f"Unable to verify Qdrant collection {self.collection_name}"
+                ) from e
 
             if not exists:
                 logger.info(f"Creating collection: {self.collection_name}")
@@ -171,6 +135,22 @@ class IntentHubQdrantClient:
                 ):
                     logger.warning(
                         f"Warning creating index for {self.IS_NEGATIVE_KEY}: {e}"
+                    )
+
+            try:
+                self.client.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name=self.IS_ROUTE_METADATA_KEY,
+                    field_schema=PayloadSchemaType.BOOL,
+                )
+                logger.info(f"Index for {self.IS_ROUTE_METADATA_KEY} ensured")
+            except Exception as e:
+                if (
+                    "already exists" not in str(e).lower()
+                    and "duplicate" not in str(e).lower()
+                ):
+                    logger.warning(
+                        f"Warning creating index for {self.IS_ROUTE_METADATA_KEY}: {e}"
                     )
 
         except Exception as e:
@@ -253,6 +233,40 @@ class IntentHubQdrantClient:
             logger.error(f"Failed to delete points: {e}", exc_info=True)
             raise
 
+    def upsert_route_metadata(
+        self,
+        route: RouteConfig,
+        route_hash: Optional[str] = None,
+        model_name: Optional[str] = None,
+    ) -> None:
+        """Store a complete recovery-only RouteConfig point.
+
+        The point is marked and every query/diagnostic path explicitly excludes it.
+        Its vector exists only because Qdrant collections require one.
+        """
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"route-metadata:{route.id}"))
+        payload = {
+            self.ROUTE_ID_KEY: route.id,
+            self.ROUTE_NAME_KEY: route.name,
+            self.IS_ROUTE_METADATA_KEY: True,
+            self.ROUTE_CONFIG_KEY: route.model_dump(),
+        }
+        if route_hash:
+            payload[self.ROUTE_HASH_KEY] = route_hash
+        if model_name:
+            payload[self.MODEL_NAME_KEY] = model_name
+        self.client.upsert(
+            collection_name=self.collection_name,
+            points=[
+                PointStruct(
+                    id=point_id,
+                    vector=[0.0] * self.dimensions,
+                    payload=payload,
+                )
+            ],
+        )
+        logger.info(f"Stored recovery metadata for route {route.name} (ID: {route.id})")
+
     def get_route_vectors(self, route_id: int) -> List[Dict[str, Any]]:
         """获取指定路由的所有向量点和载荷（排除负例向量）
 
@@ -282,7 +296,11 @@ class IntentHubQdrantClient:
                         must_not=[
                             FieldCondition(
                                 key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)
-                            )
+                            ),
+                            FieldCondition(
+                                key=self.IS_ROUTE_METADATA_KEY,
+                                match=MatchValue(value=True),
+                            ),
                         ],
                     ),
                     limit=batch_size,
@@ -321,9 +339,22 @@ class IntentHubQdrantClient:
             搜索结果列表，每个结果包含score和payload
         """
         try:
+            from qdrant_client.models import MatchValue
+
             results = self.client.query_points(
                 collection_name=self.collection_name,
                 query=query_vector,
+                query_filter=Filter(
+                    must_not=[
+                        FieldCondition(
+                            key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)
+                        ),
+                        FieldCondition(
+                            key=self.IS_ROUTE_METADATA_KEY,
+                            match=MatchValue(value=True),
+                        ),
+                    ]
+                ),
                 limit=top_k,
                 with_payload=True,
             )
@@ -466,9 +497,19 @@ class IntentHubQdrantClient:
             模型名称或 None
         """
         try:
+            from qdrant_client.models import MatchValue
+
             result = self.client.scroll(
                 collection_name=self.collection_name,
                 limit=1,
+                scroll_filter=Filter(
+                    must_not=[
+                        FieldCondition(
+                            key=self.IS_ROUTE_METADATA_KEY,
+                            match=MatchValue(value=True),
+                        )
+                    ]
+                ),
                 with_payload=True,
                 with_vectors=False,
             )
@@ -498,16 +539,19 @@ class IntentHubQdrantClient:
             offset = None
             batch_size = 200
 
-            # 构建过滤条件
-            scroll_filter = None
-            if exclude_negative:
-                scroll_filter = Filter(
-                    must_not=[
-                        FieldCondition(
-                            key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)
-                        )
-                    ]
+            # Recovery-only metadata points must never enter diagnostics or tests.
+            must_not = [
+                FieldCondition(
+                    key=self.IS_ROUTE_METADATA_KEY, match=MatchValue(value=True)
                 )
+            ]
+            if exclude_negative:
+                must_not.append(
+                    FieldCondition(
+                        key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)
+                    )
+                )
+            scroll_filter = Filter(must_not=must_not)
 
             while True:
                 scroll_params = {
@@ -517,14 +561,15 @@ class IntentHubQdrantClient:
                     "with_payload": True,
                     "with_vectors": with_vectors,
                 }
-                if scroll_filter:
-                    scroll_params["scroll_filter"] = scroll_filter
+                scroll_params["scroll_filter"] = scroll_filter
 
                 points, next_offset = self.client.scroll(**scroll_params)
 
                 for p in points:
                     # 双重检查：确保不是负例向量（如果 exclude_negative 为 True）
                     payload = p.payload or {}
+                    if payload.get(self.IS_ROUTE_METADATA_KEY, False):
+                        continue
                     if exclude_negative and payload.get(self.IS_NEGATIVE_KEY, False):
                         continue
 
@@ -614,7 +659,13 @@ class IntentHubQdrantClient:
                         FieldCondition(
                             key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)
                         )
-                    ]
+                    ],
+                    must_not=[
+                        FieldCondition(
+                            key=self.IS_ROUTE_METADATA_KEY,
+                            match=MatchValue(value=True),
+                        )
+                    ],
                 ),
                 with_payload=True,
             )

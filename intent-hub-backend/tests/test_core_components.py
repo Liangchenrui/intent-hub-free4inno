@@ -33,10 +33,8 @@ class DummyQdrantClient:
         self.api_key = api_key
 
 
-def test_component_manager_uses_default_tenant_workspace(test_dir, monkeypatch):
+def test_component_manager_uses_single_workspace(test_dir, monkeypatch):
     monkeypatch.setattr(Config, "DATA_DIR", test_dir)
-    monkeypatch.setattr(Config, "PLATFORM_DATA_DIR", test_dir / "platform")
-    monkeypatch.setattr(Config, "TENANTS_DATA_DIR", test_dir / "tenants")
     monkeypatch.setattr(Config, "ROUTES_CONFIG_PATH", str(test_dir / "routes.json"))
     (test_dir / "routes.json").write_text("[]", encoding="utf-8")
 

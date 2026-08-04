@@ -88,6 +88,11 @@ class SyncService:
                 else:
                     # 确保删除可能存在的旧负例向量
                     qdrant_client.delete_route_negative_samples(route.id)
+                qdrant_client.upsert_route_metadata(
+                    route=route,
+                    route_hash=route_manager.compute_route_hash(route),
+                    model_name=Config.EMBEDDING_MODEL_NAME,
+                )
             except Exception as e:
                 logger.error(
                     f"Failed processing route {route.name} (ID: {route.id}): {e}", exc_info=True
@@ -200,6 +205,14 @@ class SyncService:
             else:
                 skipped_count += 1
 
+            # Always backfill the complete recovery record, including for unchanged
+            # legacy routes that predate metadata points.
+            qdrant_client.upsert_route_metadata(
+                route=route,
+                route_hash=local_hash,
+                model_name=Config.EMBEDDING_MODEL_NAME,
+            )
+
         # 处理被删除的路由缓存清理
         if routes_to_delete:
             try:
@@ -292,6 +305,12 @@ class SyncService:
                 negative_threshold=negative_threshold,
             )
             total_negative_points = len(negative_samples)
+
+        qdrant_client.upsert_route_metadata(
+            route=route,
+            route_hash=route_manager.compute_route_hash(route),
+            model_name=Config.EMBEDDING_MODEL_NAME,
+        )
 
         logger.info(
             f"Synced route {route.name} (ID: {route_id}): {total_points} positive, {total_negative_points} negative vectors"

@@ -114,6 +114,13 @@ class RouteManager:
         with self._lock:
             return list(self._routes_cache.values())
 
+    def replace_routes(self, routes: List[RouteConfig]) -> None:
+        """Atomically replace the local route list and persist it once."""
+        with self._lock:
+            self._routes_cache = {route.id: route for route in routes}
+            self._save_to_file()
+            logger.info(f"Replaced local routes: {len(routes)} routes")
+
     def get_route_by_key(self, route_key: str) -> Optional[RouteConfig]:
         """按业务路由标识获取路由配置"""
         with self._lock:

@@ -6,7 +6,6 @@
           <img src="@/assets/logo.png" alt="Intent Hub" class="logo-img" />
         </div>
         <div class="user-info">
-          <ModeSwitcher />
           <LanguageSwitcher />
           <el-button type="danger" @click="handleLogout">{{ $t('common.logout') }}</el-button>
         </div>
@@ -356,8 +355,7 @@ import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Search, Plus, Refresh, MagicStick } from '@element-plus/icons-vue';
 import {
-  clearTenantSession,
-  setActiveMode,
+  clearSession,
   getRoutes,
   searchRoutes,
   deleteRoute,
@@ -371,7 +369,6 @@ import {
   type GenerateUtterancesRequest
 } from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
-import ModeSwitcher from '../components/ModeSwitcher.vue';
 
 const { t } = useI18n();
 
@@ -447,8 +444,7 @@ onMounted(() => {
 const handleLogout = async () => {
   try {
     await ElMessageBox.confirm(t('agent.logoutConfirm'), t('agent.logoutTitle'), { type: 'warning' });
-    clearTenantSession();
-    setActiveMode('tenant');
+    clearSession();
     router.push('/login');
   } catch (e) {}
 };

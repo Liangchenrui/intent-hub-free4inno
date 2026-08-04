@@ -5,9 +5,8 @@
 ## 仓库事实
 
 - 根目录是主入口，公共文档统一维护在 `docs/`。
-- 后端位于 `intent-hub-backend/`，提供 Flask API、兼容单租户接口、多租户管理接口和运行时接口。
+- 后端位于 `intent-hub-backend/`，提供单工作区 Flask 管理与路由接口。
 - 前端位于 `intent-hub-frontend/`，提供 Vue 3 + Vite 管理台。
-- 远程 CLI 与 Python SDK 位于 `intent-hub-cli/`，作为独立分发包维护。
 
 ## 文档约定
 
@@ -16,12 +15,10 @@
   - `USER_GUIDE.md`：面向使用者的操作说明
   - `docs/API.md`：接口说明
   - `docs/ARCHITECTURE.md`：架构与数据布局
-- 如子项目需要独立分发或发布说明，可在子项目内保留局部文档，例如 `intent-hub-cli/README.md`、`intent-hub-cli/PUBLISH.md`。
 
 ## 常用验证命令
 
 - 后端测试：`pytest intent-hub-backend/tests -q`
-- CLI 测试：`pytest intent-hub-cli/tests -q`
 - API 文档一致性：`python -m scripts.api_docs check`
 - 前端构建：在 `intent-hub-frontend/` 下执行 `npm run build`
 

@@ -22,7 +22,6 @@ from intent_hub.utils.logger import logger
 def get_routes():
     """获取所有路由列表"""
     component_manager = get_component_manager()
-    component_manager.ensure_ready()
 
     route_service = RouteService(component_manager)
     routes = route_service.get_all_routes()
@@ -37,7 +36,6 @@ def search_routes():
     query = request.args.get("q", "").strip()
 
     component_manager = get_component_manager()
-    component_manager.ensure_ready()
 
     route_service = RouteService(component_manager)
     routes = route_service.search_routes(query)
@@ -285,3 +283,56 @@ def delete_negative_samples(route_id: int):
         "message": f"成功删除路由 {route_id} 的所有负例样本",
         "route_id": route_id
     }), 200
+
+
+class RouteFeedbackRequest(BaseModel):
+    text: str = Field(..., min_length=1)
+
+
+def _feedback_request() -> RouteFeedbackRequest:
+    data = request.get_json(silent=True) or {}
+    data["text"] = data.get("text") or request.args.get("text", "")
+    return RouteFeedbackRequest(**data)
+
+
+def _update_feedback(route_id: int, field: str, add: bool):
+    try:
+        text = _feedback_request().text.strip()
+    except ValidationError as e:
+        return jsonify(ErrorResponse(error="请求参数错误", detail=str(e)).dict()), 400
+
+    manager = get_component_manager()
+    manager.ensure_ready()
+    route = manager.route_manager.get_route(route_id)
+    if not route:
+        return jsonify(ErrorResponse(error="路由不存在", detail=f"路由ID {route_id} 不存在").dict()), 404
+
+    values = list(getattr(route, field, []) or [])
+    if add and text not in values:
+        values.append(text)
+    elif not add:
+        values = [item for item in values if item != text]
+    setattr(route, field, values)
+    manager.route_manager.add_route(route)
+    count_key = "total_utterances" if field == "utterances" else "total_negative_samples"
+    return jsonify({"message": "反馈已更新", "route_id": route_id, count_key: len(values)}), 200
+
+
+@handle_errors
+def add_positive_feedback(route_id: int):
+    return _update_feedback(route_id, "utterances", True)
+
+
+@handle_errors
+def delete_positive_feedback(route_id: int):
+    return _update_feedback(route_id, "utterances", False)
+
+
+@handle_errors
+def add_negative_feedback(route_id: int):
+    return _update_feedback(route_id, "negative_samples", True)
+
+
+@handle_errors
+def delete_negative_feedback(route_id: int):
+    return _update_feedback(route_id, "negative_samples", False)

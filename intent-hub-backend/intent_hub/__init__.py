@@ -6,7 +6,6 @@ __version__ = "0.1.0"
 
 _EXPORTS = {
     "Config": ("intent_hub.config", "Config"),
-    "IntentHubClient": ("intent_hub.client", "IntentHubClient"),
     "RouteConfig": ("intent_hub.models", "RouteConfig"),
     "PredictRequest": ("intent_hub.models", "PredictRequest"),
     "PredictResponse": ("intent_hub.models", "PredictResponse"),

@@ -7,7 +7,6 @@ _EXPORTS = {
     "ImportService": ("intent_hub.services.import_service", "ImportService"),
     "PredictionService": ("intent_hub.services.prediction_service", "PredictionService"),
     "RouteService": ("intent_hub.services.route_service", "RouteService"),
-    "SkillScanService": ("intent_hub.services.skill_scan_service", "SkillScanService"),
     "SyncService": ("intent_hub.services.sync_service", "SyncService"),
 }
 

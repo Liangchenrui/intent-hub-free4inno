@@ -60,7 +60,7 @@ def get_repair_suggestions():
     diagnostic_service = DiagnosticService(component_manager)
 
     suggestion = diagnostic_service.get_repair_suggestions(
-        data.source_route_id, data.target_route_id
+        data.source_route_id, data.target_route_id, language=data.language
     )
     return jsonify(suggestion.dict()), 200
 

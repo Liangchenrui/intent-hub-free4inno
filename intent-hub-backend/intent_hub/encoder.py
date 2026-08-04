@@ -1,6 +1,7 @@
 """编码器模块 - 封装远程文本嵌入服务"""
 
 from typing import List, Optional
+from urllib.parse import urlsplit
 
 import numpy as np
 import requests
@@ -24,7 +25,10 @@ class QwenEmbeddingEncoder:
             timeout: 请求超时时间 (秒)
             batch_size: 批处理大小 (用于客户端分批请求，虽然服务端可能也有批处理限制)
         """
-        self.service_url = service_url.rstrip("/")
+        self.service_url = service_url.strip().rstrip("/")
+        parsed_url = urlsplit(self.service_url)
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+            raise ValueError("EMBEDDING_SERVICE_URL must be a complete http(s) URL")
         # 支持用户直接配置完整 URL (包含 /get_embeddings)
         if self.service_url.endswith("/get_embeddings"):
             self.endpoint_url = self.service_url

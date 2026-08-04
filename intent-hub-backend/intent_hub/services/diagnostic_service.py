@@ -61,12 +61,7 @@ class DiagnosticService:
 
     def __init__(self, component_manager: ComponentManager):
         self.component_manager = component_manager
-        tenant_context = getattr(component_manager, "context", None)
-        if tenant_context is not None and getattr(tenant_context, "diagnostics_cache_path", None):
-            self.cache_path = str(tenant_context.diagnostics_cache_path)
-        else:
-            # 兼容旧单租户入口
-            self.cache_path = Config.DIAGNOSTICS_CACHE_PATH
+        self.cache_path = Config.DIAGNOSTICS_CACHE_PATH
         # 确保目录存在
         os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
 
@@ -502,7 +497,7 @@ class DiagnosticService:
         }
 
     def get_repair_suggestions(
-        self, source_route_id: int, target_route_id: int
+        self, source_route_id: int, target_route_id: int, language: str = "zh"
     ) -> RepairSuggestion:
         """使用 LLM 为冲突的两个路由生成修复建议"""
         from langchain_core.output_parsers import JsonOutputParser
@@ -540,7 +535,16 @@ class DiagnosticService:
         prompt_text = (Config.AGENT_REPAIR_PROMPT or "").strip()
         if not prompt_text:
             prompt_text = self.DEFAULT_REPAIR_PROMPT
-        prompt = ChatPromptTemplate.from_messages([("system", prompt_text)])
+        language_instruction = (
+            "Write every natural-language string value in the JSON response in English. "
+            "This applies to new_utterances, negative_samples, conflicting_utterances, "
+            "and rationalization, regardless of the language used by earlier instructions."
+            if language == "en"
+            else "JSON 响应中的所有自然语言字符串值必须使用中文，包括所有语料列表和 rationalization。"
+        )
+        prompt = ChatPromptTemplate.from_messages(
+            [("system", prompt_text), ("system", language_instruction)]
+        )
 
         chain = prompt | llm | JsonOutputParser()
 

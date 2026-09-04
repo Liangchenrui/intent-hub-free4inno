@@ -57,29 +57,10 @@
             </div>
           </el-form-item>
           <el-form-item label="Embedding Service URL">
-            <el-input v-model="settings.EMBEDDING_SERVICE_URL" placeholder="http://embedding.free4inno.com" />
-          </el-form-item>
-          <el-form-item :label="$t('settings.embeddingApiFormat')">
-            <el-select v-model="settings.EMBEDDING_API_FORMAT" style="width: 100%">
-              <el-option :label="$t('settings.embeddingApiQwen')" value="qwen" />
-              <el-option :label="$t('settings.embeddingApiTei')" value="tei" />
-            </el-select>
-            <div class="field-hint">{{ $t('settings.embeddingApiFormatHint') }}</div>
+            <el-input v-model="settings.EMBEDDING_SERVICE_URL" placeholder="http://embedding.free4inno.com/embed" />
           </el-form-item>
           <el-form-item label="Route API Key">
             <el-input v-model="settings.PREDICT_AUTH_KEY" type="password" show-password />
-          </el-form-item>
-
-          <el-divider content-position="left">{{ $t('settings.upstreamAgentTitle') }}</el-divider>
-          <el-form-item :label="$t('settings.upstreamAgentUrl')">
-            <el-input v-model="settings.AGENT_API_URL" placeholder="https://agents.example/api" />
-          </el-form-item>
-          <el-form-item :label="$t('settings.upstreamAgentToken')">
-            <el-input v-model="settings.AGENT_API_TOKEN" type="password" show-password />
-          </el-form-item>
-          <el-form-item :label="$t('settings.upstreamAgentLabels')">
-            <el-input v-model="settings.AGENT_API_LABEL_IDS" placeholder="87,88,89" />
-            <div class="field-hint">{{ $t('settings.upstreamAgentHint') }}</div>
           </el-form-item>
 
           <el-divider :content-position="'left'">{{ $t('settings.llmTitle') }}</el-divider>
@@ -221,10 +202,7 @@ const creatingCollection = ref(false);
 const settings = ref<SystemSettings>({
   QDRANT_URL: 'http://app.qdrant.free4inno.com',
   PREDICT_AUTH_KEY: null,
-  EMBEDDING_SERVICE_URL: 'http://embedding.free4inno.com',
-  EMBEDDING_MODEL_NAME: '',
-  EMBEDDING_DEVICE: 'cpu',
-  EMBEDDING_API_FORMAT: 'qwen',
+  EMBEDDING_SERVICE_URL: 'http://embedding.free4inno.com/embed',
   LLM_PROVIDER: 'deepseek',
   LLM_API_KEY: null,
   LLM_BASE_URL: null,
@@ -246,12 +224,6 @@ const normalizeSettings = (data: any): SystemSettings => ({
   QDRANT_API_KEY: data.QDRANT_API_KEY ?? null,
   PREDICT_AUTH_KEY: data.PREDICT_AUTH_KEY ?? null,
   EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
-  EMBEDDING_MODEL_NAME: data.EMBEDDING_MODEL_NAME ?? '',
-  EMBEDDING_DEVICE: data.EMBEDDING_DEVICE ?? 'cpu',
-  EMBEDDING_API_FORMAT: data.EMBEDDING_API_FORMAT ?? 'qwen',
-  AGENT_API_URL: data.AGENT_API_URL ?? null,
-  AGENT_API_TOKEN: data.AGENT_API_TOKEN ?? null,
-  AGENT_API_LABEL_IDS: data.AGENT_API_LABEL_IDS ?? '',
   LLM_PROVIDER: data.LLM_PROVIDER ?? 'deepseek',
   LLM_API_KEY: data.LLM_API_KEY ?? null,
   LLM_BASE_URL: data.LLM_BASE_URL ?? null,
@@ -357,9 +329,7 @@ const prepareSettingsForSubmit = (data: SystemSettings): Partial<SystemSettings>
   const nullableFields: (keyof SystemSettings)[] = [
     'LLM_API_KEY',
     'LLM_BASE_URL',
-    'LLM_MODEL',
-    'AGENT_API_URL',
-    'AGENT_API_TOKEN'
+    'LLM_MODEL'
   ];
   nullableFields.forEach(field => {
     if (result[field] === '') {

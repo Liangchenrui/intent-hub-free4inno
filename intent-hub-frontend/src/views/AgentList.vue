@@ -59,6 +59,14 @@
               {{ $t('agent.reindex') }}
             </el-button>
             <el-button
+              type="primary"
+              plain
+              :loading="pullingUpstream"
+              @click="handlePullUpstream"
+            >
+              {{ $t('agent.pullUpstream') }}
+            </el-button>
+            <el-button
               type="info"
               plain
               @click="handleExport"
@@ -110,6 +118,16 @@
                 <div class="agent-name">{{ row.name }}</div>
                 <div class="agent-route-key">{{ row.route_key }}</div>
                 <div class="agent-description">{{ row.description || $t('agent.noDescription') }}</div>
+                <el-tag
+                  v-if="row.source?.type === 'upstream_agent'"
+                  size="small"
+                  effect="plain"
+                  class="comparison-tag"
+                  :type="comparisonTagType(row.comparison?.status)"
+                  @click="openUpstreamDiff(row)"
+                >
+                  {{ comparisonLabel(row.comparison?.status) }}
+                </el-tag>
                 <el-tooltip v-if="row.sync?.error" :content="row.sync.error" placement="top">
                   <el-tag size="small" :type="syncTagType(row.sync?.status)" class="sync-tag">
                     {{ syncLabel(row.sync?.status) }}
@@ -362,6 +380,33 @@
         </div>
       </template>
     </el-dialog>
+    <el-dialog v-model="diffVisible" :title="$t('agent.upstreamDiffTitle')" width="760px">
+      <div v-loading="diffLoading">
+        <el-descriptions v-if="upstreamDiff" :column="1" border>
+          <el-descriptions-item
+            v-for="(field, name) in upstreamDiff.fields"
+            :key="name"
+            :label="$t(`agent.upstreamFields.${name}`)"
+          >
+            <template v-if="field.kind === 'scalar'">
+              <div class="diff-values">
+                <span>{{ $t('agent.localValue') }}：{{ field.local_value || '—' }}</span>
+                <span>{{ $t('agent.upstreamValue') }}：{{ field.upstream_value || '—' }}</span>
+              </div>
+            </template>
+            <template v-else>
+              <span>{{ $t('agent.corpusDiff', { local: field.local_count, upstream: field.upstream_count, added: field.added?.length || 0, removed: field.removed?.length || 0 }) }}</span>
+            </template>
+            <el-button
+              v-if="field.overridden"
+              link
+              type="primary"
+              @click="handleRestoreField(String(name))"
+            >{{ $t('agent.restoreUpstream') }}</el-button>
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+    </el-dialog>
   </el-container>
 </template>
 
@@ -384,7 +429,11 @@ import {
   importRoutes,
   importRouteFromSkill,
   retrySyncTask,
+  pullUpstreamAgents,
+  getUpstreamRouteDiff,
+  restoreUpstreamRouteFields,
   type RouteConfig,
+  type UpstreamRouteDiff,
   type GenerateUtterancesRequest
 } from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
@@ -401,6 +450,11 @@ const reindexing = ref(false);
 const importing = ref(false);
 const importingSkill = ref(false);
 const batchDeleting = ref(false);
+const pullingUpstream = ref(false);
+const diffVisible = ref(false);
+const diffLoading = ref(false);
+const upstreamDiff = ref<UpstreamRouteDiff>();
+const diffRouteId = ref<number>();
 const genCount = ref(5);
 const searchQuery = ref('');
 const activeTab = ref('list');
@@ -474,6 +528,57 @@ const syncTagType = (status?: string) => {
   if (status === 'error') return 'danger';
   if (status === 'stale') return 'warning';
   return 'info';
+};
+
+const comparisonLabel = (status?: string) => t(`agent.comparison.${status || 'snapshot_unknown'}`);
+const comparisonTagType = (status?: string) => {
+  if (status === 'same') return 'success';
+  if (status === 'upstream_missing' || status === 'local_modified') return 'warning';
+  return 'info';
+};
+
+const handlePullUpstream = async () => {
+  pullingUpstream.value = true;
+  try {
+    const { data } = await pullUpstreamAgents();
+    if (data.warning) ElMessage.warning(data.warning);
+    else ElMessage.success(t('agent.pullUpstreamSuccess', {
+      created: data.created,
+      updated: data.updated,
+      upstream_missing: data.upstream_missing,
+    }));
+    await fetchAgents(searchQuery.value);
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || t('agent.pullUpstreamError'));
+  } finally {
+    pullingUpstream.value = false;
+  }
+};
+
+const openUpstreamDiff = async (route: RouteConfig) => {
+  diffRouteId.value = route.id;
+  upstreamDiff.value = undefined;
+  diffVisible.value = true;
+  diffLoading.value = true;
+  try {
+    upstreamDiff.value = (await getUpstreamRouteDiff(route.id)).data;
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || t('agent.upstreamDiffError'));
+  } finally {
+    diffLoading.value = false;
+  }
+};
+
+const handleRestoreField = async (field: string) => {
+  if (diffRouteId.value === undefined) return;
+  try {
+    await restoreUpstreamRouteFields(diffRouteId.value, [field]);
+    upstreamDiff.value = (await getUpstreamRouteDiff(diffRouteId.value)).data;
+    await fetchAgents(searchQuery.value, true);
+    ElMessage.success(t('agent.restoreUpstreamSuccess'));
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || t('agent.restoreUpstreamError'));
+  }
 };
 
 const handleRetrySync = async (route: RouteConfig) => {
@@ -794,6 +899,8 @@ const handleBatchDelete = async () => {
 </script>
 
 <style scoped>
+.comparison-tag { margin-left: 8px; cursor: pointer; }
+.diff-values { display: grid; gap: 6px; white-space: pre-wrap; }
 .layout-container {
   min-height: 100vh;
   background-color: #f5f7fa;

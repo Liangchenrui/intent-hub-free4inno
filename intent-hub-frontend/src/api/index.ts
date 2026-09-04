@@ -68,6 +68,16 @@ export interface RouteSourceMeta {
   source_id?: string | null;
   import_origin?: string | null;
   managed_fields?: string[];
+  source_snapshot?: Record<string, unknown>;
+  upstream_present?: boolean | null;
+  last_pulled_at?: string | null;
+}
+
+export interface RouteComparison {
+  status: 'local_only' | 'upstream_missing' | 'snapshot_unknown' | 'local_modified' | 'locked_equal' | 'same';
+  diff_fields: string[];
+  diff_count: number;
+  override_fields: string[];
 }
 
 export interface RouteSyncMeta {
@@ -101,6 +111,38 @@ export interface RouteConfig {
   source?: RouteSourceMeta;
   sync?: RouteSyncMeta;
   lifecycle_status?: string;
+  comparison?: RouteComparison;
+}
+
+export interface UpstreamDiffField {
+  kind: 'scalar' | 'corpus';
+  changed: boolean;
+  overridden: boolean;
+  local_value?: string;
+  upstream_value?: string;
+  local_count?: number;
+  upstream_count?: number;
+  added?: string[];
+  removed?: string[];
+  unchanged_count?: number;
+}
+
+export interface UpstreamRouteDiff {
+  route_id: number;
+  compared_at: string | null;
+  comparison: RouteComparison;
+  fields: Record<string, UpstreamDiffField>;
+}
+
+export interface UpstreamPullResult {
+  created: number;
+  updated: number;
+  unchanged: number;
+  preserved_overrides: number;
+  upstream_missing: number;
+  routes_count: number;
+  last_pulled_at?: string;
+  warning?: string;
 }
 
 export interface GenerateUtterancesRequest {
@@ -153,6 +195,12 @@ export const getServiceHealth = () =>
   api.get<ServiceHealthResponse>('/health/services', { timeout: 15000 });
 
 export const getRoutes = () => api.get<RouteConfig[]>('/routes');
+export const pullUpstreamAgents = () =>
+  api.post<UpstreamPullResult>('/routes/upstream-pull', {}, { timeout: 120000 });
+export const getUpstreamRouteDiff = (id: number) =>
+  api.get<UpstreamRouteDiff>(`/routes/${id}/upstream-diff`);
+export const restoreUpstreamRouteFields = (id: number, fields: string[]) =>
+  api.post<RouteConfig>(`/routes/${id}/restore-upstream-fields`, { fields });
 export const searchRoutes = (query: string = '') =>
   api.get<RouteConfig[]>('/routes/search', { params: { q: query } });
 export const createRoute = (data: RouteConfig) => api.post<RouteConfig>('/routes', data);
@@ -304,6 +352,9 @@ export interface SystemSettings extends SharedLlmSettings {
   EMBEDDING_SERVICE_URL: string;
   EMBEDDING_MODEL_NAME?: string;
   EMBEDDING_DEVICE?: string;
+  AGENT_API_URL?: string | null;
+  AGENT_API_TOKEN?: string | null;
+  AGENT_API_LABEL_IDS?: string;
 
   BATCH_SIZE?: number;
 

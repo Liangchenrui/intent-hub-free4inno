@@ -59,6 +59,31 @@ def search_routes():
     return routes.search_routes()
 
 
+@app.route("/routes/upstream-pull", methods=["POST"])
+@require_auth
+def pull_upstream_agents():
+    """Refresh local routes from the configured read-only Agent API."""
+    from intent_hub.api import upstream_agents
+
+    return upstream_agents.pull_agents()
+
+
+@app.route("/routes/<int:route_id>/upstream-diff", methods=["GET"])
+@require_auth
+def get_upstream_diff(route_id: int):
+    from intent_hub.api import upstream_agents
+
+    return upstream_agents.route_diff(route_id)
+
+
+@app.route("/routes/<int:route_id>/restore-upstream-fields", methods=["POST"])
+@require_auth
+def restore_upstream_fields(route_id: int):
+    from intent_hub.api import upstream_agents
+
+    return upstream_agents.restore_fields(route_id)
+
+
 @app.route("/routes", methods=["POST"])
 @require_auth
 def create_route():

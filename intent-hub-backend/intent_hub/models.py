@@ -1,6 +1,6 @@
 """数据模型定义"""
 
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -18,10 +18,13 @@ class RouteConfig(BaseModel):
     """路由配置模型（用于CRUD操作）"""
 
     class RouteSource(BaseModel):
-        type: Literal["web_manual", "json_import"] = Field(..., description="正式路由来源类型")
+        type: Literal["web_manual", "json_import", "upstream_agent"] = Field(..., description="正式路由来源类型")
         source_id: Optional[str] = Field(default=None, description="来源侧稳定 ID")
         import_origin: Optional[str] = Field(default=None, description="导入来源标识")
         managed_fields: List[str] = Field(default_factory=list, description="受来源托管的字段")
+        source_snapshot: Dict[str, Any] = Field(default_factory=dict, description="最近一次上游快照")
+        upstream_present: Optional[bool] = Field(default=None, description="最近拉取时上游是否存在")
+        last_pulled_at: Optional[str] = Field(default=None, description="最近成功拉取时间")
 
     class RouteSync(BaseModel):
         status: Literal["pending", "queued", "syncing", "synced", "stale", "error"] = Field(

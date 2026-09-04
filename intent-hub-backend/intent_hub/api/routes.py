@@ -17,6 +17,13 @@ from intent_hub.services.import_service import ImportService
 from intent_hub.services.sync_task_service import get_sync_task_service
 from intent_hub.utils.error_handler import handle_errors, validate_request
 from intent_hub.utils.logger import logger
+from intent_hub.route_compare import comparison_summary
+
+
+def _route_payload(route: RouteConfig) -> dict:
+    payload = route.model_dump()
+    payload["comparison"] = comparison_summary(route)
+    return payload
 
 
 @handle_errors
@@ -27,7 +34,7 @@ def get_routes():
     route_service = RouteService(component_manager)
     routes = route_service.get_all_routes()
 
-    return jsonify([route.dict() for route in routes]), 200
+    return jsonify([_route_payload(route) for route in routes]), 200
 
 
 @handle_errors
@@ -41,7 +48,7 @@ def search_routes():
     route_service = RouteService(component_manager)
     routes = route_service.search_routes(query)
 
-    return jsonify([route.dict() for route in routes]), 200
+    return jsonify([_route_payload(route) for route in routes]), 200
 
 
 @handle_errors
@@ -245,6 +252,7 @@ def add_negative_samples(route_id: int):
     if not route:
         return jsonify(ErrorResponse(error="路由不存在", detail=f"路由ID {route_id} 不存在").dict()), 404
 
+    route = route.model_copy(deep=True)
     # 合并负例样本
     existing_negative_samples = getattr(route, 'negative_samples', [])
     new_negative_samples = list(set(existing_negative_samples + req.negative_samples))
@@ -271,6 +279,7 @@ def delete_negative_samples(route_id: int):
     if not route:
         return jsonify(ErrorResponse(error="路由不存在", detail=f"路由ID {route_id} 不存在").dict()), 404
 
+    route = route.model_copy(deep=True)
     # 更新路由配置
     route.negative_samples = []
     RouteService(component_manager).update_route(route_id, route)
@@ -303,6 +312,7 @@ def _update_feedback(route_id: int, field: str, add: bool):
     if not route:
         return jsonify(ErrorResponse(error="路由不存在", detail=f"路由ID {route_id} 不存在").dict()), 404
 
+    route = route.model_copy(deep=True)
     values = list(getattr(route, field, []) or [])
     if add and text not in values:
         values.append(text)

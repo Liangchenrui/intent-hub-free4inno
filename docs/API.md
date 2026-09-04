@@ -7,6 +7,9 @@
 - `POST /predict`
 - `GET|POST /routes`
 - `GET /routes/search`
+- `POST /routes/upstream-pull`
+- `GET /routes/{route_id}/upstream-diff`
+- `POST /routes/{route_id}/restore-upstream-fields`
 - `PUT|DELETE /routes/{route_id}`
 - `POST /routes/generate-utterances`
 - `POST /routes/import` and `/routes/import-skill`

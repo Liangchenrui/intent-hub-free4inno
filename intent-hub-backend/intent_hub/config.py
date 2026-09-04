@@ -101,6 +101,11 @@ class Config:
     EMBEDDING_DEVICE: str = "cpu"
     EMBEDDING_HEALTH_URL: Optional[str] = None
 
+    # 可选的只读上游 Agent 数据源
+    AGENT_API_URL: Optional[str] = None
+    AGENT_API_TOKEN: Optional[str] = None
+    AGENT_API_LABEL_IDS: str = ""
+
     # 默认路由配置
     DEFAULT_ROUTE_ID: int = 0
     DEFAULT_ROUTE_NAME: str = "none"
@@ -288,6 +293,9 @@ class Config:
             "EMBEDDING_MODEL_NAME": cls.EMBEDDING_MODEL_NAME,
             "EMBEDDING_DEVICE": cls.EMBEDDING_DEVICE,
             "EMBEDDING_HEALTH_URL": cls.EMBEDDING_HEALTH_URL,
+            "AGENT_API_URL": cls.AGENT_API_URL,
+            "AGENT_API_TOKEN": cls.AGENT_API_TOKEN,
+            "AGENT_API_LABEL_IDS": cls.AGENT_API_LABEL_IDS,
             # LLM配置（通用）
             "LLM_PROVIDER": cls.LLM_PROVIDER,
             "LLM_API_KEY": cls.LLM_API_KEY,

@@ -15,6 +15,7 @@ from intent_hub.models import (
 )
 from intent_hub.services.llm_factory import LLMFactory
 from intent_hub.utils.logger import logger
+from intent_hub.route_compare import COMPARABLE_FIELDS, fields_equal
 
 
 class UtteranceList(BaseModel):
@@ -126,7 +127,21 @@ class RouteService:
         route.route_key = self._normalize_and_validate_route_key(route.route_key)
         self._ensure_route_key_unique(route.route_key, exclude_route_id=route_id)
         route.source = route.source or RouteConfig.RouteSource(type="web_manual")
-        self._mark_changed(route, previous=previous)
+        if previous.source and previous.source.type == "upstream_agent":
+            route.source = previous.source.model_copy(deep=True)
+            route.sync = route.sync or RouteConfig.RouteSync()
+            previous_overrides = set(previous.sync.manual_overrides if previous.sync else [])
+            changed_managed = {
+                field
+                for field in COMPARABLE_FIELDS
+                if not fields_equal(field, getattr(previous, field), getattr(route, field))
+            }
+            route.sync.manual_overrides = sorted(previous_overrides | changed_managed)
+        self._mark_changed(
+            route,
+            previous=previous,
+            manual_overrides=(route.sync.manual_overrides if route.sync else []),
+        )
 
         if not route_manager.update_route(route_id, route):
             raise ValueError(f"Route ID {route_id} does not exist")
@@ -361,7 +376,11 @@ class RouteService:
             raise ValueError(f"route_key '{route_key}' already exists")
 
     @staticmethod
-    def _mark_changed(route: RouteConfig, previous: RouteConfig | None) -> None:
+    def _mark_changed(
+        route: RouteConfig,
+        previous: RouteConfig | None,
+        manual_overrides: List[str] | None = None,
+    ) -> None:
         """Assign a new local version and preserve only prior sync history."""
         previous_sync = previous.sync if previous is not None else None
         previous_version = previous_sync.version if previous_sync is not None else 0
@@ -370,9 +389,9 @@ class RouteService:
             version=previous_version + 1,
             synced_version=previous_sync.synced_version if previous_sync is not None else 0,
             last_synced_at=previous_sync.last_synced_at if previous_sync is not None else None,
-            manual_overrides=(
-                list(previous_sync.manual_overrides)
-                if previous_sync is not None
-                else list(route.sync.manual_overrides if route.sync is not None else [])
+            manual_overrides=list(
+                manual_overrides
+                if manual_overrides is not None
+                else (previous_sync.manual_overrides if previous_sync is not None else [])
             ),
         )

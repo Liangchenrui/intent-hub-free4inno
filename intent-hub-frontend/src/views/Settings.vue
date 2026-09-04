@@ -65,6 +65,18 @@
             <el-input v-model="settings.PREDICT_AUTH_KEY" type="password" show-password />
           </el-form-item>
 
+          <el-divider content-position="left">{{ $t('settings.upstreamAgentTitle') }}</el-divider>
+          <el-form-item :label="$t('settings.upstreamAgentUrl')">
+            <el-input v-model="settings.AGENT_API_URL" placeholder="https://agents.example/api" />
+          </el-form-item>
+          <el-form-item :label="$t('settings.upstreamAgentToken')">
+            <el-input v-model="settings.AGENT_API_TOKEN" type="password" show-password />
+          </el-form-item>
+          <el-form-item :label="$t('settings.upstreamAgentLabels')">
+            <el-input v-model="settings.AGENT_API_LABEL_IDS" placeholder="87,88,89" />
+            <div class="field-hint">{{ $t('settings.upstreamAgentHint') }}</div>
+          </el-form-item>
+
           <el-divider :content-position="'left'">{{ $t('settings.llmTitle') }}</el-divider>
           <el-form-item :label="$t('settings.llmProvider')">
             <el-select v-model="settings.LLM_PROVIDER" style="width: 100%">

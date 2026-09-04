@@ -581,6 +581,7 @@ class DiagnosticService:
             raise ValueError(f"路由ID {route_id} 不存在")
 
         # 1. 更新 route_manager (内存/文件)
+        route = route.model_copy(deep=True)
         route.utterances = utterances
         from intent_hub.services.route_service import RouteService
 

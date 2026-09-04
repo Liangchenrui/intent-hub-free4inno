@@ -273,6 +273,15 @@ def list_qdrant_collections():
     return settings.list_qdrant_collections()
 
 
+@app.route("/settings/qdrant-collections", methods=["POST"])
+@require_auth
+def create_qdrant_collection():
+    """Create an empty collection using the active embedding dimensions."""
+    from intent_hub.api import settings
+
+    return settings.create_qdrant_collection()
+
+
 @app.route("/settings/qdrant-import", methods=["POST"])
 @require_auth
 def import_routes_from_qdrant():

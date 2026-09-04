@@ -1,10 +1,10 @@
 """系统设置相关API"""
 
-import requests
 from flask import jsonify, request
 
 from intent_hub.config import Config
 from intent_hub.utils.error_handler import handle_errors
+from intent_hub.services.collection_service import CollectionService
 
 
 @handle_errors
@@ -16,16 +16,16 @@ def get_settings():
 @handle_errors
 def list_qdrant_collections():
     """List collections from the configured Qdrant endpoint without initializing components."""
-    url = f"{Config.QDRANT_URL.rstrip('/')}/collections"
-    headers = {"api-key": Config.QDRANT_API_KEY} if Config.QDRANT_API_KEY else {}
-    response = requests.get(url, headers=headers, timeout=10)
-    response.raise_for_status()
-    payload = response.json()
-    collections = payload.get("result", {}).get("collections", [])
-    names = sorted(
-        item.get("name") for item in collections if isinstance(item, dict) and item.get("name")
-    )
-    return jsonify({"items": names}), 200
+    return jsonify(CollectionService().list_collections()), 200
+
+
+@handle_errors
+def create_qdrant_collection():
+    name = str((request.get_json(silent=True) or {}).get("name") or "")
+    from intent_hub.core.components import get_component_manager
+
+    result = CollectionService(get_component_manager()).create_collection(name)
+    return jsonify(result), 201
 
 
 @handle_errors

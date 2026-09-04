@@ -25,6 +25,7 @@
 - `POST /diagnostics/apply-repair`
 - `GET|POST /settings`
 - `GET /settings/qdrant-collections`
+- `POST /settings/qdrant-collections`
 - `POST /settings/qdrant-import`
 
 路由写接口先持久化本地配置并返回，向量生成与 Qdrant 写入由后台任务完成。响应中的 `route.sync` 包含 `status`、`version`、`synced_version`、`task_id` 和失败信息。只有 `version == synced_version` 且 `status == synced` 时，向量索引才与该路由的最新配置一致。

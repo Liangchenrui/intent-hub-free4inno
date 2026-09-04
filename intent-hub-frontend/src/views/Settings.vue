@@ -41,22 +41,20 @@
             >
               <el-option
                 v-for="collection in qdrantCollections"
-                :key="collection"
-                :label="collection"
-                :value="collection"
+                :key="collection.name"
+                :label="collection.kind === 'alias' ? `${collection.name} → ${collection.target}` : collection.name"
+                :value="collection.name"
               />
             </el-select>
             <div class="field-hint">{{ $t('settings.qdrantCollectionHint') }}</div>
-            <el-button
-              class="collection-import-button"
-              type="primary"
-              plain
-              :loading="importingRoutes"
-              :disabled="!settings.QDRANT_COLLECTION"
-              @click="handleImportCollection"
-            >
-              {{ $t('settings.importCollectionRoutes') }}
-            </el-button>
+            <div class="collection-actions">
+              <el-button plain :loading="creatingCollection" @click="handleCreateCollection">
+                {{ $t('settings.createCollection') }}
+              </el-button>
+              <el-button type="primary" plain :loading="importingRoutes" :disabled="!settings.QDRANT_COLLECTION" @click="handleImportCollection">
+                {{ $t('settings.importCollectionRoutes') }}
+              </el-button>
+            </div>
           </el-form-item>
           <el-form-item label="Embedding Service URL">
             <el-input v-model="settings.EMBEDDING_SERVICE_URL" placeholder="http://embedding.free4inno.com" />
@@ -192,10 +190,12 @@ import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   getQdrantCollections,
+  createQdrantCollection,
   getSettings,
   importRoutesFromQdrant,
   updateSettings,
   type SystemSettings,
+  type CollectionOption,
 } from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 import ServiceHealthIndicators from '../components/ServiceHealthIndicators.vue';
@@ -207,8 +207,9 @@ const activeTab = ref('settings');
 const loading = ref(false);
 const saving = ref(false);
 const collectionsLoading = ref(false);
-const qdrantCollections = ref<string[]>([]);
+const qdrantCollections = ref<CollectionOption[]>([]);
 const importingRoutes = ref(false);
+const creatingCollection = ref(false);
 
 const settings = ref<SystemSettings>({
   QDRANT_URL: 'http://app.qdrant.free4inno.com',
@@ -239,6 +240,9 @@ const normalizeSettings = (data: any): SystemSettings => ({
   EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
   EMBEDDING_MODEL_NAME: data.EMBEDDING_MODEL_NAME ?? '',
   EMBEDDING_DEVICE: data.EMBEDDING_DEVICE ?? 'cpu',
+  AGENT_API_URL: data.AGENT_API_URL ?? null,
+  AGENT_API_TOKEN: data.AGENT_API_TOKEN ?? null,
+  AGENT_API_LABEL_IDS: data.AGENT_API_LABEL_IDS ?? '',
   LLM_PROVIDER: data.LLM_PROVIDER ?? 'deepseek',
   LLM_API_KEY: data.LLM_API_KEY ?? null,
   LLM_BASE_URL: data.LLM_BASE_URL ?? null,
@@ -278,11 +282,37 @@ const fetchQdrantCollections = async () => {
   collectionsLoading.value = true;
   try {
     const response = await getQdrantCollections();
-    qdrantCollections.value = response.data.items;
+    qdrantCollections.value = response.data.collections;
   } catch (error) {
     qdrantCollections.value = [];
   } finally {
     collectionsLoading.value = false;
+  }
+};
+
+const handleCreateCollection = async () => {
+  try {
+    const { value } = await ElMessageBox.prompt(
+      t('settings.createCollectionPrompt'),
+      t('settings.createCollection'),
+      {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
+        inputPattern: /^[A-Za-z0-9._-]+$/,
+        inputErrorMessage: t('settings.collectionNameInvalid'),
+      }
+    );
+    creatingCollection.value = true;
+    const { data } = await createQdrantCollection(value.trim());
+    await fetchQdrantCollections();
+    settings.value.QDRANT_COLLECTION = data.name;
+    ElMessage.success(t('settings.createCollectionSuccess', { name: data.name }));
+  } catch (error: any) {
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(error.response?.data?.detail || t('settings.createCollectionError'));
+    }
+  } finally {
+    creatingCollection.value = false;
   }
 };
 
@@ -318,7 +348,9 @@ const prepareSettingsForSubmit = (data: SystemSettings): Partial<SystemSettings>
   const nullableFields: (keyof SystemSettings)[] = [
     'LLM_API_KEY',
     'LLM_BASE_URL',
-    'LLM_MODEL'
+    'LLM_MODEL',
+    'AGENT_API_URL',
+    'AGENT_API_TOKEN'
   ];
   nullableFields.forEach(field => {
     if (result[field] === '') {
@@ -424,8 +456,10 @@ onMounted(() => {
   font-size: 12px;
 }
 
-.collection-import-button {
+.collection-actions {
   margin-top: 10px;
+  display: flex;
+  gap: 8px;
 }
 
 .header-wrapper {

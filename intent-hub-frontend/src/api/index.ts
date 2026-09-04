@@ -369,8 +369,15 @@ export interface SystemSettings extends SharedLlmSettings {
 }
 
 export const getSettings = () => api.get<SystemSettings>('/settings');
+export interface CollectionOption {
+  name: string;
+  kind: 'collection' | 'alias';
+  target: string | null;
+}
 export const getQdrantCollections = () =>
-  api.get<{ items: string[] }>('/settings/qdrant-collections', { timeout: 15000 });
+  api.get<{ current: string; items: string[]; collections: CollectionOption[] }>('/settings/qdrant-collections', { timeout: 15000 });
+export const createQdrantCollection = (name: string) =>
+  api.post<CollectionOption>('/settings/qdrant-collections', { name }, { timeout: 30000 });
 export const importRoutesFromQdrant = (collection: string) =>
   api.post<{ message: string; collection: string; routes_count: number }>(
     '/settings/qdrant-import',

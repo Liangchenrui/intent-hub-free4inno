@@ -352,6 +352,7 @@ export interface SystemSettings extends SharedLlmSettings {
   EMBEDDING_SERVICE_URL: string;
   EMBEDDING_MODEL_NAME?: string;
   EMBEDDING_DEVICE?: string;
+  EMBEDDING_API_FORMAT?: 'qwen' | 'tei';
   AGENT_API_URL?: string | null;
   AGENT_API_TOKEN?: string | null;
   AGENT_API_LABEL_IDS?: string;

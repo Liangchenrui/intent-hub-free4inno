@@ -17,6 +17,7 @@ class QwenEmbeddingEncoder:
         service_url: str = "http://localhost:5000",
         timeout: int = 30,
         batch_size: int = 32,
+        api_format: str = "qwen",
     ):
         """初始化编码器客户端
 
@@ -29,8 +30,12 @@ class QwenEmbeddingEncoder:
         parsed_url = urlsplit(self.service_url)
         if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
             raise ValueError("EMBEDDING_SERVICE_URL must be a complete http(s) URL")
-        # 支持用户直接配置完整 URL (包含 /get_embeddings)
-        if self.service_url.endswith("/get_embeddings"):
+        self.api_format = api_format.strip().lower()
+        if self.api_format not in {"qwen", "tei"}:
+            raise ValueError("EMBEDDING_API_FORMAT must be 'qwen' or 'tei'")
+        if self.api_format == "tei":
+            self.endpoint_url = self.service_url
+        elif self.service_url.endswith("/get_embeddings"):
             self.endpoint_url = self.service_url
         else:
             self.endpoint_url = f"{self.service_url}/get_embeddings"
@@ -79,23 +84,28 @@ class QwenEmbeddingEncoder:
             batch_texts = texts[i : i + self.batch_size]
 
             try:
+                request_body = (
+                    {"inputs": batch_texts}
+                    if self.api_format == "tei"
+                    else {"input": {"texts": batch_texts}}
+                )
                 response = requests.post(
                     self.endpoint_url,
-                    json={"input": {"texts": batch_texts}},
+                    json=request_body,
                     timeout=self.timeout,
                 )
                 response.raise_for_status()
 
                 result = response.json()
 
-                # 解析响应
-                # 响应格式: {"output": {"embeddings": [{"text_index": 0, "embedding": [...]}, ...]}}
-                embeddings_data = result.get("output", {}).get("embeddings", [])
-
-                # 确保按索引排序
-                embeddings_data.sort(key=lambda x: x.get("text_index", 0))
-
-                batch_embeddings = [item["embedding"] for item in embeddings_data]
+                if self.api_format == "tei":
+                    if not isinstance(result, list):
+                        raise ValueError("TEI response must be an embedding array")
+                    batch_embeddings = result
+                else:
+                    embeddings_data = result.get("output", {}).get("embeddings", [])
+                    embeddings_data.sort(key=lambda x: x.get("text_index", 0))
+                    batch_embeddings = [item["embedding"] for item in embeddings_data]
 
                 if len(batch_embeddings) != len(batch_texts):
                     logger.warning(

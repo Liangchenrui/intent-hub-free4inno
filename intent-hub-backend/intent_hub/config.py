@@ -99,6 +99,7 @@ class Config:
     EMBEDDING_SERVICE_URL: str = "http://embedding.free4inno.com"
     EMBEDDING_MODEL_NAME: str = "Qwen/Qwen3-Embedding-0.6B"  # 仅用于元数据和版本控制
     EMBEDDING_DEVICE: str = "cpu"
+    EMBEDDING_API_FORMAT: str = "qwen"
     EMBEDDING_HEALTH_URL: Optional[str] = None
 
     # 可选的只读上游 Agent 数据源
@@ -292,6 +293,7 @@ class Config:
             "EMBEDDING_SERVICE_URL": cls.EMBEDDING_SERVICE_URL,
             "EMBEDDING_MODEL_NAME": cls.EMBEDDING_MODEL_NAME,
             "EMBEDDING_DEVICE": cls.EMBEDDING_DEVICE,
+            "EMBEDDING_API_FORMAT": cls.EMBEDDING_API_FORMAT,
             "EMBEDDING_HEALTH_URL": cls.EMBEDDING_HEALTH_URL,
             "AGENT_API_URL": cls.AGENT_API_URL,
             "AGENT_API_TOKEN": cls.AGENT_API_TOKEN,

@@ -30,6 +30,7 @@ class ComponentManager:
             self._encoder = self._encoder_factory(
                 service_url=Config.EMBEDDING_SERVICE_URL,
                 batch_size=Config.BATCH_SIZE,
+                api_format=Config.EMBEDDING_API_FORMAT,
             )
         return self._encoder
 

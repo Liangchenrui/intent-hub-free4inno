@@ -48,6 +48,7 @@ def update_settings():
             "QDRANT_API_KEY",
             "EMBEDDING_SERVICE_URL",
             "EMBEDDING_MODEL_NAME",
+            "EMBEDDING_API_FORMAT",
         }
         if index_settings.intersection(data):
             from intent_hub.services.sync_task_service import get_sync_task_service

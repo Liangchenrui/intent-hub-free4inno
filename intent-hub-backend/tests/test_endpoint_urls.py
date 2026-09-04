@@ -14,11 +14,14 @@ class FakeQdrantSdk:
 
 
 class FakeEmbeddingResponse:
+    def __init__(self, payload=None):
+        self.payload = payload or {"output": {"embeddings": [{"text_index": 0, "embedding": [0.1, 0.2]}]}}
+
     def raise_for_status(self):
         pass
 
     def json(self):
-        return {"output": {"embeddings": [{"text_index": 0, "embedding": [0.1, 0.2]}]}}
+        return self.payload
 
 
 @pytest.mark.parametrize(
@@ -58,6 +61,27 @@ def test_embedding_complete_url_only_gets_endpoint_path(monkeypatch):
 
     assert encoder.endpoint_url == "https://embedding.example.com:9443/api/get_embeddings"
     assert calls == [encoder.endpoint_url]
+
+
+def test_tei_embedding_uses_exact_endpoint_and_array_contract(monkeypatch):
+    calls = []
+
+    def post(url, **kwargs):
+        calls.append((url, kwargs["json"]))
+        return FakeEmbeddingResponse([[0.1, 0.2], [0.3, 0.4]])
+
+    monkeypatch.setattr("intent_hub.encoder.requests.post", post)
+    encoder = QwenEmbeddingEncoder("https://embedding.example.com/embed", api_format="tei")
+    result = encoder.encode(["one", "two"])
+
+    assert encoder.endpoint_url == "https://embedding.example.com/embed"
+    assert calls[-1] == ("https://embedding.example.com/embed", {"inputs": ["one", "two"]})
+    assert result == [[0.1, 0.2], [0.3, 0.4]]
+
+
+def test_embedding_rejects_unknown_api_format():
+    with pytest.raises(ValueError, match="qwen.*tei"):
+        QwenEmbeddingEncoder("https://embedding.example.com", api_format="unknown")
 
 
 @pytest.mark.parametrize("client,url", [(IntentHubQdrantClient, "qdrant.local"), (QwenEmbeddingEncoder, "embedding.local")])

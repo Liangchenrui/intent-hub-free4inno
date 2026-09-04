@@ -59,6 +59,13 @@
           <el-form-item label="Embedding Service URL">
             <el-input v-model="settings.EMBEDDING_SERVICE_URL" placeholder="http://embedding.free4inno.com" />
           </el-form-item>
+          <el-form-item :label="$t('settings.embeddingApiFormat')">
+            <el-select v-model="settings.EMBEDDING_API_FORMAT" style="width: 100%">
+              <el-option :label="$t('settings.embeddingApiQwen')" value="qwen" />
+              <el-option :label="$t('settings.embeddingApiTei')" value="tei" />
+            </el-select>
+            <div class="field-hint">{{ $t('settings.embeddingApiFormatHint') }}</div>
+          </el-form-item>
           <el-form-item label="Route API Key">
             <el-input v-model="settings.PREDICT_AUTH_KEY" type="password" show-password />
           </el-form-item>
@@ -217,6 +224,7 @@ const settings = ref<SystemSettings>({
   EMBEDDING_SERVICE_URL: 'http://embedding.free4inno.com',
   EMBEDDING_MODEL_NAME: '',
   EMBEDDING_DEVICE: 'cpu',
+  EMBEDDING_API_FORMAT: 'qwen',
   LLM_PROVIDER: 'deepseek',
   LLM_API_KEY: null,
   LLM_BASE_URL: null,
@@ -240,6 +248,7 @@ const normalizeSettings = (data: any): SystemSettings => ({
   EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
   EMBEDDING_MODEL_NAME: data.EMBEDDING_MODEL_NAME ?? '',
   EMBEDDING_DEVICE: data.EMBEDDING_DEVICE ?? 'cpu',
+  EMBEDDING_API_FORMAT: data.EMBEDDING_API_FORMAT ?? 'qwen',
   AGENT_API_URL: data.AGENT_API_URL ?? null,
   AGENT_API_TOKEN: data.AGENT_API_TOKEN ?? null,
   AGENT_API_LABEL_IDS: data.AGENT_API_LABEL_IDS ?? '',

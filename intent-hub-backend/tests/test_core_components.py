@@ -19,9 +19,10 @@ def test_dir():
 
 
 class DummyEncoder:
-    def __init__(self, service_url: str, batch_size: int):
+    def __init__(self, service_url: str, batch_size: int, api_format: str):
         self.service_url = service_url
         self.batch_size = batch_size
+        self.api_format = api_format
         self.dimensions = 3
 
 
@@ -49,4 +50,5 @@ def test_component_manager_uses_single_workspace(test_dir, monkeypatch):
 
     assert manager.route_manager.config_path == str(test_dir / "routes.json")
     assert manager.qdrant_client.collection_name == Config.QDRANT_COLLECTION
+    assert manager.encoder.api_format == Config.EMBEDDING_API_FORMAT
     assert manager.qdrant_client.write_batch_size == Config.QDRANT_WRITE_BATCH_SIZE

@@ -10,6 +10,21 @@ app = Flask(__name__)
 Compress(app)
 
 
+@app.route("/health", methods=["GET"])
+def health():
+    """Process-level liveness probe."""
+    return {"status": "ok"}, 200
+
+
+@app.route("/health/services", methods=["GET"])
+@require_auth
+def service_health():
+    """Probe the external services used by the router."""
+    from intent_hub.api import health
+
+    return health.get_service_health()
+
+
 @app.route("/auth/login", methods=["POST"])
 def login():
     """Login (no auth required)."""

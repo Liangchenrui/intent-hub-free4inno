@@ -22,6 +22,12 @@ export default {
     diagnostics: '诊断',
     settings: '设置',
   },
+  health: {
+    checking: '正在检查服务状态',
+    healthy: '服务正常 · {latency} ms',
+    unhealthy: '服务异常 · {message}',
+    unavailable: '无法获取服务状态',
+  },
   diagnostics: {
     title: '语义重叠诊断',
     description: '通过计算各意图路由之间的向量空间重叠度，识别潜在误判风险。',

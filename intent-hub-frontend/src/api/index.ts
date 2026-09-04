@@ -137,6 +137,21 @@ export interface RouteFeedbackResponse {
   total_negative_samples?: number;
 }
 
+export interface ServiceHealthResult {
+  healthy: boolean;
+  status_code: number | null;
+  latency_ms: number;
+  message: string;
+}
+
+export interface ServiceHealthResponse {
+  status: 'ok' | 'degraded';
+  services: Record<'embedding' | 'qdrant', ServiceHealthResult>;
+}
+
+export const getServiceHealth = () =>
+  api.get<ServiceHealthResponse>('/health/services', { timeout: 15000 });
+
 export const getRoutes = () => api.get<RouteConfig[]>('/routes');
 export const searchRoutes = (query: string = '') =>
   api.get<RouteConfig[]>('/routes/search', { params: { q: query } });

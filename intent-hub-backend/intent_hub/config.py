@@ -93,11 +93,13 @@ class Config:
     QDRANT_URL: str = "http://app.qdrant.free4inno.com"
     QDRANT_COLLECTION: str = ""
     QDRANT_API_KEY: Optional[str] = None
+    QDRANT_HEALTH_URL: Optional[str] = None
 
     # Embedding服务配置
     EMBEDDING_SERVICE_URL: str = "http://embedding.free4inno.com"
     EMBEDDING_MODEL_NAME: str = "Qwen/Qwen3-Embedding-0.6B"  # 仅用于元数据和版本控制
     EMBEDDING_DEVICE: str = "cpu"
+    EMBEDDING_HEALTH_URL: Optional[str] = None
 
     # 默认路由配置
     DEFAULT_ROUTE_ID: int = 0
@@ -280,10 +282,12 @@ class Config:
             "QDRANT_URL": cls.QDRANT_URL,
             "QDRANT_COLLECTION": cls.QDRANT_COLLECTION,
             "QDRANT_API_KEY": cls.QDRANT_API_KEY,
+            "QDRANT_HEALTH_URL": cls.QDRANT_HEALTH_URL,
             # Embedding服务配置
             "EMBEDDING_SERVICE_URL": cls.EMBEDDING_SERVICE_URL,
             "EMBEDDING_MODEL_NAME": cls.EMBEDDING_MODEL_NAME,
             "EMBEDDING_DEVICE": cls.EMBEDDING_DEVICE,
+            "EMBEDDING_HEALTH_URL": cls.EMBEDDING_HEALTH_URL,
             # LLM配置（通用）
             "LLM_PROVIDER": cls.LLM_PROVIDER,
             "LLM_API_KEY": cls.LLM_API_KEY,

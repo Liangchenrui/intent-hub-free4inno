@@ -3,6 +3,7 @@
 管理接口使用登录返回的 API key；`POST /auth/login` 免鉴权。`POST /predict` 使用独立 `PREDICT_AUTH_KEY`。
 
 - `POST /auth/login`
+- `GET /health` and authenticated `GET /health/services`
 - `POST /predict`
 - `GET|POST /routes`
 - `GET /routes/search`

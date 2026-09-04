@@ -6,6 +6,7 @@
           <img src="@/assets/logo.png" alt="Intent Hub" class="logo-img" />
         </div>
         <div class="user-info">
+          <ServiceHealthIndicators />
           <LanguageSwitcher />
           <el-button type="danger" @click="handleLogout">{{ $t('common.logout') }}</el-button>
         </div>
@@ -629,6 +630,7 @@ import {
   type RepairSuggestion
 } from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
+import ServiceHealthIndicators from '../components/ServiceHealthIndicators.vue';
 
 const { t } = useI18n();
 const router = useRouter();

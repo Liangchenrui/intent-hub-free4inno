@@ -22,6 +22,12 @@ export default {
     diagnostics: 'Diagnostics',
     settings: 'Settings',
   },
+  health: {
+    checking: 'Checking service status',
+    healthy: 'Healthy · {latency} ms',
+    unhealthy: 'Unhealthy · {message}',
+    unavailable: 'Service status unavailable',
+  },
   diagnostics: {
     title: 'Semantic Overlap Diagnostics',
     description: 'Identify potential routing risks by calculating vector-space overlap between intent routes.',

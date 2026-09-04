@@ -1,6 +1,7 @@
 import pytest
 
 from intent_hub.encoder import QwenEmbeddingEncoder
+from intent_hub.config import Config
 from intent_hub.models import RouteConfig
 from intent_hub.qdrant_wrapper import IntentHubQdrantClient
 
@@ -82,6 +83,16 @@ def test_tei_embedding_uses_exact_endpoint_and_array_contract(monkeypatch):
 def test_embedding_rejects_unknown_api_format():
     with pytest.raises(ValueError, match="qwen.*tei"):
         QwenEmbeddingEncoder("https://embedding.example.com", api_format="unknown")
+
+
+def test_legacy_free4inno_embedding_settings_migrate_to_tei(monkeypatch):
+    monkeypatch.setattr(Config, "EMBEDDING_SERVICE_URL", "http://embedding.free4inno.com/")
+    monkeypatch.setattr(Config, "EMBEDDING_API_FORMAT", "qwen")
+
+    Config._apply_backward_compatibility()
+
+    assert Config.EMBEDDING_SERVICE_URL == "http://embedding.free4inno.com/embed"
+    assert Config.EMBEDDING_API_FORMAT == "tei"
 
 
 @pytest.mark.parametrize("client,url", [(IntentHubQdrantClient, "qdrant.local"), (QwenEmbeddingEncoder, "embedding.local")])

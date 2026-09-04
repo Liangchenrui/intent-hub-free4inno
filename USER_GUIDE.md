@@ -17,7 +17,7 @@ curl -X POST http://localhost:5000/predict \
 
 ## 服务地址
 
-`QDRANT_URL` 与 `EMBEDDING_SERVICE_URL` 必须是完整的 `http://` 或 `https://` URL。系统不会追加默认端口；Embedding URL 未包含 `/get_embeddings` 时只补充该路径。
+`QDRANT_URL` 与 `EMBEDDING_SERVICE_URL` 必须是完整的 `http://` 或 `https://` URL。默认 Embedding 服务使用 `http://embedding.free4inno.com/embed` 和 `tei` 协议（请求体为 `{"inputs": [...]}`）；自定义 `qwen` 协议地址未包含 `/get_embeddings` 时才会补充该路径。
 
 ## 英文诊断
 

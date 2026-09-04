@@ -96,10 +96,10 @@ class Config:
     QDRANT_HEALTH_URL: Optional[str] = None
 
     # Embedding服务配置
-    EMBEDDING_SERVICE_URL: str = "http://embedding.free4inno.com"
+    EMBEDDING_SERVICE_URL: str = "http://embedding.free4inno.com/embed"
     EMBEDDING_MODEL_NAME: str = "Qwen/Qwen3-Embedding-0.6B"  # 仅用于元数据和版本控制
     EMBEDDING_DEVICE: str = "cpu"
-    EMBEDDING_API_FORMAT: str = "qwen"
+    EMBEDDING_API_FORMAT: str = "tei"
     EMBEDDING_HEALTH_URL: Optional[str] = None
 
     # 可选的只读上游 Agent 数据源
@@ -207,7 +207,15 @@ class Config:
 
     @classmethod
     def _apply_backward_compatibility(cls):
-        """处理向后兼容性：如果使用deepseek且新配置为空，使用旧配置"""
+        """Normalize settings written by earlier releases."""
+        if (
+            str(cls.EMBEDDING_SERVICE_URL).rstrip("/")
+            == "http://embedding.free4inno.com"
+            and str(cls.EMBEDDING_API_FORMAT).lower() == "qwen"
+        ):
+            cls.EMBEDDING_SERVICE_URL = "http://embedding.free4inno.com/embed"
+            cls.EMBEDDING_API_FORMAT = "tei"
+
         if cls.LLM_PROVIDER == "deepseek":
             if cls.LLM_API_KEY is None and cls.DEEPSEEK_API_KEY:
                 cls.LLM_API_KEY = cls.DEEPSEEK_API_KEY

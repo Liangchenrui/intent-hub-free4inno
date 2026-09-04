@@ -18,7 +18,7 @@ intent-hub-backend/
 
 One component manager creates the encoder, Qdrant client, and route manager. Qdrant and embedding endpoints are complete URLs passed without inferred ports. Management login keys and the external `PREDICT_AUTH_KEY` are separate.
 
-The embedding client supports two explicit wire formats: `qwen` keeps the existing `/get_embeddings` request/response contract, while `tei` sends `{"inputs": [...]}` to the exact configured endpoint and accepts a plain embedding array. The protocol is never guessed at runtime.
+The embedding client supports two explicit wire formats: `qwen` keeps the existing `/get_embeddings` request/response contract, while `tei` sends `{"inputs": [...]}` to the exact configured endpoint and accepts a plain embedding array. The default Free4inno service uses the TEI-compatible `http://embedding.free4inno.com/embed` endpoint. The protocol is never guessed at runtime.
 
 Each synced route also has one recovery-only Qdrant point containing the complete `RouteConfig` payload. It is marked with `is_route_metadata=true` and is explicitly excluded from prediction, matching, testing, and diagnostics. Collection recovery reads these records first and only falls back to aggregating legacy utterance payloads when metadata records are absent.
 

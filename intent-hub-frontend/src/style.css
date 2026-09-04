@@ -40,14 +40,34 @@ body { margin: 0; min-width: 320px; min-height: 100vh; }
 .brand-divider { width: 1px; height: 22px; background: #dcdfe6; }
 .brand-caption { color: #606266; font-size: 14px; letter-spacing: .04em; }
 .header-actions { gap: 20px; }
-.service-state { gap: 8px; color: #606266; font-size: 13px; }
+.service-state {
+  gap: 8px;
+  padding: 6px 10px;
+  color: #606266;
+  font-size: 13px;
+  border: 1px solid #ebeef5;
+  border-radius: 999px;
+  background: #fafbfc;
+}
 .service-state i {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+}
+.service-state.healthy i {
   background: #67c23a;
   box-shadow: 0 0 0 4px #eaf7e5;
 }
+.service-state.unhealthy i {
+  background: #f56c6c;
+  box-shadow: 0 0 0 4px #fdecec;
+}
+.service-state.checking i {
+  background: #e6a23c;
+  box-shadow: 0 0 0 4px #fdf3e4;
+  animation: health-pulse 1.2s ease-in-out infinite;
+}
+@keyframes health-pulse { 50% { opacity: .45; } }
 .main-wrapper {
   width: 95%;
   max-width: 1400px;
@@ -90,8 +110,11 @@ body { margin: 0; min-width: 320px; min-height: 100vh; }
 
 @media (max-width: 700px) {
   .app-header { padding: 0 16px; }
-  .brand-caption, .brand-divider, .service-state { display: none; }
+  .brand-caption, .brand-divider { display: none; }
   .brand img { width: 132px; }
+  .header-actions { gap: 10px; }
+  .service-state { padding: 6px; }
+  .service-state span { display: none; }
   .main-wrapper { width: calc(100% - 24px); padding-top: 16px; }
   .nav-tabs .el-tabs__item { min-width: auto; padding: 0 16px; }
   .page-intro, .toolbar { align-items: stretch; flex-direction: column; }

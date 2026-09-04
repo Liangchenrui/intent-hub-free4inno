@@ -89,6 +89,13 @@ class IntentHubQdrantClient:
                 wait=True,
             )
 
+    def clear(self) -> None:
+        self.client.delete(
+            collection_name=self.collection_name,
+            points_selector=Filter(must=[]),
+            wait=True,
+        )
+
     def upsert_routes(self, routes: list[dict], batch_size: int = 128) -> None:
         points = []
         for route in routes:

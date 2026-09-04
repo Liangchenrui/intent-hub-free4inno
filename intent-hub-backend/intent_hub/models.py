@@ -96,3 +96,7 @@ class RouteRequest(BaseModel):
 class ThresholdRequest(BaseModel):
     score_threshold: float = Field(..., ge=0.0, le=1.0)
     negative_threshold: float = Field(..., ge=0.0, le=1.0)
+
+
+class CollectionRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)

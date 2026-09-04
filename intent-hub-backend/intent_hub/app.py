@@ -12,9 +12,12 @@ from intent_hub.config import Config
 from intent_hub.core.components import get_component_manager
 from intent_hub.models import (
     AgentCreate, AgentUpdate, ApplyRepairRequest, MergeAgentsRequest,
-    RecommendationRequest, RepairRequest, RouteRequest, ThresholdRequest,
+    CollectionRequest, RecommendationRequest, RepairRequest, RouteRequest,
+    ThresholdRequest,
 )
+from intent_hub.services.collection_service import CollectionService
 from intent_hub.services.diagnostic_service import DiagnosticService
+from intent_hub.services.health_service import check_external_services
 from intent_hub.services.llm_service import LLMService
 from intent_hub.services.prediction_service import PredictionService
 from intent_hub.services.pull_service import PullService
@@ -69,6 +72,11 @@ def api_errors(function):
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+@app.get("/health/services")
+def external_services_health():
+    return jsonify(check_external_services())
 
 
 @app.get("/agents")
@@ -211,6 +219,31 @@ def update_settings():
     Config.save(request.get_json() or {})
     get_component_manager().reinit_components()
     return jsonify({"message": "配置已保存，运行组件将在下次请求时重新连接", "settings": Config.to_dict()})
+
+
+@app.get("/collections")
+@require_auth
+@api_errors
+def collections():
+    return jsonify(CollectionService(get_component_manager()).list_collections())
+
+
+@app.post("/collections")
+@require_auth
+@api_errors
+def create_collection():
+    payload = CollectionRequest(**(request.get_json() or {}))
+    result = CollectionService(get_component_manager()).create_collection(payload.name)
+    return jsonify(result), 201
+
+
+@app.post("/collections/restore")
+@require_auth
+@api_errors
+def restore_collection():
+    payload = CollectionRequest(**(request.get_json() or {}))
+    result = CollectionService(get_component_manager()).restore_collection(payload.name)
+    return jsonify(result)
 
 
 @app.get("/diagnostics/overlap")

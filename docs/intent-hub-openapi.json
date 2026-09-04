@@ -431,7 +431,6 @@
           "positive_points": {"type": "integer"},
           "negative_points": {"type": "integer"},
           "collection": {"type": "string"},
-          "physical_collection": {"type": "string"},
           "warning": {"type": "string"}
         }
       },

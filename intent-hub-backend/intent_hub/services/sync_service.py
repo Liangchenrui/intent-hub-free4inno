@@ -109,21 +109,14 @@ class SyncService:
     def _full_sync(self, connection, agents) -> dict:
         if not agents:
             return self._empty_result("full")
-        configured = Config.QDRANT_COLLECTION
-        alias = configured if configured.endswith("__active") else f"{configured}__active"
-        base = alias.removesuffix("__active")
-        generation = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
-        target_name = f"{base}__{generation}"
-        target = self.components.create_qdrant(target_name)
-        self._upsert_agents(target, agents)
-        self._validate(target, agents)
-        target.switch_alias(alias)
-        if configured != alias:
-            Config.save_collection(alias)
-            self.components.reset_qdrant()
-        self._replace_hashes(connection, alias, {agent.id: agent_hash(agent) for agent in agents})
+        collection = Config.QDRANT_COLLECTION
+        qdrant = self.components.qdrant_client
+        qdrant.clear()
+        self._upsert_agents(qdrant, agents)
+        self._validate(qdrant, agents)
+        self._replace_hashes(connection, collection, {agent.id: agent_hash(agent) for agent in agents})
         result = self._result("full", agents, len(agents), 0)
-        result.update({"collection": alias, "physical_collection": target_name})
+        result["collection"] = collection
         return result
 
     def _encode_routes(self, agents):

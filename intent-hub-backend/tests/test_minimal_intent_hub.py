@@ -174,7 +174,7 @@ def test_incremental_sync_blocks_abnormal_mass_deletion():
             raise AssertionError("mass deletion should be blocked")
 
 
-def test_full_sync_builds_and_switches_alias(monkeypatch):
+def test_full_sync_replaces_configured_collection(monkeypatch):
     agent = Agent(id=7, title="天气 Agent", utterances=["查天气"], details={"id": 7})
 
     class Encoder:
@@ -184,6 +184,9 @@ def test_full_sync_builds_and_switches_alias(monkeypatch):
             return [[1.0] for _ in texts]
 
     class Target:
+        def clear(self):
+            self.cleared = True
+
         def upsert_routes(self, routes, batch_size):
             self.routes = routes
 
@@ -195,9 +198,6 @@ def test_full_sync_builds_and_switches_alias(monkeypatch):
                 "route_hashes": {7: route["route_hash"]},
             }
 
-        def switch_alias(self, alias):
-            self.alias = alias
-
     target = Target()
     store = SimpleNamespace(
         agents=[],
@@ -207,8 +207,7 @@ def test_full_sync_builds_and_switches_alias(monkeypatch):
     components = SimpleNamespace(
         encoder=Encoder(),
         agent_store=store,
-        create_qdrant=lambda collection: target,
-        reset_qdrant=lambda: None,
+        qdrant_client=target,
     )
 
     with TemporaryDirectory() as directory:
@@ -221,9 +220,9 @@ def test_full_sync_builds_and_switches_alias(monkeypatch):
             state_path=Path(directory) / "sync.db",
         ).sync(mode="full")
 
-    assert target.alias == "agents__active"
-    assert result["collection"] == "agents__active"
-    assert result["physical_collection"].startswith("agents__")
+    assert target.cleared is True
+    assert result["collection"] == "agents"
+    assert "physical_collection" not in result
 
 
 def test_point_ids_do_not_change_when_agent_title_changes():

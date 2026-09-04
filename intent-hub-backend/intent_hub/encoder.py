@@ -5,8 +5,7 @@ import requests
 
 class QwenEmbeddingEncoder:
     def __init__(self, service_url: str, timeout: int = 30, batch_size: int = 32):
-        base = service_url.rstrip("/")
-        self.endpoint_url = base if base.endswith("/get_embeddings") else f"{base}/get_embeddings"
+        self.endpoint_url = service_url.strip()
         self.timeout = timeout
         self.batch_size = batch_size
         self._dimensions = None
@@ -23,13 +22,13 @@ class QwenEmbeddingEncoder:
             batch = texts[start : start + self.batch_size]
             response = requests.post(
                 self.endpoint_url,
-                json={"input": {"texts": batch}},
+                json={"inputs": batch},
                 timeout=self.timeout,
             )
             response.raise_for_status()
-            data = response.json().get("output", {}).get("embeddings", [])
-            data.sort(key=lambda item: item.get("text_index", 0))
-            current = [item["embedding"] for item in data]
+            current = response.json()
+            if not isinstance(current, list):
+                raise RuntimeError("Embedding 服务返回格式不正确")
             if len(current) != len(batch):
                 raise RuntimeError("Embedding 服务返回数量不匹配")
             embeddings.extend(current)

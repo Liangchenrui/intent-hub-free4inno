@@ -98,6 +98,36 @@ export interface Settings {
   INSTANCE_THRESHOLD_AMBIGUOUS: number;
 }
 
+export interface ServiceHealth {
+  status: 'ok' | 'degraded';
+  services: Record<'embedding' | 'qdrant', {
+    healthy: boolean;
+    status_code: number | null;
+    latency_ms: number;
+    message: string;
+  }>;
+}
+
+export interface CollectionOption {
+  name: string;
+  kind: 'collection' | 'alias';
+  target: string | null;
+}
+
+export interface CollectionsResponse {
+  current: string;
+  collections: CollectionOption[];
+}
+
+export interface CollectionRestoreResult {
+  collection: string;
+  restored_agents: number;
+  positive_texts: number;
+  negative_texts: number;
+  points_count: number;
+  skipped_points: number;
+}
+
 export const getAgents = () => api.get<Agent[]>('/agents');
 export const getAgentDiff = (id: number) => api.get<AgentDiffDetail>(`/agents/${id}/diff`);
 export const createAgent = (data: Partial<Agent>) => api.post<Agent>('/agents', data);
@@ -112,6 +142,10 @@ export const getSyncStatus = () => api.get<SyncStatus>('/sync/status');
 export const route = (query: string) => api.post<RouteResult>('/route', { query });
 export const getSettings = () => api.get<Settings>('/settings');
 export const saveSettings = (settings: Partial<Settings>) => api.post<{ message: string; settings: Settings }>('/settings', settings);
+export const getServiceHealth = () => api.get<ServiceHealth>('/health/services');
+export const getCollections = () => api.get<CollectionsResponse>('/collections');
+export const createCollection = (name: string) => api.post<CollectionOption>('/collections', { name });
+export const restoreCollection = (name: string) => api.post<CollectionRestoreResult>('/collections/restore', { name }, { timeout: 120000 });
 
 export interface ConflictPoint { source_utterance: string; target_utterance: string; similarity: number; }
 export interface RouteOverlap { target_route_id: number; target_route_name: string; region_similarity: number; instance_conflicts: ConflictPoint[]; total_conflicts: number; }

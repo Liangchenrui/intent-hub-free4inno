@@ -8,7 +8,7 @@ Except `GET /health`, send `Authorization: Bearer telestar` (or `X-API-Key: tele
 - `POST /agents`, `PATCH /agents/<id>`, `DELETE /agents/<id>` — create, edit, or soft-delete local Agent data.
 - `POST /agents/<id>/restore-fields` — restore selected manually overridden fields from the latest upstream snapshot.
 - `POST /agents/<id>/recommendations` — generate positive or negative corpus suggestions without saving them.
-- `POST /vectors/sync` — synchronize active local Agents to Qdrant. Send `{"mode":"full"}` for a validated blue-green rebuild.
+- `POST /vectors/sync` — synchronize active local Agents to Qdrant. Send `{"mode":"full"}` to clear and rebuild the configured collection.
 - `POST /sync` — deprecated compatibility alias for `POST /vectors/sync`; it no longer pulls upstream data.
 - `GET /sync/status` — return local pull time, pending changes, vector sync time, and point counts.
 - `POST /route` — body: `{"query":"用户问题"}`. Always returns `success`, `data`, and `error`. `data.agents` contains every Agent that reaches its threshold as `{agent, score}` entries, ordered by descending score; it is empty when no Agent matches.

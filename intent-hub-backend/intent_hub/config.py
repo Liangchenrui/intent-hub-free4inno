@@ -32,7 +32,7 @@ class Config:
     QDRANT_API_KEY = "123456"
     QDRANT_COLLECTION = "free4inno_skills"
 
-    EMBEDDING_SERVICE_URL = "http://192.168.33.1:30122"
+    EMBEDDING_SERVICE_URL = "http://embedding.free4inno.com/embed"
     EMBEDDING_MODEL_NAME = "BAAI/bge-m3"
     BATCH_SIZE = 32
     QDRANT_WRITE_BATCH_SIZE = 128

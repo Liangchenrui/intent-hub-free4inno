@@ -40,6 +40,7 @@ class IntentHubQdrantClient:
         dimensions: int,
         api_key: Optional[str] = None,
         timeout: int = 30,
+        write_batch_size: int = 128,
     ):
         """初始化Qdrant客户端
 
@@ -58,6 +59,7 @@ class IntentHubQdrantClient:
         self.collection_name = collection_name
         self.dimensions = dimensions
         self.api_key = api_key
+        self.write_batch_size = max(1, int(write_batch_size))
 
         try:
             clean_url = self.url
@@ -213,7 +215,7 @@ class IntentHubQdrantClient:
             points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
 
         try:
-            self.client.upsert(collection_name=self.collection_name, points=points)
+            self._upsert_points(points)
             logger.info(f"Updated route {route_name}: {len(points)} vectors")
         except Exception as e:
             logger.error(f"Failed to update vector points: {e}", exc_info=True)
@@ -266,15 +268,8 @@ class IntentHubQdrantClient:
             payload[self.ROUTE_HASH_KEY] = route_hash
         if model_name:
             payload[self.MODEL_NAME_KEY] = model_name
-        self.client.upsert(
-            collection_name=self.collection_name,
-            points=[
-                PointStruct(
-                    id=point_id,
-                    vector=[0.0] * self.dimensions,
-                    payload=payload,
-                )
-            ],
+        self._upsert_points(
+            [PointStruct(id=point_id, vector=[0.0] * self.dimensions, payload=payload)]
         )
         logger.info(f"Stored recovery metadata for route {route.name} (ID: {route.id})")
 
@@ -511,6 +506,37 @@ class IntentHubQdrantClient:
             logger.error(f"Failed to fetch existing route hashes: {e}", exc_info=True)
             return {}
 
+    def index_summary(self) -> Dict[str, Any]:
+        """Return counts and route hashes used to verify a completed sync."""
+        route_ids: set[int] = set()
+        route_hashes: Dict[int, str] = {}
+        points_count = 0
+        offset = None
+        while True:
+            points, offset = self.client.scroll(
+                collection_name=self.collection_name,
+                limit=200,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+            points_count += len(points)
+            for point in points:
+                payload = point.payload or {}
+                route_id = payload.get(self.ROUTE_ID_KEY)
+                if isinstance(route_id, int):
+                    route_ids.add(route_id)
+                    route_hash = payload.get(self.ROUTE_HASH_KEY)
+                    if route_hash:
+                        route_hashes[route_id] = route_hash
+            if offset is None:
+                break
+        return {
+            "points_count": points_count,
+            "route_ids": sorted(route_ids),
+            "route_hashes": route_hashes,
+        }
+
     def get_collection_model_name(self) -> Optional[str]:
         """获取集合中存储的模型名称（通过检查第一个点的 payload）
 
@@ -649,11 +675,20 @@ class IntentHubQdrantClient:
             points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
 
         try:
-            self.client.upsert(collection_name=self.collection_name, points=points)
+            self._upsert_points(points)
             logger.info(f"Updated route {route_name}: {len(points)} negative vectors")
         except Exception as e:
             logger.error(f"Failed to update negative points: {e}", exc_info=True)
             raise
+
+    def _upsert_points(self, points: List[PointStruct]) -> None:
+        batch_size = getattr(self, "write_batch_size", 128)
+        for start in range(0, len(points), batch_size):
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points[start : start + batch_size],
+                wait=True,
+            )
 
     def search_negative_samples(
         self, query_vector: List[float], top_k: int = 10

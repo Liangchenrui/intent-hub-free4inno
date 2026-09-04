@@ -107,6 +107,8 @@ class SyncService:
                     {"route_id": route.id, "route_name": route.name, "error": str(e)}
                 )
 
+        self._validate_index(config_routes, qdrant_client, route_manager)
+
         # Diagnostics is a separate background phase and never delays index readiness.
         try:
             from intent_hub.services.diagnostic_service import DiagnosticService
@@ -152,6 +154,7 @@ class SyncService:
 
         # 4. 计算需要删除的路由（在 Qdrant 中存在但配置文件中不存在）
         routes_to_delete = existing_route_ids - config_route_ids
+        self._guard_mass_deletion(len(existing_route_ids), len(routes_to_delete))
         deleted_count = 0
         for route_id in routes_to_delete:
             logger.info(f"Deleting removed route: {route_id}")
@@ -222,6 +225,8 @@ class SyncService:
                 model_name=Config.EMBEDDING_MODEL_NAME,
             )
 
+        self._validate_index(config_routes, qdrant_client, route_manager)
+
         # 处理被删除的路由缓存清理
         if routes_to_delete:
             try:
@@ -254,6 +259,35 @@ class SyncService:
             "skipped_routes": skipped_count,
             "total_points": total_points,
         }
+
+    @staticmethod
+    def _guard_mass_deletion(previous_count: int, deleted_count: int) -> None:
+        if previous_count and deleted_count / previous_count > Config.MAX_DELETE_RATIO:
+            raise ValueError(
+                f"本次将删除 {deleted_count}/{previous_count} 个路由，超过安全阈值；"
+                "请确认配置后使用全量重建"
+            )
+
+    @staticmethod
+    def _validate_index(config_routes: list, qdrant_client, route_manager) -> None:
+        expected_hashes = {
+            route.id: route_manager.compute_route_hash(route) for route in config_routes
+        }
+        expected_points = sum(
+            len(route.utterances) + len(getattr(route, "negative_samples", [])) + 1
+            for route in config_routes
+        )
+        actual = qdrant_client.index_summary()
+        if (
+            actual["points_count"] != expected_points
+            or actual["route_ids"] != sorted(expected_hashes)
+            or actual["route_hashes"] != expected_hashes
+        ):
+            raise RuntimeError(
+                "Qdrant 索引校验失败："
+                f"期望 {expected_points} 个点和 {len(expected_hashes)} 个路由，"
+                f"实际 {actual['points_count']} 个点和 {len(actual['route_ids'])} 个路由"
+            )
 
     def sync_route(self, route_id: int) -> Dict[str, Any]:
         """同步单个路由到向量数据库

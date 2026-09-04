@@ -74,8 +74,9 @@ class CaptureQdrantClient:
         self.points = None
         self.query_filter = None
 
-    def upsert(self, collection_name, points):
+    def upsert(self, collection_name, points, wait=False):
         self.points = points
+        self.wait = wait
 
     def query_points_groups(self, **kwargs):
         self.query_filter = kwargs["query_filter"]
@@ -111,3 +112,26 @@ def test_route_metadata_is_complete_and_excluded_from_search():
     assert wrapper.IS_NEGATIVE_KEY in excluded_keys
     assert wrapper.client.query_kwargs["group_by"] == wrapper.ROUTE_ID_KEY
     assert wrapper.client.query_kwargs["group_size"] == 1
+
+
+def test_qdrant_writes_large_routes_in_batches():
+    wrapper = object.__new__(IntentHubQdrantClient)
+    wrapper.collection_name = "routes"
+    wrapper.write_batch_size = 2
+    calls = []
+
+    class BatchClient:
+        def upsert(self, **kwargs):
+            calls.append(kwargs)
+
+    wrapper.client = BatchClient()
+    wrapper.upsert_route_utterances(
+        route_id=1,
+        route_name="Batch",
+        utterances=["a", "b", "c", "d", "e"],
+        embeddings=[[0.1, 0.2]] * 5,
+        score_threshold=0.8,
+    )
+
+    assert [len(call["points"]) for call in calls] == [2, 2, 1]
+    assert all(call["wait"] is True for call in calls)

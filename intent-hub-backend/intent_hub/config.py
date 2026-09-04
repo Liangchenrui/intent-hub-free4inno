@@ -106,6 +106,8 @@ class Config:
 
     # 性能配置
     BATCH_SIZE: int = 32
+    QDRANT_WRITE_BATCH_SIZE: int = 128
+    MAX_DELETE_RATIO: float = 0.2
 
     # 路由配置文件路径
     ROUTES_CONFIG_PATH: str = str(DATA_DIR / "routes.json")
@@ -303,6 +305,8 @@ class Config:
             "DEFAULT_PASSWORD": cls.DEFAULT_PASSWORD,
             # 其他配置
             "BATCH_SIZE": cls.BATCH_SIZE,
+            "QDRANT_WRITE_BATCH_SIZE": cls.QDRANT_WRITE_BATCH_SIZE,
+            "MAX_DELETE_RATIO": cls.MAX_DELETE_RATIO,
             "DEFAULT_ROUTE_ID": cls.DEFAULT_ROUTE_ID,
             "DEFAULT_ROUTE_NAME": cls.DEFAULT_ROUTE_NAME,
             "DEFAULT_ROUTE_KEY": cls.DEFAULT_ROUTE_KEY,

@@ -42,6 +42,7 @@ class ComponentManager:
                 dimensions=self.encoder.dimensions,
                 api_key=Config.QDRANT_API_KEY,
                 timeout=Config.QDRANT_TIMEOUT_SECONDS,
+                write_batch_size=Config.QDRANT_WRITE_BATCH_SIZE,
             )
         return self._qdrant_client
 

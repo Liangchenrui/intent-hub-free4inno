@@ -14,10 +14,16 @@ class FakeQdrantClient:
     SCORE_THRESHOLD_KEY = "score_threshold"
     NEGATIVE_THRESHOLD_KEY = "negative_threshold"
 
+    def __init__(self):
+        self.positive_top_k = None
+        self.negative_top_k = None
+
     def search_negative_samples(self, query_vector, top_k=20):
+        self.negative_top_k = top_k
         return []
 
     def search(self, query_vector, top_k=20):
+        self.positive_top_k = top_k
         return [
             {
                 "score": 0.91,
@@ -60,6 +66,9 @@ class ReloadingRouteManager:
         route = self.get_route(route_id)
         return route.score_threshold if route else None
 
+    def get_all_routes(self):
+        return [self.route, self.route.model_copy(update={"id": 2, "route_key": "other"})]
+
 
 class FakeComponentManager:
     def __init__(self):
@@ -80,3 +89,5 @@ def test_predict_reloads_route_config_before_resolving_match_metadata():
     assert component_manager.route_manager.reload_called is True
     assert results[0].name == "New Route"
     assert results[0].route_key == "new.route"
+    assert component_manager.qdrant_client.positive_top_k == 2
+    assert component_manager.qdrant_client.negative_top_k == 2

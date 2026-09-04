@@ -36,6 +36,7 @@ class PredictionService:
         qdrant_client = self.component_manager.qdrant_client
         route_manager = self.component_manager.route_manager
         route_manager.reload()
+        result_limit = max(1, len(route_manager.get_all_routes()))
 
         # 1. 向量化
         query_vector = encoder.encode_single(request.text)
@@ -44,7 +45,7 @@ class PredictionService:
         # 2. 负例检查：先检查查询是否与任何负例向量过于接近
         excluded_route_ids = set()
         negative_search_results = qdrant_client.search_negative_samples(
-            query_vector, top_k=20
+            query_vector, top_k=result_limit
         )
 
         for neg_result in negative_search_results:
@@ -65,8 +66,7 @@ class PredictionService:
                 )
 
         # 3. 相似度检索 (获取较多的候选结果以便过滤)
-        top_k = 20
-        search_results = qdrant_client.search(query_vector, top_k=top_k)
+        search_results = qdrant_client.search(query_vector, top_k=result_limit)
         logger.debug(f"Search raw result count: {len(search_results)}")
 
         if not search_results:

@@ -352,9 +352,9 @@ class IntentHubQdrantClient:
         try:
             from qdrant_client.models import MatchValue
 
-            results = self.client.query_points(
-                collection_name=self.collection_name,
-                query=query_vector,
+            return self._search_grouped(
+                query_vector=query_vector,
+                top_k=top_k,
                 query_filter=Filter(
                     must_not=[
                         FieldCondition(
@@ -366,30 +366,40 @@ class IntentHubQdrantClient:
                         ),
                     ]
                 ),
-                limit=top_k,
-                with_payload=True,
             )
-
-            search_results = []
-            for point in results.points:
-                search_results.append(
-                    {
-                        "score": point.score,
-                        "payload": {
-                            self.ROUTE_ID_KEY: point.payload.get(self.ROUTE_ID_KEY),
-                            self.ROUTE_NAME_KEY: point.payload.get(self.ROUTE_NAME_KEY),
-                            self.UTTERANCE_KEY: point.payload.get(self.UTTERANCE_KEY),
-                            self.SCORE_THRESHOLD_KEY: point.payload.get(
-                                self.SCORE_THRESHOLD_KEY
-                            ),
-                        },
-                    }
-                )
-
-            return search_results
         except Exception as e:
             logger.error(f"Vector search failed: {e}", exc_info=True)
             raise
+
+    def _search_grouped(
+        self,
+        query_vector: List[float],
+        top_k: int,
+        query_filter: Filter,
+    ) -> List[Dict[str, Any]]:
+        """Return the best matching point for each route."""
+        results = self.client.query_points_groups(
+            collection_name=self.collection_name,
+            query=query_vector,
+            group_by=self.ROUTE_ID_KEY,
+            group_size=1,
+            limit=top_k,
+            query_filter=query_filter,
+            with_payload=True,
+        )
+
+        search_results = []
+        for group in results.groups:
+            if not group.hits:
+                continue
+            point = group.hits[0]
+            search_results.append(
+                {
+                    "score": point.score,
+                    "payload": point.payload or {},
+                }
+            )
+        return search_results
 
     def delete_all(self):
         """清空Collection中的所有向量点"""
@@ -661,10 +671,9 @@ class IntentHubQdrantClient:
             from qdrant_client.models import MatchValue
 
             # 只搜索负例向量
-            results = self.client.query_points(
-                collection_name=self.collection_name,
-                query=query_vector,
-                limit=top_k,
+            return self._search_grouped(
+                query_vector=query_vector,
+                top_k=top_k,
                 query_filter=Filter(
                     must=[
                         FieldCondition(
@@ -678,26 +687,7 @@ class IntentHubQdrantClient:
                         )
                     ],
                 ),
-                with_payload=True,
             )
-
-            search_results = []
-            for point in results.points:
-                search_results.append(
-                    {
-                        "score": point.score,
-                        "payload": {
-                            self.ROUTE_ID_KEY: point.payload.get(self.ROUTE_ID_KEY),
-                            self.ROUTE_NAME_KEY: point.payload.get(self.ROUTE_NAME_KEY),
-                            self.UTTERANCE_KEY: point.payload.get(self.UTTERANCE_KEY),
-                            self.NEGATIVE_THRESHOLD_KEY: point.payload.get(
-                                self.NEGATIVE_THRESHOLD_KEY, 0.95
-                            ),
-                        },
-                    }
-                )
-
-            return search_results
         except Exception as e:
             logger.error(f"Negative vector search failed: {e}", exc_info=True)
             raise

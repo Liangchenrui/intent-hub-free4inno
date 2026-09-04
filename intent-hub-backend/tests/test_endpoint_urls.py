@@ -77,9 +77,10 @@ class CaptureQdrantClient:
     def upsert(self, collection_name, points):
         self.points = points
 
-    def query_points(self, **kwargs):
+    def query_points_groups(self, **kwargs):
         self.query_filter = kwargs["query_filter"]
-        return type("Result", (), {"points": []})()
+        self.query_kwargs = kwargs
+        return type("Result", (), {"groups": []})()
 
 
 def test_route_metadata_is_complete_and_excluded_from_search():
@@ -108,3 +109,5 @@ def test_route_metadata_is_complete_and_excluded_from_search():
     excluded_keys = {condition.key for condition in wrapper.client.query_filter.must_not}
     assert wrapper.IS_ROUTE_METADATA_KEY in excluded_keys
     assert wrapper.IS_NEGATIVE_KEY in excluded_keys
+    assert wrapper.client.query_kwargs["group_by"] == wrapper.ROUTE_ID_KEY
+    assert wrapper.client.query_kwargs["group_size"] == 1

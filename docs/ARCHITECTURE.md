@@ -24,7 +24,9 @@ Each synced route also has one recovery-only Qdrant point containing the complet
 
 Route configuration is the source of truth and Qdrant is a derived index. Route writes atomically persist `routes.json`, increment a route version, enqueue a durable task in `sync_tasks.json`, and return without waiting for embedding or Qdrant. A single background worker coalesces queued edits, retries transient failures, and marks a route synced only when the indexed version still matches the current local version. Route IDs are stable and monotonically allocated through `routes.json.sequence`.
 
-Manual full reindex remains available for embedding-model or collection migrations. Normal create, update, delete, feedback, import, and repair operations use route-scoped background synchronization. Diagnostics refresh runs as a separate asynchronous phase after indexing, so it does not delay save or index readiness.
+The normal manual sync endpoint enqueues a durable `incremental_reindex` task and returns before initializing Embedding or Qdrant. The worker compares local route hashes with Qdrant metadata, embeds only new or changed routes, deletes removed routes, and records its counts on the task. Repeated requests coalesce while a scan is queued; a request made during a running scan creates one follow-up scan so concurrent edits are not missed.
+
+Explicit full reindex remains available for embedding-model or collection migrations. Normal create, update, delete, feedback, import, and repair operations use route-scoped background synchronization. Diagnostics refresh runs as a separate asynchronous phase after indexing, so it does not delay save or index readiness.
 
 Manual reindex writes Qdrant points in bounded batches and verifies the final point count, route IDs, and route hashes. Incremental reindex rejects an unexpectedly large deletion set according to `MAX_DELETE_RATIO`; an intentional large replacement must use the explicit full-reindex path.
 

@@ -181,6 +181,7 @@ import { ChatLineRound } from '@element-plus/icons-vue';
 import {
   clearSession,
   getRoutes,
+  getSyncTasks,
   deleteNegativeRouteFeedback,
   deletePositiveRouteFeedback,
   predict,
@@ -189,6 +190,7 @@ import {
   submitPositiveRouteFeedback,
   type PredictResult,
   type RouteConfig,
+  type SyncTask,
 } from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 import ServiceHealthIndicators from '../components/ServiceHealthIndicators.vue';
@@ -202,6 +204,7 @@ const loading = ref(false);
 const hasTested = ref(false);
 const activeTab = ref('test');
 const reindexing = ref(false);
+const reindexTaskId = ref<string>();
 const feedbackState = ref<Record<number, 'positive' | 'negative' | undefined>>({});
 const feedbackPending = ref<Record<number, boolean | undefined>>({});
 
@@ -220,11 +223,50 @@ const refreshRouteSyncState = async () => {
 let syncPollTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
   refreshRouteSyncState();
+  refreshReindexTask();
   syncPollTimer = setInterval(() => {
     if (!hasFullReindex.value) refreshRouteSyncState();
+    if (reindexing.value || reindexTaskId.value) refreshReindexTask();
   }, 2000);
 });
 onBeforeUnmount(() => syncPollTimer && clearInterval(syncPollTimer));
+
+const refreshReindexTask = async () => {
+  try {
+    const tasks = (await getSyncTasks()).data;
+    let task: SyncTask | undefined;
+    if (reindexTaskId.value) {
+      task = tasks.find(item => item.id === reindexTaskId.value);
+    } else {
+      task = [...tasks].reverse().find(item =>
+        item.kind === 'incremental_reindex' && ['queued', 'running'].includes(item.status)
+      );
+      if (task) reindexTaskId.value = task.id;
+    }
+    if (!task) return;
+    if (['queued', 'running'].includes(task.status)) {
+      reindexing.value = true;
+      return;
+    }
+
+    reindexing.value = false;
+    reindexTaskId.value = undefined;
+    await refreshRouteSyncState();
+    if (task.status === 'succeeded') {
+      const result = task.result || {};
+      ElMessage.success(t('agent.reindexSuccessDetail', {
+        created: result.new_routes || 0,
+        updated: result.updated_routes || 0,
+        deleted: result.deleted_routes || 0,
+        skipped: result.skipped_routes || 0,
+      }));
+    } else if (task.status === 'error') {
+      ElMessage.error(t('test.reindexErrorDetail', { detail: task.error || t('test.reindexError') }));
+    }
+  } catch (_) {
+    // Route readiness polling remains available if task polling is temporarily unavailable.
+  }
+};
 
 // Backend route versions are the source of truth for index readiness.
 const hasFullReindex = computed(() => {
@@ -251,16 +293,15 @@ const handleReindex = async () => {
     await ElMessageBox.confirm(t('agent.reindexConfirm'), t('agent.reindexTitle'));
     reindexing.value = true;
     try {
-      const response = await reindex(true);
-      const { message, routes_count, total_points } = response.data;
-      await refreshRouteSyncState();
-      ElMessage.success(`${message} (${t('nav.list')}: ${routes_count}, ${t('agent.utterances')}: ${total_points})`);
+      const response = await reindex();
+      reindexTaskId.value = response.data.id;
+      ElMessage.success(t('agent.reindexQueued'));
+      refreshReindexTask();
     } catch (error: any) {
+      reindexing.value = false;
       const detail = error?.response?.data?.detail || error?.response?.data?.error || error?.message || t('test.reindexError');
       ElMessage.error(t('test.reindexErrorDetail', { detail }));
       await refreshRouteSyncState();
-    } finally {
-      reindexing.value = false;
     }
   } catch (e) {
     // 用户取消

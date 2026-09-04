@@ -129,6 +129,44 @@ class SyncTaskService:
             self._condition.notify_all()
             return dict(queued)
 
+    def enqueue_incremental_reindex(self) -> dict[str, Any]:
+        """Queue one hash-based index scan without touching remote services."""
+        with self._condition:
+            queued = next(
+                (
+                    task
+                    for task in reversed(self._tasks)
+                    if task["kind"] == "incremental_reindex"
+                    and task["status"] == "queued"
+                ),
+                None,
+            )
+            if queued is None:
+                queued = {
+                    "id": uuid.uuid4().hex,
+                    "kind": "incremental_reindex",
+                    "route_ids": [],
+                    "route_versions": {},
+                    "status": "queued",
+                    "attempts": 0,
+                    "next_attempt_at": 0.0,
+                    "created_at": _utc_now(),
+                    "updated_at": _utc_now(),
+                    "error": None,
+                    "result": None,
+                }
+                self._tasks.append(queued)
+            else:
+                queued["updated_at"] = _utc_now()
+                queued["error"] = None
+                queued["next_attempt_at"] = 0.0
+
+            self._save_tasks()
+            if self._autostart:
+                self.start()
+            self._condition.notify_all()
+            return dict(queued)
+
     def list_tasks(self, active_only: bool = False) -> list[dict[str, Any]]:
         with self._lock:
             tasks = self._tasks
@@ -184,7 +222,7 @@ class SyncTaskService:
             self._save_tasks()
 
         try:
-            self._execute_route_task(task)
+            self._execute_task(task)
         except Exception as exc:
             self._handle_failure(task, exc)
         else:
@@ -194,11 +232,16 @@ class SyncTaskService:
                 task["updated_at"] = _utc_now()
                 task["error"] = None
                 self._save_tasks()
-            self._refresh_diagnostics_if_idle()
+            if task["kind"] != "incremental_reindex":
+                self._refresh_diagnostics_if_idle()
         return True
 
-    def _execute_route_task(self, task: dict[str, Any]) -> None:
+    def _execute_task(self, task: dict[str, Any]) -> None:
         with SyncService.execution_lock:
+            if task["kind"] == "incremental_reindex":
+                sync_service = self.sync_service_factory(self.component_manager)
+                task["result"] = sync_service.reindex(force_full=False)
+                return
             self._execute_route_task_locked(task)
 
     def _execute_route_task_locked(self, task: dict[str, Any]) -> None:

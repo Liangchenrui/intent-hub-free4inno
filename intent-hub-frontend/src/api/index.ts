@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type AxiosResponse } from 'axios';
 
 const api = axios.create({
   baseURL: '/api',
@@ -92,11 +92,20 @@ export interface RouteSyncMeta {
 
 export interface SyncTask {
   id: string;
-  kind: 'route_sync' | 'full_reindex';
+  kind: 'route_sync' | 'incremental_reindex' | 'full_reindex';
   route_ids: number[];
   status: string;
   attempts: number;
   error?: string | null;
+  result?: {
+    mode?: string;
+    routes_count?: number;
+    new_routes?: number;
+    updated_routes?: number;
+    deleted_routes?: number;
+    skipped_routes?: number;
+    total_points?: number;
+  } | null;
 }
 
 export interface RouteConfig {
@@ -308,8 +317,11 @@ export interface ReindexResponse {
   total_points: number;
 }
 
-export const reindex = (forceFull: boolean = false) =>
-  api.post<ReindexResponse>('/reindex', { force_full: forceFull });
+export function reindex(forceFull: true): Promise<AxiosResponse<ReindexResponse>>;
+export function reindex(forceFull?: false): Promise<AxiosResponse<SyncTask>>;
+export function reindex(forceFull: boolean = false): Promise<AxiosResponse<ReindexResponse | SyncTask>> {
+  return api.post<ReindexResponse | SyncTask>('/reindex', { force_full: forceFull });
+}
 
 export const predict = (text: string) => api.post<PredictResult[]>('/predict', { text });
 export const submitPositiveRouteFeedback = (routeId: number, text: string) =>

@@ -73,3 +73,64 @@ def test_index_validation_checks_points_routes_and_hashes():
 
     with pytest.raises(RuntimeError, match="索引校验失败"):
         SyncService._validate_index([item], InvalidQdrant(), RouteManager())
+
+
+def test_incremental_sync_skips_route_when_hash_matches():
+    item = route(3)
+    item.sync = RouteConfig.RouteSync(status="synced", version=2, synced_version=2)
+
+    class RouteManager:
+        def reload(self):
+            pass
+
+        def get_all_routes(self):
+            return [item]
+
+        @staticmethod
+        def compute_route_hash(_route):
+            return "matching-hash"
+
+        def update_sync_state(self, *_args, **_kwargs):
+            raise AssertionError("an already-synced matching route must not be rewritten")
+
+    class Encoder:
+        def encode(self, _texts):
+            raise AssertionError("matching hashes must skip embedding")
+
+    class Qdrant:
+        metadata = []
+
+        @staticmethod
+        def get_existing_route_hashes():
+            return {3: "matching-hash"}
+
+        def delete_route(self, _route_id):
+            raise AssertionError("matching hashes must not delete vectors")
+
+        def upsert_route_metadata(self, route, **_kwargs):
+            self.metadata.append(route.id)
+
+        @staticmethod
+        def index_summary():
+            return {
+                "points_count": 3,
+                "route_ids": [3],
+                "route_hashes": {3: "matching-hash"},
+            }
+
+    manager = type(
+        "Manager",
+        (),
+        {
+            "ensure_ready": lambda self: None,
+            "route_manager": RouteManager(),
+            "qdrant_client": Qdrant(),
+            "encoder": Encoder(),
+        },
+    )()
+
+    result = SyncService(manager).reindex()
+
+    assert result["updated_routes"] == 0
+    assert result["skipped_routes"] == 1
+    assert manager.qdrant_client.metadata == [3]

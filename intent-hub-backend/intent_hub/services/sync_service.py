@@ -215,7 +215,15 @@ class SyncService:
                 synced_route = self._mark_synced_if_current(route.id, expected_version)
             else:
                 skipped_count += 1
-                synced_route = route
+                sync_state = route.sync
+                if (
+                    sync_state is None
+                    or sync_state.status != "synced"
+                    or sync_state.synced_version != expected_version
+                ):
+                    synced_route = self._mark_synced_if_current(route.id, expected_version)
+                else:
+                    synced_route = route
 
             # Always backfill the complete recovery record, including for unchanged
             # legacy routes that predate metadata points.

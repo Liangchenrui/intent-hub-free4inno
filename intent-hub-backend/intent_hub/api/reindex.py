@@ -10,21 +10,26 @@ from intent_hub.utils.error_handler import handle_errors
 
 @handle_errors
 def reindex():
-    """增量重新索引：只更新变化的路由
+    """Queue a hash-based incremental sync or run an explicit full rebuild.
 
-    支持可选参数：
-    - force_full: 如果为true，则执行全量重建（清空后重新创建）
+    The default path returns immediately and initializes remote components only
+    on the background worker. ``force_full=true`` remains an explicit,
+    synchronous recovery operation.
     """
     component_manager = get_component_manager()
-    component_manager.ensure_ready()
-
-    # 获取请求参数
     data = request.get_json() or {}
     force_full = data.get("force_full", False)
+    if not isinstance(force_full, bool):
+        return jsonify({"error": "force_full 必须是布尔值"}), 400
 
+    if not force_full:
+        task = get_sync_task_service(component_manager).enqueue_incremental_reindex()
+        return jsonify(task), 202
+
+    component_manager.ensure_ready()
     sync_service = SyncService(component_manager)
     with SyncService.execution_lock:
-        result = sync_service.reindex(force_full=force_full)
+        result = sync_service.reindex(force_full=True)
 
     return jsonify(result), 200
 

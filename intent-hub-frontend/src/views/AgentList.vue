@@ -428,11 +428,13 @@ import {
   reindex,
   importRoutes,
   importRouteFromSkill,
+  getSyncTasks,
   retrySyncTask,
   pullUpstreamAgents,
   getUpstreamRouteDiff,
   restoreUpstreamRouteFields,
   type RouteConfig,
+  type SyncTask,
   type UpstreamRouteDiff,
   type GenerateUtterancesRequest
 } from '../api';
@@ -447,6 +449,7 @@ const loading = ref(false);
 const saving = ref(false);
 const generating = ref(false);
 const reindexing = ref(false);
+const reindexTaskId = ref<string>();
 const importing = ref(false);
 const importingSkill = ref(false);
 const batchDeleting = ref(false);
@@ -514,13 +517,52 @@ const handleSearch = debounce(() => {
 let syncPollTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
   fetchAgents();
+  refreshReindexTask();
   syncPollTimer = setInterval(() => {
     if (agents.value.some(agent => ['pending', 'queued', 'syncing'].includes(agent.sync?.status || 'pending'))) {
       fetchAgents(searchQuery.value, true);
     }
+    if (reindexing.value || reindexTaskId.value) refreshReindexTask();
   }, 2000);
 });
 onBeforeUnmount(() => syncPollTimer && clearInterval(syncPollTimer));
+
+const refreshReindexTask = async () => {
+  try {
+    const tasks = (await getSyncTasks()).data;
+    let task: SyncTask | undefined;
+    if (reindexTaskId.value) {
+      task = tasks.find(item => item.id === reindexTaskId.value);
+    } else {
+      task = [...tasks].reverse().find(item =>
+        item.kind === 'incremental_reindex' && ['queued', 'running'].includes(item.status)
+      );
+      if (task) reindexTaskId.value = task.id;
+    }
+    if (!task) return;
+    if (['queued', 'running'].includes(task.status)) {
+      reindexing.value = true;
+      return;
+    }
+
+    reindexing.value = false;
+    reindexTaskId.value = undefined;
+    await fetchAgents(searchQuery.value, true);
+    if (task.status === 'succeeded') {
+      const result = task.result || {};
+      ElMessage.success(t('agent.reindexSuccessDetail', {
+        created: result.new_routes || 0,
+        updated: result.updated_routes || 0,
+        deleted: result.deleted_routes || 0,
+        skipped: result.skipped_routes || 0,
+      }));
+    } else if (task.status === 'error') {
+      ElMessage.error(t('agent.reindexErrorDetail', { detail: task.error || t('agent.reindexError') }));
+    }
+  } catch (_) {
+    // Route-level status polling remains available if task polling is temporarily unavailable.
+  }
+};
 
 const syncLabel = (status?: string) => t(`agent.syncStatus.${status || 'pending'}`);
 const syncTagType = (status?: string) => {
@@ -667,15 +709,17 @@ const handleReindex = async () => {
   try {
     await ElMessageBox.confirm(t('agent.reindexConfirm'), t('agent.reindexTitle'));
     reindexing.value = true;
-    const response = await reindex(true);
-    const { message, routes_count, total_points } = response.data;
-    ElMessage.success(`${message} (${t('nav.list')}: ${routes_count}, ${t('agent.utterances')}: ${total_points})`);
-    fetchAgents();
+    const response = await reindex();
+    reindexTaskId.value = response.data.id;
+    ElMessage.success(t('agent.reindexQueued'));
+    refreshReindexTask();
   } catch (e: any) {
+    if (e === 'cancel' || e === 'close') return;
+    reindexing.value = false;
     const detail = e?.response?.data?.detail || e?.response?.data?.error || e?.message || t('agent.reindexError');
     ElMessage.error(t('agent.reindexErrorDetail', { detail }));
     await fetchAgents(searchQuery.value, true);
-  } finally { reindexing.value = false; }
+  }
 };
 
 const triggerImport = () => {

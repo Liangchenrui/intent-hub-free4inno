@@ -46,9 +46,12 @@ class AgentSource:
         return agents
 
     def _get(self, path: str, params=None) -> dict[str, Any]:
+        token = str(Config.AGENT_API_TOKEN or "").strip()
+        if not token:
+            raise RuntimeError("AGENT_API_TOKEN 未在运行环境中配置")
         response = self.session.get(
             f"{Config.AGENT_API_URL}{path}",
-            headers={"Authorization": f"Bearer {Config.AGENT_API_TOKEN}"},
+            headers={"Authorization": f"Bearer {token}"},
             params=params,
             timeout=30,
         )

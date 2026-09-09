@@ -62,6 +62,7 @@ MANIFEST
 
 # Virtual environments
 .venv/
+.local-venv/
 venv/
 env/
 ENV/
@@ -100,6 +101,7 @@ intent-hub-backend/data/**
 !intent-hub-backend/data/tenants/default/
 !intent-hub-backend/data/tenants/default/*.example
 !intent-hub-backend/data/default_route.txt
+!intent-hub-backend/data/settings.example.json
 
 # Test artifacts
 pytest-cache-files-*/

@@ -39,9 +39,10 @@ def _probe(url: str, headers: dict[str, str] | None = None) -> dict:
 
 
 def check_external_services() -> dict:
+    qdrant_api_key = Config.require_qdrant_api_key()
     embedding_url = _service_root_url(Config.EMBEDDING_SERVICE_URL, "/health")
     qdrant_url = _service_root_url(Config.QDRANT_URL, "/healthz")
-    qdrant_headers = {"api-key": Config.QDRANT_API_KEY} if Config.QDRANT_API_KEY else None
+    qdrant_headers = {"api-key": qdrant_api_key}
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = {

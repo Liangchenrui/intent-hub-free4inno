@@ -1,12 +1,6 @@
 import axios from 'axios';
 
 const api = axios.create({ baseURL: '/api' });
-const AUTH_CODE = 'telestar';
-
-api.interceptors.request.use((config) => {
-  config.headers.Authorization = `Bearer ${AUTH_CODE}`;
-  return config;
-});
 
 export interface Agent {
   id: number;
@@ -82,12 +76,10 @@ export interface SyncStatus {
 export interface Settings {
   QDRANT_URL: string;
   QDRANT_COLLECTION: string;
-  QDRANT_API_KEY: string | null;
   EMBEDDING_SERVICE_URL: string;
   EMBEDDING_MODEL_NAME: string;
   BATCH_SIZE: number;
   LLM_PROVIDER: 'deepseek' | 'openrouter' | 'doubao' | 'qwen' | 'gemini';
-  LLM_API_KEY: string | null;
   LLM_BASE_URL: string | null;
   LLM_MODEL: string | null;
   LLM_TEMPERATURE: number;

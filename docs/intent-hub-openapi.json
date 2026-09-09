@@ -3,7 +3,7 @@
   "info": {
     "title": "Intent Hub API",
     "version": "1.1.0",
-    "description": "Agent synchronization and intent routing API protected by the fixed Bearer authentication code telestar."
+    "description": "Agent synchronization and intent routing API protected by a runtime-configured Bearer authentication code."
   },
   "servers": [
     {
@@ -272,7 +272,7 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "Static code (telestar)"
+        "bearerFormat": "Runtime-configured code"
       }
     },
     "responses": {

@@ -41,7 +41,7 @@ class LLMService:
 
     def _invoke(self, prompt: str):
         if not Config.LLM_API_KEY:
-            raise ValueError("请先在系统设置中配置 LLM API Key")
+            raise ValueError("请先在运行环境中配置 LLM API Key")
         if Config.LLM_PROVIDER == "gemini":
             model = Config.LLM_MODEL or "gemini-pro"
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={Config.LLM_API_KEY}"

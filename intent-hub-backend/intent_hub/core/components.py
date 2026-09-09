@@ -30,11 +30,12 @@ class ComponentManager:
         return self._qdrant_client
 
     def create_qdrant(self, collection_name: str):
+        api_key = Config.require_qdrant_api_key()
         return self.qdrant_client_factory(
             url=Config.QDRANT_URL,
             collection_name=collection_name,
             dimensions=self.encoder.dimensions,
-            api_key=Config.QDRANT_API_KEY,
+            api_key=api_key,
         )
 
     def reset_qdrant(self) -> None:

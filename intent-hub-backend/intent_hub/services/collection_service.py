@@ -27,9 +27,10 @@ class CollectionService:
 
     @staticmethod
     def _client() -> QdrantClient:
+        api_key = Config.require_qdrant_api_key()
         return QdrantClient(
             url=Config.QDRANT_URL.strip().rstrip("/"),
-            api_key=Config.QDRANT_API_KEY,
+            api_key=api_key,
             timeout=30,
             check_compatibility=False,
         )

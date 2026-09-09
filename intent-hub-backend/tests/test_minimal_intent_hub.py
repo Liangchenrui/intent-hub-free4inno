@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from tempfile import TemporaryDirectory
@@ -22,7 +23,8 @@ class Response:
         return self.payload
 
 
-def test_agent_source_fetches_search_and_details():
+def test_agent_source_fetches_search_and_details(monkeypatch):
+    monkeypatch.setattr(Config, "AGENT_API_TOKEN", "test-agent-api-token")
     class Session:
         def __init__(self):
             self.calls = []
@@ -63,7 +65,8 @@ def test_agent_source_fetches_search_and_details():
     assert len(session.calls) == 4
 
 
-def test_api_requires_static_auth_code_and_exposes_collection():
+def test_api_requires_configured_auth_code_and_exposes_collection(monkeypatch):
+    monkeypatch.setattr(Config, "AUTH_CODE", "test-auth-code")
     client = app.test_client()
     assert client.get("/agents").status_code == 401
     assert client.get("/agents", headers={"Authorization": "Bearer wrong"}).status_code == 401
@@ -294,7 +297,32 @@ def test_route_returns_all_agents_by_descending_score_or_default_file(monkeypatc
         }
 
 
-def test_route_api_uses_consistent_error_envelope():
+def test_bundled_defaults_are_user_friendly_safe_and_saveable(tmp_path, monkeypatch):
+    assert Config.DEFAULT_ROUTE_FILE.read_text(encoding="utf-8").strip() == (
+        "抱歉，我暂时没有找到匹配的服务。请补充想查询或办理的具体事项后再试。"
+    )
+
+    example_path = Path(__file__).resolve().parents[1] / "data" / "settings.example.json"
+    example = json.loads(example_path.read_text(encoding="utf-8"))
+
+    assert set(example) == Config.editable_keys()
+    assert example["BATCH_SIZE"] > 0
+    assert "LLM_API_KEY" not in example
+    assert "QDRANT_API_KEY" not in example
+
+    original = Config.to_dict()
+    monkeypatch.setattr(Config, "SETTINGS_FILE", tmp_path / "settings.json")
+    for key, value in original.items():
+        monkeypatch.setattr(Config, key, value)
+
+    Config.save(example)
+
+    saved = json.loads(Config.SETTINGS_FILE.read_text(encoding="utf-8"))
+    assert saved == example
+
+
+def test_route_api_uses_consistent_error_envelope(monkeypatch):
+    monkeypatch.setattr(Config, "AUTH_CODE", "test-auth-code")
     client = app.test_client()
 
     unauthorized = client.post("/route", json={"query": "天气"})

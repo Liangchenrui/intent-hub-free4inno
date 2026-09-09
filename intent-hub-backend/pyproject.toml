@@ -42,7 +42,7 @@ line-length = 100
 target-version = ['py39', 'py310', 'py311']
 
 [tool.pytest.ini_options]
-addopts = "--basetemp=.tmp/pytest -p no:cacheprovider"
+addopts = "--basetemp=pytest-cache-files-backend -p no:cacheprovider"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]

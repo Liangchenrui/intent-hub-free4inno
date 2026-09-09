@@ -16,7 +16,8 @@ def require_auth(function):
         authorization = request.headers.get("Authorization", "")
         bearer = authorization[7:].strip() if authorization.startswith("Bearer ") else ""
         key = bearer or request.headers.get("X-API-Key", "").strip()
-        if not hmac.compare_digest(key, Config.AUTH_CODE):
+        expected = str(Config.AUTH_CODE or "").strip()
+        if not expected or not key or not hmac.compare_digest(key, expected):
             return jsonify({
                 "success": False,
                 "data": None,

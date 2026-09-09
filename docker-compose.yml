@@ -10,6 +10,11 @@ services:
         - PIP_INDEX_URL=${PIP_INDEX_URL}
     container_name: intent-hub-backend
     image: ${IMAGE_PREFIX}intent-hub-backend:latest
+    environment:
+      - AGENT_API_TOKEN=${AGENT_API_TOKEN:?Set AGENT_API_TOKEN in the local environment file}
+      - QDRANT_API_KEY=${QDRANT_API_KEY:?Set QDRANT_API_KEY in the local environment file}
+      - LLM_API_KEY=${LLM_API_KEY:?Set LLM_API_KEY in the local environment file}
+      - AUTH_CODE=${INTENT_HUB_AUTH_CODE:?Set INTENT_HUB_AUTH_CODE in the local environment file}
     volumes:
       - ./intent-hub-backend/intent_hub:/app/intent_hub
       - ./intent-hub-backend/data:/app/data
@@ -28,6 +33,8 @@ services:
         - NPM_REGISTRY=${NPM_REGISTRY}
     container_name: intent-hub-frontend
     image: ${IMAGE_PREFIX}intent-hub-frontend:latest
+    environment:
+      - INTENT_HUB_AUTH_CODE=${INTENT_HUB_AUTH_CODE:?Set INTENT_HUB_AUTH_CODE in the local environment file}
     ports:
       - "80:80"
     depends_on:

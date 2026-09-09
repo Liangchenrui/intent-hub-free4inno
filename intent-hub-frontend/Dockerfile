@@ -20,8 +20,8 @@ FROM ${NGINX_BASE}
 # 复制构建好的静态文件到 nginx 的 html 目录
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# 复制 nginx 配置文件
-COPY nginx.conf /etc/nginx/nginx.conf
+# 官方 nginx 入口脚本会在启动时将环境变量注入 default.conf。
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 EXPOSE 80
 

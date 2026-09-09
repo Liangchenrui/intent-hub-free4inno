@@ -56,6 +56,7 @@ def test_restores_agent_text_from_qdrant_payload(tmp_path, monkeypatch):
 
 
 def test_collection_api_requires_auth_and_returns_options(monkeypatch):
+    monkeypatch.setattr(Config, "AUTH_CODE", "test-auth-code")
     expected = {"current": "routes", "collections": []}
     monkeypatch.setattr(
         "intent_hub.app.CollectionService.list_collections",

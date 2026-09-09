@@ -18,12 +18,12 @@
             <div class="field-hint">从所选 Collection 的向量 payload 恢复 Agent 正向与负向语料。</div>
           </el-form-item>
         </el-col>
-        <el-col :md="12" :xs="24"><el-form-item label="Qdrant API Key"><el-input v-model="settings.QDRANT_API_KEY" type="password" show-password /></el-form-item></el-col>
       </el-row>
+      <el-alert title="服务凭据由部署环境安全注入，管理页面不读取或修改。" type="info" :closable="false" show-icon />
       <el-divider content-position="left">Embedding</el-divider>
       <el-row :gutter="18"><el-col :md="12" :xs="24"><el-form-item label="服务地址"><el-input v-model="settings.EMBEDDING_SERVICE_URL" placeholder="请输入完整的 Embedding 接口地址" /></el-form-item></el-col></el-row>
       <el-divider content-position="left">LLM</el-divider>
-      <el-row :gutter="18"><el-col :md="6" :xs="24"><el-form-item label="Provider"><el-select v-model="settings.LLM_PROVIDER" class="full"><el-option v-for="item in providers" :key="item" :label="item" :value="item" /></el-select></el-form-item></el-col><el-col :md="9" :xs="24"><el-form-item label="API Key"><el-input v-model="settings.LLM_API_KEY" type="password" show-password /></el-form-item></el-col><el-col :md="9" :xs="24"><el-form-item label="模型"><el-input v-model="settings.LLM_MODEL" /></el-form-item></el-col><el-col :md="18" :xs="24"><el-form-item label="Base URL"><el-input v-model="settings.LLM_BASE_URL" /></el-form-item></el-col><el-col :md="6" :xs="24"><el-form-item label="Temperature"><el-input-number v-model="settings.LLM_TEMPERATURE" :min="0" :max="2" :step="0.1" /></el-form-item></el-col></el-row>
+      <el-row :gutter="18"><el-col :md="6" :xs="24"><el-form-item label="Provider"><el-select v-model="settings.LLM_PROVIDER" class="full"><el-option v-for="item in providers" :key="item" :label="item" :value="item" /></el-select></el-form-item></el-col><el-col :md="9" :xs="24"><el-form-item label="模型"><el-input v-model="settings.LLM_MODEL" /></el-form-item></el-col><el-col :md="18" :xs="24"><el-form-item label="Base URL"><el-input v-model="settings.LLM_BASE_URL" /></el-form-item></el-col><el-col :md="6" :xs="24"><el-form-item label="Temperature"><el-input-number v-model="settings.LLM_TEMPERATURE" :min="0" :max="2" :step="0.1" /></el-form-item></el-col></el-row>
       <el-divider content-position="left">提示词模板</el-divider>
       <el-form-item label="正向语料推荐"><el-input v-model="settings.UTTERANCE_GENERATION_PROMPT" type="textarea" :rows="5" /></el-form-item>
       <el-form-item label="负向语料推荐"><el-input v-model="settings.NEGATIVE_SAMPLE_GENERATION_PROMPT" type="textarea" :rows="5" /></el-form-item>

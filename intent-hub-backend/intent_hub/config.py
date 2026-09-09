@@ -1,6 +1,7 @@
 """Runtime configuration persisted in an atomic JSON settings file."""
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -26,10 +27,10 @@ class Config:
     DEFAULT_ROUTE_FILE = DATA_DIR / "default_route.txt"
 
     AGENT_API_URL = "https://yuanfang.bupt.edu.cn/ac/api"
-    AGENT_API_TOKEN = "0sQe_jpSY-uF2.zKLSz7"
+    AGENT_API_TOKEN = os.getenv("AGENT_API_TOKEN")
 
     QDRANT_URL = "http://192.168.33.1:31853"
-    QDRANT_API_KEY = "123456"
+    QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
     QDRANT_COLLECTION = "free4inno_skills"
 
     EMBEDDING_SERVICE_URL = "http://embedding.free4inno.com/embed"
@@ -41,7 +42,7 @@ class Config:
     SCORE_THRESHOLD = 0.8
     NEGATIVE_THRESHOLD = 0.95
     LLM_PROVIDER = "deepseek"
-    LLM_API_KEY: str | None = None
+    LLM_API_KEY: str | None = os.getenv("LLM_API_KEY")
     LLM_BASE_URL: str | None = "https://api.deepseek.com"
     LLM_MODEL: str | None = "deepseek-chat"
     LLM_TEMPERATURE = 0.7
@@ -50,7 +51,7 @@ class Config:
     AGENT_REPAIR_PROMPT = DEFAULT_AGENT_REPAIR_PROMPT
     REGION_THRESHOLD_SIGNIFICANT = 0.85
     INSTANCE_THRESHOLD_AMBIGUOUS = 0.92
-    AUTH_CODE = "telestar"
+    AUTH_CODE = os.getenv("AUTH_CODE")
 
     @classmethod
     def load(cls) -> None:
@@ -64,9 +65,9 @@ class Config:
     @classmethod
     def editable_keys(cls) -> set[str]:
         return {
-            "QDRANT_URL", "QDRANT_COLLECTION", "QDRANT_API_KEY",
+            "QDRANT_URL", "QDRANT_COLLECTION",
             "EMBEDDING_SERVICE_URL", "EMBEDDING_MODEL_NAME", "BATCH_SIZE",
-            "LLM_PROVIDER", "LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL",
+            "LLM_PROVIDER", "LLM_BASE_URL", "LLM_MODEL",
             "LLM_TEMPERATURE", "UTTERANCE_GENERATION_PROMPT",
             "NEGATIVE_SAMPLE_GENERATION_PROMPT", "AGENT_REPAIR_PROMPT",
             "REGION_THRESHOLD_SIGNIFICANT", "INSTANCE_THRESHOLD_AMBIGUOUS",
@@ -75,6 +76,13 @@ class Config:
     @classmethod
     def to_dict(cls) -> dict[str, Any]:
         return {key: getattr(cls, key) for key in sorted(cls.editable_keys())}
+
+    @classmethod
+    def require_qdrant_api_key(cls) -> str:
+        value = str(cls.QDRANT_API_KEY or "").strip()
+        if not value:
+            raise RuntimeError("QDRANT_API_KEY 未在运行环境中配置")
+        return value
 
     @classmethod
     def save(cls, values: dict[str, Any]) -> None:

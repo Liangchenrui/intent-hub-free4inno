@@ -1,0 +1,11 @@
+.env
+.env.*
+.git
+.pytest_cache
+__pycache__
+*.py[cod]
+tests
+# Runtime data is mounted at /app/data. Keep every current and future runtime
+# artifact out of image layers; only the documented non-secret template ships.
+data/*
+!data/settings.example.json

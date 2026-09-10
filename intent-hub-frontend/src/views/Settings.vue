@@ -24,6 +24,15 @@
       <el-row :gutter="18"><el-col :md="12" :xs="24"><el-form-item label="服务地址"><el-input v-model="settings.EMBEDDING_SERVICE_URL" placeholder="请输入完整的 Embedding 接口地址" /></el-form-item></el-col></el-row>
       <el-divider content-position="left">LLM</el-divider>
       <el-row :gutter="18"><el-col :md="6" :xs="24"><el-form-item label="Provider"><el-select v-model="settings.LLM_PROVIDER" class="full"><el-option v-for="item in providers" :key="item" :label="item" :value="item" /></el-select></el-form-item></el-col><el-col :md="9" :xs="24"><el-form-item label="模型"><el-input v-model="settings.LLM_MODEL" /></el-form-item></el-col><el-col :md="18" :xs="24"><el-form-item label="Base URL"><el-input v-model="settings.LLM_BASE_URL" /></el-form-item></el-col><el-col :md="6" :xs="24"><el-form-item label="Temperature"><el-input-number v-model="settings.LLM_TEMPERATURE" :min="0" :max="2" :step="0.1" /></el-form-item></el-col></el-row>
+      <el-divider content-position="left">未命中时的大模型兜底</el-divider>
+      <el-form-item label="启用兜底">
+        <el-switch v-model="settings.LLM_FALLBACK_ENABLED" />
+        <div class="field-hint">仅在现有路由未命中时使用上方模型，固定温度 0。启用前完成一次增量同步；模型可以拒绝匹配或提示补充信息。</div>
+      </el-form-item>
+      <el-row :gutter="18">
+        <el-col :md="12" :xs="24"><el-form-item label="候选意图数量"><el-input-number v-model="settings.LLM_FALLBACK_TOP_K" :min="1" :max="20" :step="1" :precision="0" :disabled="!settings.LLM_FALLBACK_ENABLED" /></el-form-item></el-col>
+        <el-col :md="12" :xs="24"><el-form-item label="模型调用超时（秒）"><el-input-number v-model="settings.LLM_FALLBACK_TIMEOUT_SECONDS" :min="1" :max="60" :step="1" :disabled="!settings.LLM_FALLBACK_ENABLED" /></el-form-item></el-col>
+      </el-row>
       <el-divider content-position="left">提示词模板</el-divider>
       <el-form-item label="正向语料推荐"><el-input v-model="settings.UTTERANCE_GENERATION_PROMPT" type="textarea" :rows="5" /></el-form-item>
       <el-form-item label="负向语料推荐"><el-input v-model="settings.NEGATIVE_SAMPLE_GENERATION_PROMPT" type="textarea" :rows="5" /></el-form-item>

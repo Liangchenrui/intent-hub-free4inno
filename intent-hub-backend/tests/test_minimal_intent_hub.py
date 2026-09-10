@@ -104,6 +104,10 @@ def test_sync_keeps_existing_qdrant_payload_inputs():
         routes = []
         upsert_calls = 0
 
+        def get_description_embedding(self, agent, model):
+            return next((route["description_embedding"] for route in self.routes
+                         if route["route_id"] == agent.id), None)
+
         def delete_routes(self, route_ids):
             self.deleted_routes = route_ids
 
@@ -114,7 +118,7 @@ def test_sync_keeps_existing_qdrant_payload_inputs():
         def index_summary(self):
             return {
                 "points_count": sum(
-                    len(route["utterances"]) + len(route["negative_samples"])
+                    len(route["utterances"]) + len(route["negative_samples"]) + 1
                     for route in self.routes
                 ),
                 "route_ids": sorted(route["route_id"] for route in self.routes),
@@ -196,7 +200,7 @@ def test_full_sync_replaces_configured_collection(monkeypatch):
         def index_summary(self):
             route = self.routes[0]
             return {
-                "points_count": 1,
+                "points_count": 2,
                 "route_ids": [7],
                 "route_hashes": {7: route["route_hash"]},
             }
@@ -283,6 +287,8 @@ def test_route_returns_all_agents_by_descending_score_or_default_file(monkeypatc
             {"agent": {"id": 8, "title": "旅行 Agent"}, "score": 0.86},
         ],
         "text": None,
+        "match_source": "semantic",
+        "fallback_status": None,
     }
 
     with TemporaryDirectory() as directory:
@@ -294,6 +300,8 @@ def test_route_returns_all_agents_by_descending_score_or_default_file(monkeypatc
             "matched": False,
             "agents": [],
             "text": "交给调用方处理",
+            "match_source": "default",
+            "fallback_status": None,
         }
 
 

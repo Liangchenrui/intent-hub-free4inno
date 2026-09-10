@@ -8,12 +8,16 @@ from pathlib import Path
 
 from intent_hub.agent_compare import normalize_corpus
 from intent_hub.config import Config
+from intent_hub.intent_description import description_hash, description_text
 
 
 def agent_hash(agent) -> str:
     payload = {
         "id": agent.id,
         "title": agent.title,
+        "text": agent.text,
+        "description_index_version": 1,
+        "embedding_model": Config.EMBEDDING_MODEL_NAME,
         "utterances": normalize_corpus(agent.utterances),
         "negative_samples": normalize_corpus(agent.negative_samples),
         "score_threshold": agent.score_threshold,
@@ -74,7 +78,7 @@ class SyncService:
         if agent_ids is not None:
             selected = set(agent_ids)
             agents = [agent for agent in agents if agent.id in selected]
-        return agents
+        return [agent.model_copy(deep=True) for agent in agents]
 
     def _incremental_sync(self, connection, agents, agent_ids=None) -> dict:
         if getattr(self, "_legacy_empty", False):
@@ -90,11 +94,14 @@ class SyncService:
         else:
             selected = set(agent_ids)
             deleted_ids = {agent_id for agent_id in selected if agent_id in saved_hashes and agent_id not in current_hashes}
-        changed = [agent for agent in agents if saved_hashes.get(agent.id) != current_hashes[agent.id]]
         qdrant = self.components.qdrant_client
+        descriptions = {agent.id: qdrant.get_description_embedding(agent, Config.EMBEDDING_MODEL_NAME)
+                        for agent in agents}
+        changed = [agent for agent in agents if saved_hashes.get(agent.id) != current_hashes[agent.id]
+                   or descriptions[agent.id] is None]
         # Route-level replacement guarantees removed and renamed corpus points cannot remain stale.
         qdrant.delete_routes({agent.id for agent in changed} | deleted_ids)
-        self._upsert_agents(qdrant, changed)
+        self._upsert_agents(qdrant, changed, descriptions)
 
         merged_hashes = dict(saved_hashes)
         for agent_id in deleted_ids:
@@ -119,11 +126,12 @@ class SyncService:
         result["collection"] = collection
         return result
 
-    def _encode_routes(self, agents):
+    def _encode_routes(self, agents, descriptions=None):
         routes = []
         for agent in agents:
-            if not agent.utterances:
-                continue
+            embedding = (descriptions or {}).get(agent.id)
+            if embedding is None:
+                embedding = self.components.encoder.encode([description_text(agent)])[0]
             routes.append({
                 "route_id": agent.id, "route_name": agent.title,
                 "utterances": agent.utterances,
@@ -133,12 +141,14 @@ class SyncService:
                 "score_threshold": agent.score_threshold,
                 "negative_threshold": agent.negative_threshold,
                 "route_hash": agent_hash(agent), "model_name": Config.EMBEDDING_MODEL_NAME,
+                "description_embedding": embedding,
+                "description_version": description_hash(agent, Config.EMBEDDING_MODEL_NAME),
             })
         return routes
 
-    def _upsert_agents(self, qdrant, agents) -> None:
+    def _upsert_agents(self, qdrant, agents, descriptions=None) -> None:
         for start in range(0, len(agents), Config.QDRANT_WRITE_BATCH_SIZE):
-            routes = self._encode_routes(agents[start:start + Config.QDRANT_WRITE_BATCH_SIZE])
+            routes = self._encode_routes(agents[start:start + Config.QDRANT_WRITE_BATCH_SIZE], descriptions)
             if routes:
                 qdrant.upsert_routes(routes, batch_size=Config.QDRANT_WRITE_BATCH_SIZE)
 
@@ -149,9 +159,9 @@ class SyncService:
 
     @staticmethod
     def _validate(qdrant, agents):
-        indexed = [agent for agent in agents if agent.utterances]
+        indexed = agents
         expected_hashes = {agent.id: agent_hash(agent) for agent in indexed}
-        expected_points = sum(len(agent.utterances) + len(agent.negative_samples) for agent in indexed)
+        expected_points = sum(len(agent.utterances) + len(agent.negative_samples) + 1 for agent in indexed)
         actual = qdrant.index_summary()
         if actual["points_count"] != expected_points or actual["route_ids"] != sorted(expected_hashes) or actual["route_hashes"] != expected_hashes:
             raise RuntimeError(f"Qdrant 校验失败：期望 {expected_points} points，实际 {actual['points_count']}")
@@ -174,8 +184,8 @@ class SyncService:
 
     @staticmethod
     def _result(mode, agents, changed_agents, deleted_agents):
-        indexed = [agent for agent in agents if agent.utterances]
-        return {"mode": mode, "agents_count": len(agents), "indexed_agents_count": len(indexed), "changed_agents": changed_agents, "deleted_agents": deleted_agents, "unchanged_agents": len(agents) - changed_agents, "positive_points": sum(len(a.utterances) for a in indexed), "negative_points": sum(len(a.negative_samples) for a in indexed)}
+        indexed = agents
+        return {"mode": mode, "agents_count": len(agents), "indexed_agents_count": len(indexed), "changed_agents": changed_agents, "deleted_agents": deleted_agents, "unchanged_agents": len(agents) - changed_agents, "positive_points": sum(len(a.utterances) for a in indexed), "negative_points": sum(len(a.negative_samples) for a in indexed), "description_points": len(indexed)}
 
     @staticmethod
     def _empty_result(mode):
@@ -188,8 +198,8 @@ class SyncService:
     def status(self) -> dict:
         all_agents = self.components.agent_store.all()
         active = self._active_agents()
-        hashes = {agent.id: agent_hash(agent) for agent in active if agent.utterances}
-        expected_points = sum(len(agent.utterances) + len(agent.negative_samples) for agent in active if agent.utterances)
+        hashes = {agent.id: agent_hash(agent) for agent in active}
+        expected_points = sum(len(agent.utterances) + len(agent.negative_samples) + 1 for agent in active)
         actual = self.components.qdrant_client.index_summary()
         synced = actual["points_count"] == expected_points and actual["route_ids"] == sorted(hashes) and actual["route_hashes"] == hashes
         connection = self._open_state()

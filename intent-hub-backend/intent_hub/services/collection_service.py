@@ -81,6 +81,9 @@ class CollectionService:
             for point in points:
                 points_count += 1
                 payload = point.payload or {}
+                if payload.get("is_route_metadata") is True:
+                    skipped_points += 1
+                    continue
                 try:
                     route_id = int(payload.get("route_id"))
                 except (TypeError, ValueError):

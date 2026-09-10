@@ -46,6 +46,9 @@ class Config:
     LLM_BASE_URL: str | None = "https://api.deepseek.com"
     LLM_MODEL: str | None = "deepseek-chat"
     LLM_TEMPERATURE = 0.7
+    LLM_FALLBACK_ENABLED = False
+    LLM_FALLBACK_TOP_K = 5
+    LLM_FALLBACK_TIMEOUT_SECONDS = 8.0
     UTTERANCE_GENERATION_PROMPT = DEFAULT_UTTERANCE_GENERATION_PROMPT
     NEGATIVE_SAMPLE_GENERATION_PROMPT = DEFAULT_NEGATIVE_SAMPLE_GENERATION_PROMPT
     AGENT_REPAIR_PROMPT = DEFAULT_AGENT_REPAIR_PROMPT
@@ -69,6 +72,7 @@ class Config:
             "EMBEDDING_SERVICE_URL", "EMBEDDING_MODEL_NAME", "BATCH_SIZE",
             "LLM_PROVIDER", "LLM_BASE_URL", "LLM_MODEL",
             "LLM_TEMPERATURE", "UTTERANCE_GENERATION_PROMPT",
+            "LLM_FALLBACK_ENABLED", "LLM_FALLBACK_TOP_K", "LLM_FALLBACK_TIMEOUT_SECONDS",
             "NEGATIVE_SAMPLE_GENERATION_PROMPT", "AGENT_REPAIR_PROMPT",
             "REGION_THRESHOLD_SIGNIFICANT", "INSTANCE_THRESHOLD_AMBIGUOUS",
         }
@@ -91,6 +95,7 @@ class Config:
             raise ValueError(f"不支持的设置项: {', '.join(sorted(unknown))}")
         merged = cls.to_dict()
         merged.update(values)
+        cls.validate_fallback_settings(merged)
         for required in ("QDRANT_URL", "QDRANT_COLLECTION", "EMBEDDING_SERVICE_URL"):
             if not str(merged.get(required) or "").strip():
                 raise ValueError(f"{required} 不能为空")
@@ -105,6 +110,20 @@ class Config:
         temp.replace(cls.SETTINGS_FILE)
         for key, value in merged.items():
             setattr(cls, key, value)
+
+    @classmethod
+    def validate_fallback_settings(cls, values: dict[str, Any]) -> None:
+        import math
+
+        enabled = values.get("LLM_FALLBACK_ENABLED", cls.LLM_FALLBACK_ENABLED)
+        top_k = values.get("LLM_FALLBACK_TOP_K", cls.LLM_FALLBACK_TOP_K)
+        timeout = values.get("LLM_FALLBACK_TIMEOUT_SECONDS", cls.LLM_FALLBACK_TIMEOUT_SECONDS)
+        if type(enabled) is not bool:
+            raise ValueError("LLM_FALLBACK_ENABLED must be a boolean")
+        if type(top_k) is not int or not 1 <= top_k <= 20:
+            raise ValueError("LLM_FALLBACK_TOP_K must be an integer between 1 and 20")
+        if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 1 <= timeout <= 60:
+            raise ValueError("LLM_FALLBACK_TIMEOUT_SECONDS must be between 1 and 60")
 
     @classmethod
     def save_collection(cls, collection: str) -> None:

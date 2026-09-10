@@ -1,0 +1,19 @@
+Command: npm run build (intent-hub-frontend)
+Date: 2026-09-10; captured from this adaptation's tool output.
+
+> intent-hub-frontend@0.0.0 build
+> vue-tsc -b && vite build
+
+vite v7.3.1 building client environment for production...
+transforming...
+✓ 1505 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.47 kB │ gzip:   0.30 kB
+dist/assets/logo-B8aBuugL.png      15.75 kB
+dist/assets/index-B_zz6pNy.css    364.17 kB │ gzip:  50.54 kB
+dist/assets/index-Dci2sPZU.js   1,093.90 kB │ gzip: 359.25 kB
+
+(!) Some chunks are larger than 500 kB after minification.
+✓ built in 10.71s
+Exit code: 0

@@ -35,6 +35,7 @@ def test_restores_agent_text_from_qdrant_payload(tmp_path, monkeypatch):
     store = AgentStore(tmp_path / "agents.db")
     store.upsert(Agent(id=7, title="原名称", utterances=["旧语料"]))
     points = [
+        SimpleNamespace(payload={"route_id": 7, "route_name": "metadata", "utterance": "不是语料", "is_route_metadata": True}),
         SimpleNamespace(payload={"route_id": 7, "route_name": "天气", "utterance": "查天气", "score_threshold": 0.8}),
         SimpleNamespace(payload={"route_id": 7, "route_name": "天气", "utterance": "写代码", "is_negative": True, "negative_threshold": 0.95}),
     ]

@@ -22,7 +22,7 @@
     "/route": {
       "post": {
         "tags": ["Routing"],
-        "summary": "Route a user query to the best matching Agent",
+        "summary": "Return all threshold matches, or optionally use definition-based LLM fallback",
         "operationId": "routeQuery",
         "security": [{"bearerAuth": []}],
         "requestBody": {
@@ -47,9 +47,10 @@
                       "success": true,
                       "data": {
                         "matched": true,
-                        "agent": {"id": 7, "title": "天气 Agent"},
-                        "score": 0.91,
-                        "text": null
+                        "agents": [{"agent": {"id": 7, "title": "天气 Agent"}, "score": 0.91}],
+                        "text": null,
+                        "match_source": "semantic",
+                        "fallback_status": null
                       },
                       "error": null
                     }
@@ -60,9 +61,10 @@
                       "success": true,
                       "data": {
                         "matched": false,
-                        "agent": null,
-                        "score": null,
-                        "text": "none"
+                        "agents": [],
+                        "text": "none",
+                        "match_source": "default",
+                        "fallback_status": "no_match"
                       },
                       "error": null
                     }
@@ -206,7 +208,7 @@
     "/settings": {
       "get": {
         "tags": ["Settings"],
-        "summary": "Get the Qdrant collection setting",
+        "summary": "Get non-secret runtime settings including LLM fallback controls",
         "operationId": "getSettings",
         "security": [{"bearerAuth": []}],
         "responses": {
@@ -223,7 +225,7 @@
       },
       "post": {
         "tags": ["Settings"],
-        "summary": "Update the Qdrant collection setting",
+        "summary": "Update non-secret runtime settings including LLM fallback controls",
         "operationId": "updateSettings",
         "security": [{"bearerAuth": []}],
         "requestBody": {
@@ -236,10 +238,10 @@
         },
         "responses": {
           "200": {
-            "description": "Updated settings",
+            "description": "Updated settings and confirmation message",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/Settings"}
+                "schema": {"type": "object", "properties": {"message": {"type": "string"}, "settings": {"$ref": "#/components/schemas/Settings"}}}
               }
             }
           },
@@ -347,20 +349,21 @@
       },
       "RouteData": {
         "type": "object",
-        "required": ["matched", "agent", "score", "text"],
+        "required": ["matched", "agents", "text", "match_source", "fallback_status"],
         "properties": {
           "matched": {"type": "boolean"},
-          "agent": {
-            "allOf": [{"$ref": "#/components/schemas/AgentDetails"}],
-            "nullable": true
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["agent", "score"],
+              "properties": {
+                "agent": {"$ref": "#/components/schemas/AgentDetails"},
+                "score": {"type": "number", "nullable": true, "description": "Utterance vector similarity; null for LLM fallback"}
+              }
+            }
           },
-          "score": {
-            "type": "number",
-            "format": "float",
-            "minimum": 0,
-            "maximum": 1,
-            "nullable": true
-          },
+          "match_source": {"type": "string", "enum": ["semantic", "llm_fallback", "default"]},
+          "fallback_status": {"type": "string", "nullable": true, "enum": ["matched", "no_match", "ambiguous", "no_candidates", "unavailable", null]},
           "text": {"type": "string", "nullable": true}
         }
       },
@@ -453,9 +456,12 @@
       },
       "Settings": {
         "type": "object",
-        "required": ["QDRANT_COLLECTION"],
+        "description": "Non-secret settings. POST accepts a partial update; credentials must be injected through the environment.",
         "properties": {
-          "QDRANT_COLLECTION": {"type": "string"}
+          "QDRANT_COLLECTION": {"type": "string"},
+          "LLM_FALLBACK_ENABLED": {"type": "boolean", "default": false},
+          "LLM_FALLBACK_TOP_K": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
+          "LLM_FALLBACK_TIMEOUT_SECONDS": {"type": "number", "minimum": 1, "maximum": 60, "default": 8, "description": "Deadline for the model call only; excludes embedding and vector retrieval"}
         }
       },
       "HealthResponse": {

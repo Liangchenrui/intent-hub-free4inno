@@ -16,6 +16,7 @@
       <div v-if="!result.matched" class="fallback">
         <strong>未命中 Agent</strong>
         <p>{{ result.text }}</p>
+        <p v-if="result.fallback_status" class="fallback-detail">{{ fallbackMessages[result.fallback_status] }}</p>
       </div>
       <template v-else>
       <el-card
@@ -34,10 +35,12 @@
               <span>Agent ID: {{ match.agent.id }}</span>
             </div>
           </div>
-          <el-tag type="success" effect="plain">已通过阈值</el-tag>
+          <el-tag v-if="result.match_source === 'llm_fallback'" type="warning" effect="plain">大模型兜底</el-tag>
+          <el-tag v-else type="success" effect="plain">已通过阈值</el-tag>
         </div>
-        <div class="score-row">
-          <span>相关分数</span>
+        <p v-if="result.match_source === 'llm_fallback'" class="fallback-detail">根据意图职责匹配，不提供相似度分数。</p>
+        <div v-if="match.score != null" class="score-row">
+          <span>向量相似度</span>
           <el-progress
             :percentage="scorePercentage(match.score)"
             :stroke-width="12"
@@ -94,6 +97,13 @@ const query = ref('');
 const submittedQuery = ref('');
 const loading = ref(false);
 const result = ref<RouteData>();
+const fallbackMessages = {
+  matched: '根据意图职责匹配，不提供相似度分数。',
+  no_match: '候选意图均不适用，已保留默认回复。',
+  ambiguous: '请求存在歧义，请补充操作对象或希望完成的动作。',
+  no_candidates: '没有可用的意图候选，请检查 Agent 状态和向量同步。',
+  unavailable: '大模型兜底暂不可用，已返回默认回复。',
+};
 const feedbackStates = ref<Record<number, Feedback | undefined>>({});
 const feedbackPendingAgent = ref<number>();
 const scorePercentage = (score: number) => Math.min(100, Math.max(0, Math.round(score * 100)));
@@ -150,6 +160,7 @@ const handleFeedback = async (agentId: number, type: Feedback) => {
 .section-title strong { font-size: 17px; }
 .fallback strong { display: block; margin-bottom: 6px; }
 .fallback p { margin: 0; font-size: 13px; line-height: 1.6; }
+.fallback-detail { margin-top: 12px; color: #606266; font-size: 13px; line-height: 1.6; }
 .match-card { border: 1px solid #d9ecff; border-left: 4px solid #67c23a; background: #f5fbf2; }
 .match-card + .match-card { margin-top: 12px; }
 .match-card :deep(.el-card__body) { padding: 20px 22px; }

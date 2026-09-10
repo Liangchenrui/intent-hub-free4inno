@@ -50,9 +50,11 @@ export interface RouteData {
   matched: boolean;
   agents: Array<{
     agent: { id: number; title: string };
-    score: number;
+    score: number | null;
   }>;
   text: string | null;
+  match_source?: 'semantic' | 'llm_fallback' | 'default';
+  fallback_status?: 'matched' | 'no_match' | 'ambiguous' | 'no_candidates' | 'unavailable' | null;
 }
 
 export interface RouteResult {
@@ -83,6 +85,9 @@ export interface Settings {
   LLM_BASE_URL: string | null;
   LLM_MODEL: string | null;
   LLM_TEMPERATURE: number;
+  LLM_FALLBACK_ENABLED: boolean;
+  LLM_FALLBACK_TOP_K: number;
+  LLM_FALLBACK_TIMEOUT_SECONDS: number;
   UTTERANCE_GENERATION_PROMPT: string;
   NEGATIVE_SAMPLE_GENERATION_PROMPT: string;
   AGENT_REPAIR_PROMPT: string;

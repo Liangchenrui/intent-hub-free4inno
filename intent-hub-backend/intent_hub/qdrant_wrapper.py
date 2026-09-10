@@ -20,6 +20,8 @@ from qdrant_client.models import (
     VectorParams,
 )
 
+from intent_hub.intent_description import description_hash
+
 
 class IntentHubQdrantClient:
     ROUTE_ID_KEY = "route_id"
@@ -30,6 +32,8 @@ class IntentHubQdrantClient:
     SCORE_THRESHOLD_KEY = "score_threshold"
     IS_NEGATIVE_KEY = "is_negative"
     NEGATIVE_THRESHOLD_KEY = "negative_threshold"
+    IS_ROUTE_METADATA_KEY = "is_route_metadata"
+    DESCRIPTION_HASH_KEY = "description_hash"
 
     def __init__(self, url: str, collection_name: str, dimensions: int, api_key: str | None = None):
         self.collection_name = collection_name
@@ -46,6 +50,8 @@ class IntentHubQdrantClient:
         for field, schema in (
             (self.ROUTE_ID_KEY, PayloadSchemaType.INTEGER),
             (self.IS_NEGATIVE_KEY, PayloadSchemaType.BOOL),
+            (self.IS_ROUTE_METADATA_KEY, PayloadSchemaType.BOOL),
+            (self.DESCRIPTION_HASH_KEY, PayloadSchemaType.KEYWORD),
         ):
             try:
                 self.client.create_payload_index(
@@ -163,12 +169,14 @@ class IntentHubQdrantClient:
         negative_threshold: float,
         route_hash: str,
         model_name: str,
+        description_embedding: list[float] | None = None,
+        description_version: str | None = None,
     ) -> list[PointStruct]:
         if len(utterances) != len(positive_embeddings):
             raise ValueError("utterances 和 embeddings 长度不匹配")
         if len(negative_samples) != len(negative_embeddings):
             raise ValueError("negative_samples 和 embeddings 长度不匹配")
-        return self._positive_points(
+        points = self._positive_points(
             route_id,
             route_name,
             utterances,
@@ -183,6 +191,43 @@ class IntentHubQdrantClient:
             negative_embeddings,
             negative_threshold,
         )
+        if description_embedding is not None:
+            if (len(description_embedding) != self.dimensions or not any(description_embedding)
+                    or not description_version):
+                raise ValueError("Invalid intent description embedding")
+            points.append(PointStruct(
+                id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"route-metadata:{route_id}")),
+                vector=description_embedding,
+                payload={self.ROUTE_ID_KEY: route_id, self.ROUTE_NAME_KEY: route_name,
+                         self.IS_ROUTE_METADATA_KEY: True, self.ROUTE_HASH_KEY: route_hash,
+                         self.DESCRIPTION_HASH_KEY: description_version, self.MODEL_NAME_KEY: model_name},
+            ))
+        return points
+
+    def get_description_embedding(self, agent, model_name: str) -> list[float] | None:
+        points = self.client.retrieve(
+            collection_name=self.collection_name,
+            ids=[str(uuid.uuid5(uuid.NAMESPACE_DNS, f"route-metadata:{agent.id}"))],
+            with_payload=True, with_vectors=True,
+        )
+        if not points:
+            return None
+        point = points[0]
+        if ((point.payload or {}).get(self.DESCRIPTION_HASH_KEY) == description_hash(agent, model_name)
+                and isinstance(point.vector, list) and len(point.vector) == self.dimensions and any(point.vector)):
+            return point.vector
+        return None
+
+    def search_route_descriptions(self, query_vector, route_ids, top_k=5) -> list[dict]:
+        from qdrant_client.models import IsEmptyCondition, PayloadField
+
+        if not route_ids:
+            return []
+        return self._search_grouped(query_vector, top_k, Filter(
+            must=[FieldCondition(key=self.IS_ROUTE_METADATA_KEY, match=MatchValue(value=True)),
+                  FieldCondition(key=self.ROUTE_ID_KEY, match=MatchAny(any=route_ids))],
+            must_not=[IsEmptyCondition(is_empty=PayloadField(key=self.DESCRIPTION_HASH_KEY))],
+        ))
 
     def _positive_points(
         self,
@@ -243,7 +288,8 @@ class IntentHubQdrantClient:
             query_vector,
             top_k,
             Filter(
-                must_not=[FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True))]
+                must_not=[FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)),
+                          FieldCondition(key=self.IS_ROUTE_METADATA_KEY, match=MatchValue(value=True))]
             ),
         )
 
@@ -282,7 +328,9 @@ class IntentHubQdrantClient:
         return {"id": str(point.id), "vector": vector, "payload": point.payload or {}}
 
     def get_route_vectors(self, route_id: int, exclude_negative: bool = False) -> list[dict]:
-        must_not = [FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True))] if exclude_negative else None
+        must_not = [FieldCondition(key=self.IS_ROUTE_METADATA_KEY, match=MatchValue(value=True))]
+        if exclude_negative:
+            must_not.append(FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)))
         points, offset = self.client.scroll(
             collection_name=self.collection_name, limit=256,
             scroll_filter=Filter(must=[FieldCondition(key=self.ROUTE_ID_KEY, match=MatchValue(value=route_id))], must_not=must_not),
@@ -295,7 +343,10 @@ class IntentHubQdrantClient:
         return result
 
     def scroll_all_points(self, with_vectors: bool = True, exclude_negative: bool = False) -> list[dict]:
-        route_filter = Filter(must_not=[FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True))]) if exclude_negative else None
+        exclusions = [FieldCondition(key=self.IS_ROUTE_METADATA_KEY, match=MatchValue(value=True))]
+        if exclude_negative:
+            exclusions.append(FieldCondition(key=self.IS_NEGATIVE_KEY, match=MatchValue(value=True)))
+        route_filter = Filter(must_not=exclusions)
         result, offset = [], None
         while True:
             points, offset = self.client.scroll(collection_name=self.collection_name, limit=256, offset=offset, scroll_filter=route_filter, with_payload=True, with_vectors=with_vectors)

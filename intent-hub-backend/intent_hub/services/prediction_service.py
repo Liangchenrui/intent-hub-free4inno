@@ -1,6 +1,7 @@
 """Return every Agent that reaches its routing threshold."""
 
 from intent_hub.config import Config
+from intent_hub.services.fallback_service import FallbackService
 
 
 class PredictionService:
@@ -42,17 +43,8 @@ class PredictionService:
                 "matched": True,
                 "agents": matches,
                 "text": None,
+                "match_source": "semantic",
+                "fallback_status": None,
             }
 
-        return {
-            "matched": False,
-            "agents": [],
-            "text": self._default_text(),
-        }
-
-    @staticmethod
-    def _default_text() -> str:
-        try:
-            return Config.DEFAULT_ROUTE_FILE.read_text(encoding="utf-8").strip()
-        except FileNotFoundError:
-            return "none"
+        return FallbackService(self.components).predict(query, vector, excluded)

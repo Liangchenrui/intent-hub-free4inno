@@ -101,6 +101,10 @@ def test_incremental_sync_skips_route_when_hash_matches():
         metadata = []
 
         @staticmethod
+        def get_description_embedding(_route, _model_name):
+            return [1.0, 0.0]
+
+        @staticmethod
         def get_existing_route_hashes():
             return {3: "matching-hash"}
 

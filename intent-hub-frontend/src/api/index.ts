@@ -178,7 +178,9 @@ export interface PredictResult {
   id: number;
   name: string;
   route_key: string;
-  score?: number;
+  score?: number | null;
+  match_source?: 'semantic' | 'llm_fallback' | 'default';
+  fallback_status?: 'matched' | 'no_match' | 'ambiguous' | 'no_candidates' | 'unavailable' | null;
 }
 
 export interface RouteFeedbackResponse {
@@ -357,6 +359,9 @@ export interface SharedLlmSettings {
 }
 
 export interface SystemSettings extends SharedLlmSettings {
+  LLM_FALLBACK_ENABLED: boolean;
+  LLM_FALLBACK_TOP_K: number;
+  LLM_FALLBACK_TIMEOUT_SECONDS: number;
   QDRANT_URL?: string;
   QDRANT_COLLECTION?: string;
   QDRANT_API_KEY?: string | null;

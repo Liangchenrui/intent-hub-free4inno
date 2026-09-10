@@ -16,6 +16,7 @@ from qdrant_client.models import (
 
 from intent_hub.utils.logger import logger
 from intent_hub.models import RouteConfig
+from intent_hub.intent_description import description_hash
 
 
 class IntentHubQdrantClient:
@@ -32,6 +33,7 @@ class IntentHubQdrantClient:
     NEGATIVE_THRESHOLD_KEY = "negative_threshold"  # 负例阈值
     IS_ROUTE_METADATA_KEY = "is_route_metadata"
     ROUTE_CONFIG_KEY = "route_config"
+    DESCRIPTION_HASH_KEY = "description_hash"
 
     def __init__(
         self,
@@ -166,6 +168,16 @@ class IntentHubQdrantClient:
                         f"Warning creating index for {self.IS_ROUTE_METADATA_KEY}: {e}"
                     )
 
+            try:
+                self.client.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name=self.DESCRIPTION_HASH_KEY,
+                    field_schema=PayloadSchemaType.KEYWORD,
+                )
+            except Exception as e:
+                if "already exists" not in str(e).lower() and "duplicate" not in str(e).lower():
+                    logger.warning(f"Warning creating description hash index: {e}")
+
         except Exception as e:
             logger.error(f"Collection initialization failed: {e}", exc_info=True)
             raise
@@ -251,11 +263,12 @@ class IntentHubQdrantClient:
         route: RouteConfig,
         route_hash: Optional[str] = None,
         model_name: Optional[str] = None,
+        embedding: Optional[List[float]] = None,
     ) -> None:
-        """Store a complete recovery-only RouteConfig point.
+        """Store recovery data and an optional name/description retrieval vector.
 
-        The point is marked and every query/diagnostic path explicitly excludes it.
-        Its vector exists only because Qdrant collections require one.
+        Ordinary utterance searches and diagnostics still exclude this point.
+        Legacy zero vectors are never eligible for description retrieval.
         """
         point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"route-metadata:{route.id}"))
         payload = {
@@ -268,10 +281,63 @@ class IntentHubQdrantClient:
             payload[self.ROUTE_HASH_KEY] = route_hash
         if model_name:
             payload[self.MODEL_NAME_KEY] = model_name
+        if embedding is not None:
+            if len(embedding) != self.dimensions or not any(embedding):
+                raise ValueError("Invalid intent description embedding")
+            payload[self.DESCRIPTION_HASH_KEY] = description_hash(route, model_name or "")
         self._upsert_points(
-            [PointStruct(id=point_id, vector=[0.0] * self.dimensions, payload=payload)]
+            [PointStruct(id=point_id, vector=embedding if embedding is not None else [0.0] * self.dimensions, payload=payload)]
         )
         logger.info(f"Stored recovery metadata for route {route.name} (ID: {route.id})")
+
+    def get_description_embedding(self, route: RouteConfig, model_name: str) -> Optional[List[float]]:
+        """Reuse only a vector for the same text, model and collection dimension."""
+        points = self.client.retrieve(
+            collection_name=self.collection_name,
+            ids=[str(uuid.uuid5(uuid.NAMESPACE_DNS, f"route-metadata:{route.id}"))],
+            with_payload=True,
+            with_vectors=True,
+        )
+        if not points:
+            return None
+        point = points[0]
+        if (
+            (point.payload or {}).get(self.DESCRIPTION_HASH_KEY) == description_hash(route, model_name)
+            and isinstance(point.vector, list)
+            and len(point.vector) == self.dimensions
+            and any(point.vector)
+        ):
+            return point.vector
+        return None
+
+    def update_route_metadata_state(self, route: RouteConfig) -> None:
+        """Update task/sync recovery state without replacing the indexed vector."""
+        self.client.set_payload(
+            collection_name=self.collection_name,
+            points=[str(uuid.uuid5(uuid.NAMESPACE_DNS, f"route-metadata:{route.id}"))],
+            payload={self.ROUTE_CONFIG_KEY: route.model_dump()},
+            wait=True,
+        )
+
+    def search_route_descriptions(
+        self, query_vector: List[float], route_ids: List[int], top_k: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Retrieve eligible entity vectors; apply exclusions before the Top-K."""
+        from qdrant_client.models import IsEmptyCondition, MatchAny, MatchValue, PayloadField
+
+        if not route_ids:
+            return []
+        return self._search_grouped(
+            query_vector=query_vector,
+            top_k=top_k,
+            query_filter=Filter(
+                must=[
+                    FieldCondition(key=self.IS_ROUTE_METADATA_KEY, match=MatchValue(value=True)),
+                    FieldCondition(key=self.ROUTE_ID_KEY, match=MatchAny(any=route_ids)),
+                ],
+                must_not=[IsEmptyCondition(is_empty=PayloadField(key=self.DESCRIPTION_HASH_KEY))],
+            ),
+        )
 
     def get_route_vectors(self, route_id: int) -> List[Dict[str, Any]]:
         """获取指定路由的所有向量点和载荷（排除负例向量）

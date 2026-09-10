@@ -1,6 +1,6 @@
 """LLM工厂类 - 根据provider创建对应的LangChain LLM实例"""
 
-from typing import Optional
+from typing import Any, Optional
 
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
@@ -28,6 +28,9 @@ class LLMFactory:
         base_url: Optional[str] = None,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
+        timeout: Optional[float] = None,
+        max_retries: Optional[int] = None,
+        http_async_client: Optional[Any] = None,
     ) -> BaseChatModel:
         """创建LLM实例
 
@@ -58,17 +61,25 @@ class LLMFactory:
 
         logger.info(f"Creating LLM instance: provider={provider}, model={model}")
 
+        runtime_options = {}
+        if timeout is not None:
+            runtime_options["timeout"] = timeout
+        if max_retries is not None:
+            runtime_options["max_retries"] = max_retries
+        if http_async_client is not None and provider != "gemini":
+            runtime_options["http_async_client"] = http_async_client
+
         if provider == "gemini":
-            return LLMFactory._create_gemini(api_key, model, temperature)
+            return LLMFactory._create_gemini(api_key, model, temperature, **runtime_options)
         elif provider in ["deepseek", "openrouter", "doubao", "qwen"]:
             return LLMFactory._create_openai_compatible(
-                provider, api_key, base_url, model, temperature
+                provider, api_key, base_url, model, temperature, **runtime_options
             )
         else:
             raise ValueError(f"未实现的provider: {provider}")
 
     @staticmethod
-    def _create_gemini(api_key: str, model: str, temperature: float) -> BaseChatModel:
+    def _create_gemini(api_key: str, model: str, temperature: float, **runtime_options) -> BaseChatModel:
         """创建Gemini LLM实例"""
         if ChatGoogleGenerativeAI is None:
             raise ImportError(
@@ -82,6 +93,7 @@ class LLMFactory:
             model=model or "gemini-pro",
             google_api_key=api_key,
             temperature=temperature,
+            **runtime_options,
         )
 
     @staticmethod
@@ -91,6 +103,7 @@ class LLMFactory:
         base_url: Optional[str],
         model: str,
         temperature: float,
+        **runtime_options,
     ) -> BaseChatModel:
         """创建OpenAI兼容的LLM实例（DeepSeek/OpenRouter/Doubao/Qwen）"""
         if not api_key:
@@ -131,4 +144,5 @@ class LLMFactory:
             openai_api_key=api_key,
             openai_api_base=final_base_url,
             temperature=temperature,
+            **runtime_options,
         )

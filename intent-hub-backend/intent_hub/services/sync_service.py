@@ -6,6 +6,8 @@ from typing import Any, Dict
 
 from intent_hub.config import Config
 from intent_hub.core.components import ComponentManager
+from intent_hub.intent_description import description_text
+from intent_hub.models import RouteConfig
 from intent_hub.utils.logger import logger
 
 
@@ -41,7 +43,7 @@ class SyncService:
         route_manager.reload()
 
         # 2. 获取配置文件中的路由
-        config_routes = route_manager.get_all_routes()
+        config_routes = [route.model_copy(deep=True) for route in route_manager.get_all_routes()]
         config_route_ids = {route.id for route in config_routes}
 
         if force_full:
@@ -63,7 +65,6 @@ class SyncService:
         failed_routes = []
         for route in config_routes:
             try:
-                expected_version = route.sync.version if route.sync else 0
                 # 处理正例向量
                 embeddings = encoder.encode(route.utterances)
                 qdrant_client.upsert_route_utterances(
@@ -93,12 +94,7 @@ class SyncService:
                 else:
                     # 确保删除可能存在的旧负例向量
                     qdrant_client.delete_route_negative_samples(route.id)
-                synced_route = self._mark_synced_if_current(route.id, expected_version)
-                qdrant_client.upsert_route_metadata(
-                    route=synced_route or route,
-                    route_hash=route_manager.compute_route_hash(route),
-                    model_name=Config.EMBEDDING_MODEL_NAME,
-                )
+                self._sync_metadata(route)
             except Exception as e:
                 logger.error(
                     f"Failed processing route {route.name} (ID: {route.id}): {e}", exc_info=True
@@ -170,7 +166,6 @@ class SyncService:
 
         for route in config_routes:
             local_hash = route_manager.compute_route_hash(route)
-            expected_version = route.sync.version if route.sync else 0
             qdrant_hash = qdrant_route_hashes.get(route.id)
             
             is_new_route = route.id not in existing_route_ids
@@ -212,26 +207,12 @@ class SyncService:
                         embeddings=negative_embeddings,
                         negative_threshold=negative_threshold,
                     )
-                synced_route = self._mark_synced_if_current(route.id, expected_version)
             else:
                 skipped_count += 1
-                sync_state = route.sync
-                if (
-                    sync_state is None
-                    or sync_state.status != "synced"
-                    or sync_state.synced_version != expected_version
-                ):
-                    synced_route = self._mark_synced_if_current(route.id, expected_version)
-                else:
-                    synced_route = route
 
             # Always backfill the complete recovery record, including for unchanged
             # legacy routes that predate metadata points.
-            qdrant_client.upsert_route_metadata(
-                route=synced_route or route,
-                route_hash=local_hash,
-                model_name=Config.EMBEDDING_MODEL_NAME,
-            )
+            self._sync_metadata(route)
 
         self._validate_index(config_routes, qdrant_client, route_manager)
 
@@ -322,9 +303,9 @@ class SyncService:
         route = route_manager.get_route(route_id)
         if not route:
             raise ValueError(f"Route ID {route_id} not found")
+        route = route.model_copy(deep=True)
 
         logger.info(f"Syncing route: {route.name} (ID: {route_id})")
-        expected_version = route.sync.version if route.sync else 0
 
         # 先删除旧的向量点（包括正例和负例）
         qdrant_client.delete_route(route_id)
@@ -358,12 +339,7 @@ class SyncService:
             )
             total_negative_points = len(negative_samples)
 
-        synced_route = self._mark_synced_if_current(route.id, expected_version)
-        qdrant_client.upsert_route_metadata(
-            route=synced_route or route,
-            route_hash=route_manager.compute_route_hash(route),
-            model_name=Config.EMBEDDING_MODEL_NAME,
-        )
+        self._sync_metadata(route)
 
         logger.info(
             f"Synced route {route.name} (ID: {route_id}): {total_points} positive, {total_negative_points} negative vectors"
@@ -376,6 +352,33 @@ class SyncService:
             "total_points": total_points,
             "total_negative_points": total_negative_points,
         }
+
+    def _sync_metadata(self, route: RouteConfig) -> None:
+        """Backfill legacy vectors and acknowledge sync only after the final write."""
+        route = route.model_copy(deep=True)
+        manager = self.component_manager
+        embedding = manager.qdrant_client.get_description_embedding(route, Config.EMBEDDING_MODEL_NAME)
+        if embedding is None:
+            embedding = manager.encoder.encode_single(description_text(route))
+        snapshot = route.model_copy(deep=True)
+        snapshot.sync = snapshot.sync or RouteConfig.RouteSync()
+        expected_version = snapshot.sync.version
+        snapshot.sync.status = "synced"
+        snapshot.sync.synced_version = expected_version
+        snapshot.sync.last_synced_at = datetime.now(timezone.utc).isoformat()
+        snapshot.sync.error = None
+        manager.qdrant_client.upsert_route_metadata(
+            route=snapshot,
+            route_hash=manager.route_manager.compute_route_hash(route),
+            model_name=Config.EMBEDDING_MODEL_NAME,
+            embedding=embedding,
+        )
+        if (
+            route.sync is None
+            or route.sync.status != "synced"
+            or route.sync.synced_version != expected_version
+        ):
+            self._mark_synced_if_current(route.id, expected_version)
 
     def _mark_synced_if_current(self, route_id: int, expected_version: int):
         """Only acknowledge the exact route version that was just indexed."""

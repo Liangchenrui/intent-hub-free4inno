@@ -1,0 +1,19 @@
+
+> intent-hub-frontend@0.0.0 build
+> vue-tsc -b && vite build
+
+vite v7.3.1 building client environment for production...
+transforming...
+✓ 2077 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.47 kB │ gzip:   0.30 kB
+dist/assets/logo-B8aBuugL.png      15.75 kB
+dist/assets/index-DYoBwbbC.css    370.41 kB │ gzip:  51.21 kB
+dist/assets/index-C18Yvris.js   2,282.79 kB │ gzip: 747.34 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 19.71s

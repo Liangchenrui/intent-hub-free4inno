@@ -1,0 +1,73 @@
+{
+  "purpose": "受控功能演示。高阈值用于方便触发兜底，不代表推荐生产阈值；expected 是待核对的预期，不是已测结果。",
+  "routes": [
+    {
+      "id": 101,
+      "name": "订单物流查询",
+      "route_key": "demo.order.track",
+      "description": "查询已下单商品的订单状态、承运快递、物流轨迹和预计送达日期。仅提供查询，不取消订单、不修改地址、不发起退款。",
+      "utterances": ["查询订单物流", "我的订单到哪里了", "查看包裹配送进度"],
+      "negative_samples": ["帮我取消这个订单", "我要修改收货地址"],
+      "score_threshold": 0.99,
+      "negative_threshold": 0.96
+    },
+    {
+      "id": 102,
+      "name": "未发货订单取消",
+      "route_key": "demo.order.cancel",
+      "description": "取消尚未发货的商品订单。需要明确用户要取消的是商品订单。已发货或已签收的订单不支持取消；不处理会员订阅、自动续费、退货退款或退款进度查询。",
+      "utterances": ["取消未发货的订单", "这笔商品订单还没发货我不想要了", "撤销刚提交的购物订单"],
+      "negative_samples": ["订单已经签收了，帮我取消这个订单", "帮我取消会员自动续费"],
+      "score_threshold": 0.99,
+      "negative_threshold": 0.96
+    },
+    {
+      "id": 103,
+      "name": "未发货订单改地址",
+      "route_key": "demo.order.address",
+      "description": "修改尚未发货商品订单的收货地址、收件人和联系电话。需要明确是现有商品订单，且尚未发货；不更改已发货或已签收包裹，也不修改发票抬头。",
+      "utterances": ["修改未发货订单的收货地址", "这个订单还没发货帮我换收件人", "更新订单收货手机号"],
+      "negative_samples": ["包裹已经签收了现在修改收货地址", "修改发票抬头"],
+      "score_threshold": 0.99,
+      "negative_threshold": 0.96
+    },
+    {
+      "id": 104,
+      "name": "电子发票申请补开",
+      "route_key": "demo.invoice.issue",
+      "description": "为已购买的商品申请、补开或重新发送电子发票，供公司财务报销使用。支持提供公司名称作为发票抬头及税号。仅处理发票，不操作收货地址、不退款、不提供税务筹划。",
+      "utterances": ["申请电子发票", "给这笔订单补开发票", "重新发送购物发票"],
+      "negative_samples": ["帮我修改快递收货地址", "帮我设计公司避税方案"],
+      "score_threshold": 0.99,
+      "negative_threshold": 0.96
+    },
+    {
+      "id": 105,
+      "name": "会员自动续费关闭",
+      "route_key": "demo.subscription.cancel",
+      "description": "关闭会员或服务订阅的自动续费，避免下个周期再次扣费。需要明确用户要取消的是订阅或续费。不会取消商品订单，不申请已扣费用退款，不删除账号。",
+      "utterances": ["关闭会员自动续费", "取消下个月的订阅扣款", "不要再自动续订会员"],
+      "negative_samples": ["取消未发货的商品订单", "注销我的账号并删除所有数据"],
+      "score_threshold": 0.99,
+      "negative_threshold": 0.96
+    },
+    {
+      "id": 106,
+      "name": "退款进度查询",
+      "route_key": "demo.refund.track",
+      "description": "查询已经提交并受理的退款申请的审批状态、退款金额和到账进度。仅查询现有退款，不发起新的退款或退货，不取消商品订单，不保证具体到账时间。",
+      "utterances": ["查询退款到账进度", "之前申请的退款到哪一步了", "看看已受理退款的处理状态"],
+      "negative_samples": ["帮我发起一笔新的退货退款", "取消还没有发货的商品订单"],
+      "score_threshold": 0.99,
+      "negative_threshold": 0.96
+    }
+  ],
+  "cases": [
+    {"name": "正常例句匹配", "text": "查询订单物流", "expected_source": "semantic", "expected_route_key": "demo.order.track"},
+    {"name": "长尾表达触发兜底", "text": "上个月买的显示器，财务报销需要抬头为星河科技有限公司的电子凭证，应该去哪里申请？", "expected_source": "llm_fallback", "expected_route_key": "demo.invoice.issue"},
+    {"name": "职责边界拒绝", "text": "帮我发起一笔新的退货退款", "expected_source": "default", "expected_status": "no_match"},
+    {"name": "歧义需要澄清", "text": "帮我取消一下", "expected_source": "default", "expected_status": "ambiguous"},
+    {"name": "域外请求拒绝", "text": "帮我诊断持续三天的胸痛并开处方药", "expected_source": "default", "expected_status": "no_match"},
+    {"name": "负例排除不可绕过", "text": "订单已经签收了，帮我取消这个订单", "expected_source": "default", "expected_status": "no_match"}
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "observed_at": "2026-09-10T16:17:54.007361+08:00",
+  "environment": "local demo, not production",
+  "python": "3.13.5",
+  "frontend_http_status": 200,
+  "backend_health": {
+    "status": "ok"
+  },
+  "services_health": {
+    "services": {
+      "embedding": {
+        "healthy": true,
+        "latency_ms": 1446,
+        "message": "ok",
+        "status_code": 200
+      },
+      "qdrant": {
+        "healthy": true,
+        "latency_ms": 1493,
+        "message": "ok",
+        "status_code": 200
+      }
+    },
+    "status": "ok"
+  },
+  "configuration": {
+    "QDRANT_COLLECTION": "llm_fallback_demo_20260910_152741",
+    "EMBEDDING_MODEL_NAME": "BAAI/bge-m3",
+    "LLM_PROVIDER": "deepseek",
+    "LLM_MODEL": "deepseek-flash",
+    "LLM_FALLBACK_ENABLED": true,
+    "LLM_FALLBACK_TOP_K": 5,
+    "LLM_FALLBACK_TIMEOUT_SECONDS": 20,
+    "model_identity_note": "EMBEDDING_MODEL_NAME is configured metadata, not a verified server model identity"
+  },
+  "local_routes": {
+    "count": 6,
+    "ids": [
+      101,
+      102,
+      103,
+      104,
+      105,
+      106
+    ],
+    "sync_statuses": {
+      "101": "synced",
+      "102": "synced",
+      "103": "synced",
+      "104": "synced",
+      "105": "synced",
+      "106": "synced"
+    }
+  },
+  "qdrant": {
+    "points_count": 36,
+    "status": "green",
+    "vectors": {
+      "size": 2560,
+      "distance": "Cosine"
+    }
+  },
+  "original_data_integrity": {
+    "settings.json": true,
+    "routes.json": true,
+    "diagnostics_cache.json": true
+  }
+}

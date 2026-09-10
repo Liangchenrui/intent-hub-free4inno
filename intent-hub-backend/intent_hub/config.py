@@ -144,6 +144,9 @@ class Config:
     LLM_BASE_URL: Optional[str] = None
     LLM_MODEL: Optional[str] = None
     LLM_TEMPERATURE: float = 0.7
+    LLM_FALLBACK_ENABLED: bool = False
+    LLM_FALLBACK_TOP_K: int = 5
+    LLM_FALLBACK_TIMEOUT_SECONDS: float = 8.0
 
     # DeepSeek LLM配置（向后兼容）
     DEEPSEEK_API_KEY: Optional[str] = None
@@ -244,6 +247,7 @@ class Config:
         Returns:
             如果 QDRANT_COLLECTION 发生变化，返回 True；否则返回 False
         """
+        cls.validate_fallback_settings(settings_dict)
         # 检测 QDRANT_COLLECTION 是否发生变化
         old_collection = cls.QDRANT_COLLECTION
         collection_changed = False
@@ -289,6 +293,21 @@ class Config:
         return collection_changed
 
     @classmethod
+    def validate_fallback_settings(cls, settings: Dict[str, Any]) -> None:
+        """Reject invalid controls before changing the file or live settings."""
+        import math
+
+        enabled = settings.get("LLM_FALLBACK_ENABLED", cls.LLM_FALLBACK_ENABLED)
+        top_k = settings.get("LLM_FALLBACK_TOP_K", cls.LLM_FALLBACK_TOP_K)
+        timeout = settings.get("LLM_FALLBACK_TIMEOUT_SECONDS", cls.LLM_FALLBACK_TIMEOUT_SECONDS)
+        if type(enabled) is not bool:
+            raise ValueError("LLM_FALLBACK_ENABLED must be a boolean")
+        if type(top_k) is not int or not 1 <= top_k <= 20:
+            raise ValueError("LLM_FALLBACK_TOP_K must be an integer between 1 and 20")
+        if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 1 <= timeout <= 60:
+            raise ValueError("LLM_FALLBACK_TIMEOUT_SECONDS must be between 1 and 60")
+
+    @classmethod
     def to_dict(cls) -> Dict[str, Any]:
         """获取可供前端配置的项"""
         return {
@@ -312,6 +331,9 @@ class Config:
             "LLM_BASE_URL": cls.LLM_BASE_URL,
             "LLM_MODEL": cls.LLM_MODEL,
             "LLM_TEMPERATURE": cls.LLM_TEMPERATURE,
+            "LLM_FALLBACK_ENABLED": cls.LLM_FALLBACK_ENABLED,
+            "LLM_FALLBACK_TOP_K": cls.LLM_FALLBACK_TOP_K,
+            "LLM_FALLBACK_TIMEOUT_SECONDS": cls.LLM_FALLBACK_TIMEOUT_SECONDS,
             # DeepSeek配置（向后兼容）
             "DEEPSEEK_API_KEY": cls.DEEPSEEK_API_KEY,
             "DEEPSEEK_BASE_URL": cls.DEEPSEEK_BASE_URL,

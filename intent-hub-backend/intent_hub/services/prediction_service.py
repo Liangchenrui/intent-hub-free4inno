@@ -4,9 +4,9 @@ from typing import Dict, List
 
 from intent_hub.utils.logger import logger
 
-from intent_hub.config import Config
 from intent_hub.core.components import ComponentManager
 from intent_hub.models import PredictRequest, PredictResponse
+from intent_hub.services.fallback_service import FallbackService
 
 
 class PredictionService:
@@ -70,18 +70,9 @@ class PredictionService:
         logger.debug(f"Search raw result count: {len(search_results)}")
 
         if not search_results:
-            # 没有找到任何结果，返回默认路由
-            logger.warning(
-                f"Search returned no results, using default route. Query: {request.text}"
-            )
-            return [
-                PredictResponse(
-                    id=Config.DEFAULT_ROUTE_ID,
-                    name=Config.DEFAULT_ROUTE_NAME,
-                    route_key=Config.DEFAULT_ROUTE_KEY,
-                    score=None,
-                )
-            ]
+            return [FallbackService(self.component_manager).predict(
+                request.text, query_vector, excluded_route_ids
+            )]
 
         # 4. 按路由ID分组并进行阈值过滤（同时排除负例匹配的路由）
         # 因为 Qdrant 返回的是 utterance 级别的匹配，一个路由可能有多个匹配项，取最高分
@@ -137,16 +128,9 @@ class PredictionService:
         )
 
         if not sorted_results:
-            # 如果没有路由满足阈值，返回默认路由
-            logger.info(f"No route above threshold, using default route. Query: {request.text}")
-            return [
-                PredictResponse(
-                    id=Config.DEFAULT_ROUTE_ID,
-                    name=Config.DEFAULT_ROUTE_NAME,
-                    route_key=Config.DEFAULT_ROUTE_KEY,
-                    score=None,
-                )
-            ]
+            return [FallbackService(self.component_manager).predict(
+                request.text, query_vector, excluded_route_ids
+            )]
 
         logger.info(f"Matched route count: {len(sorted_results)}")
         return sorted_results

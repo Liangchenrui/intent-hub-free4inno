@@ -1,0 +1,110 @@
+[
+  {
+    "name": "正常例句匹配",
+    "text": "查询订单物流",
+    "expected_source": "semantic",
+    "expected_route_key": "demo.order.track",
+    "actual": [
+      {
+        "fallback_status": null,
+        "id": 101,
+        "match_source": "semantic",
+        "name": "订单物流查询",
+        "route_key": "demo.order.track",
+        "score": 1.0
+      }
+    ],
+    "passed": true,
+    "elapsed_ms": 28489
+  },
+  {
+    "name": "长尾表达触发兜底",
+    "text": "上个月买的显示器，财务报销需要抬头为星河科技有限公司的电子凭证，应该去哪里申请？",
+    "expected_source": "llm_fallback",
+    "expected_route_key": "demo.invoice.issue",
+    "actual": [
+      {
+        "fallback_status": "unavailable",
+        "id": 0,
+        "match_source": "default",
+        "name": "none",
+        "route_key": "fallback.default",
+        "score": null
+      }
+    ],
+    "passed": false,
+    "elapsed_ms": 17822
+  },
+  {
+    "name": "职责边界拒绝",
+    "text": "帮我发起一笔新的退货退款",
+    "expected_source": "default",
+    "expected_status": "no_match",
+    "actual": [
+      {
+        "fallback_status": "unavailable",
+        "id": 0,
+        "match_source": "default",
+        "name": "none",
+        "route_key": "fallback.default",
+        "score": null
+      }
+    ],
+    "passed": false,
+    "elapsed_ms": 7296
+  },
+  {
+    "name": "歧义需要澄清",
+    "text": "帮我取消一下",
+    "expected_source": "default",
+    "expected_status": "ambiguous",
+    "actual": [
+      {
+        "fallback_status": "unavailable",
+        "id": 0,
+        "match_source": "default",
+        "name": "none",
+        "route_key": "fallback.default",
+        "score": null
+      }
+    ],
+    "passed": false,
+    "elapsed_ms": 6710
+  },
+  {
+    "name": "域外请求拒绝",
+    "text": "帮我诊断持续三天的胸痛并开处方药",
+    "expected_source": "default",
+    "expected_status": "no_match",
+    "actual": [
+      {
+        "fallback_status": "unavailable",
+        "id": 0,
+        "match_source": "default",
+        "name": "none",
+        "route_key": "fallback.default",
+        "score": null
+      }
+    ],
+    "passed": false,
+    "elapsed_ms": 6163
+  },
+  {
+    "name": "负例排除不可绕过",
+    "text": "订单已经签收了，帮我取消这个订单",
+    "expected_source": "default",
+    "expected_status": "no_match",
+    "actual": [
+      {
+        "fallback_status": "unavailable",
+        "id": 0,
+        "match_source": "default",
+        "name": "none",
+        "route_key": "fallback.default",
+        "score": null
+      }
+    ],
+    "passed": false,
+    "elapsed_ms": 7700
+  }
+]

@@ -117,6 +117,23 @@
               {{ $t('settings.temperatureHint') }}
             </div>
           </el-form-item>
+          <el-divider content-position="left">{{ $t('settings.fallbackTitle') }}</el-divider>
+          <el-form-item :label="$t('settings.fallbackEnabled')">
+            <el-switch v-model="settings.LLM_FALLBACK_ENABLED" />
+            <div class="field-hint">{{ $t('settings.fallbackHint') }}</div>
+          </el-form-item>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item :label="$t('settings.fallbackTopK')">
+                <el-input-number v-model="settings.LLM_FALLBACK_TOP_K" :min="1" :max="20" :step="1" :precision="0" :disabled="!settings.LLM_FALLBACK_ENABLED" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item :label="$t('settings.fallbackTimeout')">
+                <el-input-number v-model="settings.LLM_FALLBACK_TIMEOUT_SECONDS" :min="1" :max="60" :step="1" :disabled="!settings.LLM_FALLBACK_ENABLED" />
+              </el-form-item>
+            </el-col>
+          </el-row>
           <el-form-item :label="$t('settings.prompt')">
             <el-input v-model="settings.UTTERANCE_GENERATION_PROMPT" type="textarea" :rows="4" />
           </el-form-item>
@@ -208,6 +225,9 @@ const settings = ref<SystemSettings>({
   LLM_BASE_URL: null,
   LLM_MODEL: null,
   LLM_TEMPERATURE: 0.7,
+  LLM_FALLBACK_ENABLED: false,
+  LLM_FALLBACK_TOP_K: 5,
+  LLM_FALLBACK_TIMEOUT_SECONDS: 8,
   UTTERANCE_GENERATION_PROMPT: '',
   SKILL_ROUTE_IMPORT_PROMPT: '',
   AGENT_REPAIR_PROMPT: '',
@@ -229,6 +249,9 @@ const normalizeSettings = (data: any): SystemSettings => ({
   LLM_BASE_URL: data.LLM_BASE_URL ?? null,
   LLM_MODEL: data.LLM_MODEL ?? null,
   LLM_TEMPERATURE: data.LLM_TEMPERATURE ?? 0.7,
+  LLM_FALLBACK_ENABLED: data.LLM_FALLBACK_ENABLED ?? false,
+  LLM_FALLBACK_TOP_K: data.LLM_FALLBACK_TOP_K ?? 5,
+  LLM_FALLBACK_TIMEOUT_SECONDS: data.LLM_FALLBACK_TIMEOUT_SECONDS ?? 8,
   UTTERANCE_GENERATION_PROMPT: data.UTTERANCE_GENERATION_PROMPT ?? '',
   SKILL_ROUTE_IMPORT_PROMPT: data.SKILL_ROUTE_IMPORT_PROMPT ?? '',
   AGENT_REPAIR_PROMPT: data.AGENT_REPAIR_PROMPT ?? '',

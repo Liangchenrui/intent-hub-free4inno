@@ -1,0 +1,15 @@
+........................................................................ [ 85%]
+............                                                             [100%]
+============================== warnings summary ===============================
+tests/test_health_service.py::test_health_routes_separate_liveness_and_authenticated_services
+  D:\code\intent-hub\intent-hub-backend\intent_hub\auth.py:255: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    ).dict()
+
+tests/test_llm_fallback.py::test_http_predict_returns_fallback_contract_and_requires_auth
+tests/test_predict_api.py::test_predict_uses_independent_route_key
+  D:\code\intent-hub\intent-hub-backend\intent_hub\auth.py:326: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    ).dict()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: D:\code\intent-hub\docs\changes\llm-fallback\evidence\backend-pytest.xml -
+84 passed, 3 warnings in 97.77s (0:01:37)

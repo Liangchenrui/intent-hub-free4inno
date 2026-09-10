@@ -82,6 +82,10 @@ class PredictResponse(BaseModel):
     name: str = Field(..., description="匹配到的路由名称")
     route_key: str = Field(..., description="稳定的业务路由标识")
     score: Optional[float] = Field(None, description="相似度分数")
+    match_source: Literal["semantic", "llm_fallback", "default"] = "semantic"
+    fallback_status: Optional[Literal[
+        "matched", "no_match", "ambiguous", "no_candidates", "unavailable"
+    ]] = None
 
 
 class ErrorResponse(BaseModel):

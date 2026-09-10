@@ -68,6 +68,8 @@ def update_settings():
         return jsonify(
             {"message": "配置更新成功，组件已重新加载", "settings": Config.to_dict()}
         ), 200
+    except ValueError as e:
+        return jsonify({"error": "配置参数错误", "detail": str(e)}), 400
     except Exception as e:
         return jsonify({"error": "配置保存失败", "detail": str(e)}), 500
 

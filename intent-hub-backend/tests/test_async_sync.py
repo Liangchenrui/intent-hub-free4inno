@@ -29,7 +29,7 @@ class FakeQdrant:
     def delete_route(self, route_id):
         self.deleted.append(route_id)
 
-    def upsert_route_metadata(self, route, **_kwargs):
+    def update_route_metadata_state(self, route):
         self.metadata.append(route.model_copy(deep=True))
 
 

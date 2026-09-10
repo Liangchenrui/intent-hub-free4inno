@@ -277,11 +277,7 @@ class SyncTaskService:
                 error=None,
             )
             if latest is not None:
-                self.component_manager.qdrant_client.upsert_route_metadata(
-                    route=latest,
-                    route_hash=self.route_manager.compute_route_hash(latest),
-                    model_name=Config.EMBEDDING_MODEL_NAME,
-                )
+                self.component_manager.qdrant_client.update_route_metadata_state(latest)
             synced_any = True
 
         if superseded_any and not synced_any:

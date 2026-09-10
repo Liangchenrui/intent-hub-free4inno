@@ -1,0 +1,25 @@
+{
+  "observed_at": "2026-09-10T16:17:54.007361+08:00",
+  "method": "GET /models, no generation request",
+  "provider": "deepseek",
+  "host": "api.deepseek.com",
+  "model": "deepseek-flash",
+  "probes": [
+    {
+      "transport": "environment proxy",
+      "http_status": 200,
+      "model_ids": [
+        "deepseek-flash",
+        "deepseek-v4-pro"
+      ]
+    },
+    {
+      "transport": "direct without environment proxy",
+      "http_status": 200,
+      "model_ids": [
+        "deepseek-flash",
+        "deepseek-v4-pro"
+      ]
+    }
+  ]
+}

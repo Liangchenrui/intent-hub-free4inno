@@ -95,7 +95,11 @@
                 </div>
                 <el-tag v-if="!isNoneRoute(result)" size="small" type="info" effect="plain">ID: {{ result.id }}</el-tag>
               </div>
-              <div class="result-score">
+              <div v-if="result.match_source === 'llm_fallback' || result.fallback_status" class="fallback-result">
+                <el-tag v-if="result.match_source === 'llm_fallback'" type="warning" size="small">{{ $t('test.llmFallback') }}</el-tag>
+                <span v-if="result.fallback_status">{{ $t(`test.fallbackStatus.${result.fallback_status}`) }}</span>
+              </div>
+              <div v-if="result.score != null" class="result-score">
                 <div class="score-label">{{ $t('test.confidenceScore') }}</div>
                 <div class="score-bar-container">
                   <el-progress 
@@ -330,7 +334,8 @@ const handleTest = async () => {
   }
 };
 
-const isNoneRoute = (result: PredictResult) => result.route_key === 'none';
+const isNoneRoute = (result: PredictResult) => result.match_source === 'default'
+  || (!result.match_source && ['none', 'fallback.default'].includes(result.route_key));
 const getFeedbackState = (routeId: number) => feedbackState.value[routeId];
 const isFeedbackPending = (routeId: number) => Boolean(feedbackPending.value[routeId]);
 
@@ -610,6 +615,16 @@ const handleFeedback = async (result: PredictResult, feedbackType: 'positive' | 
 .none-route-copy {
   color: #909399;
   white-space: normal;
+}
+
+.fallback-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  color: #606266;
+  font-size: 13px;
 }
 
 .empty-results {

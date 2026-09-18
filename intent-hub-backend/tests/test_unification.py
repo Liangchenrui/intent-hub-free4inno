@@ -319,3 +319,15 @@ def test_collection_restore_uses_alias_and_preserves_details(components, monkeyp
     assert restored.details == {'id': 71, 'title': 'Orders'}
     assert restored.route_key == 'bupt'
     assert restored.sync.status == 'pending'
+
+
+def test_upstream_pull_does_not_reactivate_merged_originals(components):
+    from intent_hub.services.upstream_agent_service import UpstreamAgentService
+    incoming = [dict(source_id=str(i), name=f'Agent {i}', description='', utterances=['track'], negative_samples=[]) for i in (1, 2)]
+    source = SimpleNamespace(fetch_all=lambda: incoming)
+    UpstreamAgentService(components, source).pull()
+    originals = components.agent_store.all()
+    components.agent_store.merge(originals[0].id, originals[1].id, 'Merged', '')
+    UpstreamAgentService(components, source).pull()
+    assert all(components.agent_store.get(a.id).lifecycle_status == 'inactive' for a in originals)
+    assert len(components.agent_store.active()) == 1

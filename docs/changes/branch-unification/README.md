@@ -244,7 +244,7 @@ npm run build
 ### 本地证据
 
 - 基线：master 84 个测试通过（[原始输出](evidence/master-baseline.txt)）；BUPT 81 个测试通过（本会话隔离 worktree 执行，未保存原始日志，不与统一版测试数混算）。
-- 统一版：最终 **118 passed，5 warnings**（55.36 秒）；[后端输出](evidence/backend.txt)、[JUnit](evidence/backend.xml)；覆盖双契约、鉴权、迁移、负 ID、合并、重启、目标变化、并发 outbox 及原有回归。
+- 统一版：最终 **119 passed，5 warnings**（55.03 秒）；[后端输出](evidence/backend.txt)、[JUnit](evidence/backend.xml)；覆盖双契约、鉴权、迁移、负 ID、合并、重启、目标变化、并发 outbox 及原有回归。
 - 前端：[构建输出](evidence/frontend-build.txt)，TypeScript 检查及 Vite 构建通过；保留既有大 chunk 警告。
 - 浏览器：[可复现离线 fixture](evidence/ui_fixture.py)、[观察摘要](evidence/ui-check.json)。实际完成登录、推荐负例、保存、合并及刷新后停用/同步状态验证；SQLite 和内存 Qdrant 为真实组件，Embedding/LLM 为确定性替身。
 - [OpenAPI 清单](../../intent-hub-openapi.json) 由 `python -m intent_hub.openapi` 生成，`--check` 核对注册路由及模型；这是接口清单和主要 DTO schema，尚非每个响应的完整形式化规格。
@@ -276,4 +276,30 @@ npm run build
 
 移植编码测试时发现旧测试会在构造器探测外部 Embedding URL，并得到 404；已为构造器注入测试替身。该探测不计作外部服务验证，后续回归使用离线替身。
 
-最终合并工作树已通过 118 项后端测试、前端 TypeScript/Vite 构建、OpenAPI 一致性和 Compose 配置解析。5 条后端警告为既有 Pydantic `dict()` 弃用提示；前端仍有既有的大 chunk 提示。没有以真实 Provider、生产数据或部署结果替代本地测试结论。
+最终交付工作树已通过 119 项后端测试、前端 TypeScript/Vite 构建、OpenAPI 一致性和 Compose 配置解析。5 条后端警告为既有 Pydantic `dict()` 弃用提示；前端仍有既有的大 chunk 提示。没有以真实 Provider、生产数据或部署结果替代本地测试结论。
+
+### 迁移命令示例（未对用户运行数据执行）
+
+以下命令从 `intent-hub-backend` 目录执行。输入使用停写后的快照；SQLite 若采用 WAL，应通过 SQLite backup API 制作一致性备份，不能只复制正在写入的 `.db` 主文件。
+
+```powershell
+# master 来源：先预检，再写入新的数据库
+python -m intent_hub.migrate --contract master --source default --input snapshots/routes.json --target data/unified.sqlite3
+python -m intent_hub.migrate --contract master --source default --input snapshots/routes.json --target data/unified.sqlite3 --apply
+
+# BUPT 来源：独立部署使用独立目标；只有明确要合并数据时才选择同一个目标
+python -m intent_hub.migrate --contract bupt --source default --input snapshots/agents.db --target data/bupt-unified.sqlite3
+python -m intent_hub.migrate --contract bupt --source default --input snapshots/agents.db --target data/bupt-unified.sqlite3 --apply
+```
+
+预检/写入输出实体数、输入指纹和 `requires_reindex`，不输出实体正文或密钥。相同输入重复 apply 幂等；变更过的输入拒绝再次导入同一来源。验证后将 `ROUTES_CONFIG_PATH` 指向目标 SQLite 的绝对路径，并使 `SOURCE_INSTANCE` 与迁移 `--source` 一致。显式选择测试 collection 后重建索引，再核对 ID、语料、定义向量和契约输出。仅切换 `API_COMPAT_PROFILE` 不会自动迁移旧 `agents.db`。
+
+恢复时保留旧代码和原始快照，停写后切回原数据路径及原 collection；如果新库已有业务写入，先导出并协调增量，不能直接丢弃。当前迁移测试证明源文件未修改、事务失败回滚与重复执行幂等，没有替代生产恢复演练。
+
+### 本地交付
+
+- `f3a2f94`：统一实现；`47d9edb`：普通双亲历史合并，第二父提交为 BUPT `36df30b9`。
+- 本地 `master` 已快进到整合分支；通过祖先关系检查确认同时包含原 master 和 BUPT 历史，保留旧分支。
+- 主目录 13 个已有运行数据、脚本与研究文件 SHA-256 校验完全一致；前期规划文档原稿备份在本机 `.tmp/branch-unification-pre-ff-20260918/`。
+- 收尾回归补齐“合并后再次拉取上游”场景：原实体的停用状态记为人工覆盖，避免被自动激活。
+- 本轮仅完成本地 Git 提交和合并，未推送远端；按用户决定未部署。

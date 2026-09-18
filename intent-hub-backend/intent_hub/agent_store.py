@@ -129,7 +129,8 @@ class AgentStore:
             for old in (left, right):
                 previous = old.model_copy(deep=True)
                 old.lifecycle_status = 'disabled'
-                RouteService._mark_changed(old, previous)
+                RouteService._mark_changed(old, previous, manual_overrides=sorted(
+                    set(previous.sync.manual_overrides if previous.sync else []) | {"lifecycle_status"}))
                 self.repo.save(old, db)
             db.execute('INSERT INTO metadata VALUES (?,?)', (f'merge:{entity_id}', f'{source},{target}'))
         return self.from_route(route)

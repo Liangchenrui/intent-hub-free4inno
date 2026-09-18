@@ -29,11 +29,18 @@
         "negative_samples",
         "score_threshold",
         "negative_threshold"
-      ]
+      ],
+      "source_snapshot": {},
+      "upstream_present": null,
+      "last_pulled_at": null
     },
     "sync": {
       "status": "synced",
-      "last_synced_at": null,
+      "last_synced_at": "2026-09-04T07:57:41.036041+00:00",
+      "version": 2,
+      "synced_version": 2,
+      "task_id": "ce6649e46a1f4ae68bd4fa275a0bb188",
+      "error": null,
       "manual_overrides": []
     },
     "lifecycle_status": "active"
@@ -69,11 +76,18 @@
         "negative_samples",
         "score_threshold",
         "negative_threshold"
-      ]
+      ],
+      "source_snapshot": {},
+      "upstream_present": null,
+      "last_pulled_at": null
     },
     "sync": {
       "status": "synced",
-      "last_synced_at": null,
+      "last_synced_at": "2026-09-04T07:57:49.063967+00:00",
+      "version": 2,
+      "synced_version": 2,
+      "task_id": "ce6649e46a1f4ae68bd4fa275a0bb188",
+      "error": null,
       "manual_overrides": []
     },
     "lifecycle_status": "active"

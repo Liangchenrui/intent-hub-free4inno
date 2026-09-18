@@ -1,0 +1,4 @@
+import requests,re
+for u in ['https://aclanthology.org/D19-1131/','https://aclanthology.org/P19-1548/','https://aclanthology.org/2020.acl-main.99/','https://aclanthology.org/2021.findings-acl.252/','https://aclanthology.org/2022.acl-long.352/','https://aclanthology.org/2021.acl-long.190/','https://aclanthology.org/2021.acl-short.110/','https://aclanthology.org/2020.emnlp-main.324/','https://aclanthology.org/2023.findings-emnlp.47/']:
+ t=requests.get(u).text
+ print(u, re.findall(r'<title>(.*?) - ACL Anthology',t)[:1]); print('authors',re.findall(r'<meta content="(.*?)" name=citation_author>',t)[:6]); print('conf',re.findall(r'<meta content="(.*?)" name=citation_conference_title>',t)); print('date',re.findall(r'<meta content="(.*?)" name=citation_publication_date>',t)); print('doi',re.findall(r'<meta content="(.*?)" name=citation_doi>',t))

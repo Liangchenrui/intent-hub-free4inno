@@ -2,6 +2,8 @@
 
 管理接口使用登录返回的 API key；`POST /auth/login` 免鉴权。`POST /predict` 使用独立 `PREDICT_AUTH_KEY`。
 
+对外路由接口的 BUPT 契约（`POST /compat/bupt/route`、`POST /route`）见 [bupt-routing-api.openapi.yaml](bupt-routing-api.openapi.yaml)；master 契约（`POST /predict`）见下文。
+
 - `POST /auth/login`
 - `GET /health` and authenticated `GET /health/services`
 - `POST /predict`

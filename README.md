@@ -25,6 +25,6 @@ cd intent-hub-frontend && npm install && npm run build
 
 ## Unified master / BUPT version
 
-Both contracts share one SQLite repository, routing core and sync queue. Set `API_COMPAT_PROFILE=master` (default) or `bupt` for root API aliases; `/compat/master/*` and `/compat/bupt/*` remain explicit. The administration UI uses the master namespace on either profile. Set `DEFAULT_PASSWORD` for management login and `AUTH_CODE` for BUPT API access in the process environment; there is no built-in password. Provider keys are also environment-only.
+Both contracts share one SQLite repository, routing core and sync queue. Set `API_COMPAT_PROFILE=master` (default) or `bupt` for root API aliases; `/compat/master/*` and `/compat/bupt/*` remain explicit. The administration UI uses the master namespace on either profile and fixed credentials `admin / telestar`; it does not use a `DEFAULT_PASSWORD` environment variable. Set `AUTH_CODE` for BUPT API access in the process environment. The LLM API key is configured in the Settings page and saved locally; other provider keys remain environment-only.
 
 For populated installations, use the [migration and compatibility guide](docs/changes/branch-unification/README.md). Do not reuse a BUPT index without rebuilding against migrated internal IDs. Deployment is deferred by user request.

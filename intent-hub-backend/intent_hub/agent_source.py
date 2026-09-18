@@ -16,14 +16,13 @@ class AgentSource:
 
     def fetch_all(self) -> list[dict[str, Any]]:
         base_url = str(Config.AGENT_API_URL or "").strip().rstrip("/")
-        token = str(Config.AGENT_API_TOKEN or "").strip()
         label_ids = [item.strip() for item in str(self.label_ids if self.label_ids is not None else Config.AGENT_API_LABEL_IDS or "").split(",") if item.strip()]
-        if not base_url or not token or not label_ids:
-            raise ValueError("请先配置 AGENT_API_URL、AGENT_API_TOKEN 和 AGENT_API_LABEL_IDS")
+        if not base_url or not label_ids:
+            raise ValueError("请先配置 AGENT_API_URL 和 AGENT_API_LABEL_IDS")
 
         records_by_id: dict[str, dict] = {}
         for label_id in label_ids:
-            payload = self._get(base_url, token, "/resource/search", {"labels": label_id})
+            payload = self._get(base_url, "/resource/search", {"labels": label_id})
             for record in payload.get("records", []):
                 resource_id = (record.get("resource") or {}).get("id")
                 if resource_id is not None:
@@ -31,7 +30,7 @@ class AgentSource:
 
         agents = []
         for source_id in records_by_id:
-            details = self._get(base_url, token, f"/resource/{source_id}/detail")
+            details = self._get(base_url, f"/resource/{source_id}/detail")
             agents.append(
                 {
                     "source_id": str(details.get("id", source_id)),
@@ -44,10 +43,9 @@ class AgentSource:
             )
         return agents
 
-    def _get(self, base_url: str, token: str, path: str, params=None) -> dict[str, Any]:
+    def _get(self, base_url: str, path: str, params=None) -> dict[str, Any]:
         response = self.session.get(
             f"{base_url}{path}",
-            headers={"Authorization": f"Bearer {token}"},
             params=params,
             timeout=30,
         )

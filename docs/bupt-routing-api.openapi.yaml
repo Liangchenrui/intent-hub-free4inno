@@ -1,0 +1,425 @@
+openapi: 3.1.0
+info:
+  title: Intent Hub 对外路由接口（BUPT 契约）
+  version: "0.2.0"
+  summary: BUPT 语义路由契约：输入 query，返回 success/data/error 信封
+  description: |
+    本文档描述 Intent Hub 以 **BUPT 契约**对外提供的路由接口，即「输入一段用户文本，返回应该处理它的 Agent」。
+    管理接口（`/agents`、`/collections`、`/settings`、`/diagnostics/*` 等）不在本文档范围内。
+
+    ## 入口与稳定路径
+    - 固定前缀入口 `POST /compat/bupt/route`，与 `API_COMPAT_PROFILE` 无关，**建议对外集成使用该路径**。
+    - 无前缀别名 `POST /route`。该路径与 master 路径不冲突，因此在任何 profile 下都注册为 BUPT 契约。
+    - 两处是同一个视图函数，请求与响应契约完全一致。
+
+    ## 鉴权
+    - 仅接受启动环境变量 `AUTH_CODE` 的值（Bearer 或 `X-API-Key`，`hmac.compare_digest` 精确比较）。
+    - `AUTH_CODE` 为空时该接口对所有请求返回 401；`AUTH_ENABLED` 开关不影响该接口。
+    - master 的 `PREDICT_AUTH_KEY` 与管理台登录签发的 API Key 在此**不被接受**，两套凭据不能交叉使用。
+
+    ## 命中与未命中语义
+    1. 查询文本先向量化，再与当前 Collection 中的例句向量检索。
+    2. 命中判定受三个条件约束：该 Agent `lifecycle_status` 必须为 `active`；相似度必须 ≥ 该 Agent 的 `score_threshold`；查询命中该 Agent 的 `negative_samples`（相似度 ≥ `negative_threshold`）时该 Agent 被排除。
+    3. 一个 Agent 有多条例句命中时只保留最高分；`agents` 按 `score` 降序返回，因此可能是多条（按当前设计不是单一 top-1）。
+    4. 全部未命中时进入兜底：启用 `LLM_FALLBACK_ENABLED` 时用名称/描述向量召回 Top-K 意图并由 LLM 在「选择其一 / 不适用 / 歧义」三态中决策；未启用或调用失败时返回默认结果。`matched` 的判定依据是 `match_source != "default"`。
+    5. 命中与否都返回 **HTTP 200**，业务结果通过 `matched`、`agents`、`text` 表达。
+
+    ## score 的口径
+    `score` 始终是**例句向量相似度**，不是概率、也不是模型自评置信度。LLM 兜底命中为 `null`；调用方不应把 `null` 当作低置信度阈值判断，而应读取 `match_source` 与 `fallback_status`。
+
+    ## 访问路径
+    - 后端容器监听 `5000`，`docker-compose.yml` 发布为宿主机 `8000`，可直接访问 `/compat/bupt/route`。
+    - 内置前端 Nginx 发布 `80` 并把 `/api/*` 剥前缀反代到后端，因此也可通过 `/api/compat/bupt/route` 访问。
+    - 前端代理对 LLM 相关请求设置了 300s 读超时。
+  contact:
+    name: Intent Hub Team
+
+servers:
+  - url: https://{host}
+    description: 生产部署地址由部署方填写；本仓库不含固定公网域名
+    variables:
+      host:
+        default: intent-hub.example.com
+  - url: http://localhost:8000
+    description: 按 docker-compose.yml 发布的宿主机端口（后端直连）
+  - url: http://localhost:5000
+    description: 本地直接运行后端时的默认地址
+  - url: http://localhost/api
+    description: 经内置前端 Nginx 反代（/api 前缀会被剥离后转发到后端）
+
+tags:
+  - name: 路由预测
+    description: BUPT `/route` 契约，返回 success/data/error 信封
+  - name: 探针
+    description: BUPT 命名空间下的存活与依赖健康检查
+
+paths:
+  /compat/bupt/route:
+    post:
+      tags: [路由预测]
+      summary: 语义路由预测（BUPT 契约，稳定前缀入口）
+      operationId: compatBuptRoute
+      description: |
+        输入 `query`，返回 `success/data/error` 信封。
+
+        - 命中（`matched=true`）时 `agents` 按 `score` 降序给出所有达标 Agent，`text` 为 `null`。
+        - 未命中（`matched=false`）时 `agents` 为空数组，`text` 返回部署配置的默认文本（缺省 `没有找到合适的 Agent`，可由 `data/default_route.txt` 覆盖）。
+        - `data.agents[].agent` 是该 Agent 的原始 `details` 载荷，字段由数据来源决定，同一部署内可能不稳定，也可能是空对象；不要按固定字段解析。
+        - `match_source` 与 `fallback_status` 取排序后第一条结果的口径，即最高分命中者（或兜底结果）。
+        - 组件未就绪（Embedding / Qdrant 连接失败）统一返回 500 `INTERNAL_ERROR`，不向外部区分具体原因。
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteRequest'
+            examples:
+              basic:
+                summary: 常规请求
+                value:
+                  query: 帮我查一下订单物流
+      responses:
+        '200':
+          description: 统一信封响应；命中与否都返回 HTTP 200
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteEnvelope'
+              examples:
+                matched:
+                  summary: 命中一个 Agent
+                  value:
+                    success: true
+                    data:
+                      matched: true
+                      agents:
+                        - agent:
+                            id: 71
+                            title: 订单物流查询
+                          score: 0.93
+                      text: null
+                      match_source: semantic
+                      fallback_status: null
+                    error: null
+                multiMatch:
+                  summary: 命中多条（按 score 降序）
+                  value:
+                    success: true
+                    data:
+                      matched: true
+                      agents:
+                        - agent:
+                            id: 71
+                            title: 订单物流查询
+                          score: 0.93
+                        - agent:
+                            id: 76
+                            title: 退款进度查询
+                          score: 0.84
+                      text: null
+                      match_source: semantic
+                      fallback_status: null
+                    error: null
+                noMatch:
+                  summary: 未命中且未启用兜底
+                  value:
+                    success: true
+                    data:
+                      matched: false
+                      agents: []
+                      text: 没有找到合适的 Agent
+                      match_source: default
+                      fallback_status: null
+                    error: null
+                fallbackMatched:
+                  summary: LLM 兜底命中（score 为 null）
+                  value:
+                    success: true
+                    data:
+                      matched: true
+                      agents:
+                        - agent:
+                            id: 74
+                            title: 电子发票申请补开
+                          score: null
+                      text: null
+                      match_source: llm_fallback
+                      fallback_status: matched
+                    error: null
+                ambiguous:
+                  summary: 兜底判定为歧义，建议提示用户澄清
+                  value:
+                    success: true
+                    data:
+                      matched: false
+                      agents: []
+                      text: 没有找到合适的 Agent
+                      match_source: default
+                      fallback_status: ambiguous
+                    error: null
+        '400':
+          $ref: '#/components/responses/BuptBadRequest'
+        '401':
+          $ref: '#/components/responses/BuptUnauthorized'
+        '500':
+          $ref: '#/components/responses/BuptInternalError'
+
+  /route:
+    post:
+      tags: [路由预测]
+      summary: 语义路由预测（BUPT 契约，无前缀别名）
+      operationId: route
+      description: |
+        与 `POST /compat/bupt/route` 完全相同的请求与响应契约（同一个视图函数）。
+        该路径不与 master 路径冲突，因此在任何 `API_COMPAT_PROFILE` 下都由 BUPT 契约处理。
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteRequest'
+      responses:
+        '200':
+          description: 同 `POST /compat/bupt/route`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteEnvelope'
+        '400':
+          $ref: '#/components/responses/BuptBadRequest'
+        '401':
+          $ref: '#/components/responses/BuptUnauthorized'
+        '500':
+          $ref: '#/components/responses/BuptInternalError'
+
+  /compat/bupt/health:
+    get:
+      tags: [探针]
+      summary: BUPT 命名空间存活探针
+      operationId: compatBuptHealth
+      description: 免鉴权。仅表示 Flask 进程存活，不代表向量库与 Embedding 可用。
+      security: []
+      responses:
+        '200':
+          description: 进程存活
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessResponse'
+              examples:
+                ok:
+                  value:
+                    status: ok
+
+  /compat/bupt/health/services:
+    get:
+      tags: [探针]
+      summary: BUPT 命名空间依赖健康检查
+      operationId: compatBuptServiceHealth
+      description: |
+        需要 `AUTH_CODE` 鉴权。返回 Embedding 与 Qdrant 的探活结果，任一不健康则整体 `status=degraded`。
+        该响应会暴露依赖服务健康信息，仅应向受信任的调用方开放。
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: 依赖健康汇总
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalServiceHealth'
+              examples:
+                degraded:
+                  value:
+                    status: degraded
+                    services:
+                      embedding:
+                        healthy: true
+                        status_code: 200
+                        latency_ms: 42
+                        message: ok
+                      qdrant:
+                        healthy: false
+                        status_code: null
+                        latency_ms: 5001
+                        message: connection failed
+        '401':
+          $ref: '#/components/responses/BuptUnauthorized'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: '`Authorization: Bearer <key>`，`<key>` 为启动环境变量 `AUTH_CODE` 的值。'
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: 与 `BearerAuth` 等价的备用传递方式，取值同为 `AUTH_CODE`。
+
+  responses:
+    BuptBadRequest:
+      description: 请求参数错误（`query` 缺失、为空字符串或仅含空白）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RouteEnvelope'
+          examples:
+            emptyQuery:
+              value:
+                success: false
+                data: null
+                error:
+                  code: INVALID_REQUEST
+                  message: 请求参数错误
+                  detail: query 不能为空
+    BuptUnauthorized:
+      description: 认证失败（缺少或错误的 AUTH_CODE；AUTH_CODE 未配置时同样返回此响应）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RouteEnvelope'
+          examples:
+            unauthorized:
+              value:
+                success: false
+                data: null
+                error:
+                  code: UNAUTHORIZED
+                  message: Authentication failed
+                  detail: null
+    BuptInternalError:
+      description: 服务异常（含组件未就绪），详情不向外暴露
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RouteEnvelope'
+          examples:
+            internalError:
+              value:
+                success: false
+                data: null
+                error:
+                  code: INTERNAL_ERROR
+                  message: 服务异常
+                  detail: null
+
+  schemas:
+    RouteRequest:
+      type: object
+      description: 多余字段会被忽略，不会因此报错；`query` 缺失、为空字符串或仅含空白返回 400。
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          description: 待匹配的用户文本
+          examples: [帮我查一下订单物流]
+
+    RouteEnvelope:
+      type: object
+      required: [success, data, error]
+      description: BUPT 统一信封；失败时 `data` 为 `null`
+      properties:
+        success:
+          type: boolean
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/RouteData'
+            - type: 'null'
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/ApiError'
+            - type: 'null'
+
+    RouteData:
+      type: object
+      required: [matched, agents, text, match_source, fallback_status]
+      properties:
+        matched:
+          type: boolean
+          description: 是否存在非 `default` 的命中结果；LLM 兜底命中同样为 `true`
+        agents:
+          type: array
+          description: 命中的 Agent 列表，按 `score` 降序；未命中时为空数组
+          items:
+            $ref: '#/components/schemas/RouteAgentMatch'
+        text:
+          type: [string, 'null']
+          description: 仅未命中时返回默认文本；命中时为 `null`
+        match_source:
+          type: string
+          enum: [semantic, llm_fallback, default]
+          description: '取值含义：`semantic` 例句匹配；`llm_fallback` LLM 兜底选中；`default` 默认结果'
+        fallback_status:
+          type: [string, 'null']
+          enum: [matched, no_match, ambiguous, no_candidates, unavailable, null]
+          description: 未触发兜底时为 `null`；`ambiguous` 建议调用方提示用户澄清（服务端不会自动发起多轮对话）
+
+    RouteAgentMatch:
+      type: object
+      required: [agent, score]
+      properties:
+        agent:
+          type: object
+          description: 原始 Agent `details` 载荷；字段由数据来源决定，可能为空对象，不作为稳定契约使用
+          additionalProperties: true
+        score:
+          type: [number, 'null']
+          description: 例句向量相似度；LLM 兜底命中为 `null`
+
+    ApiError:
+      type: object
+      required: [code, message, detail]
+      properties:
+        code:
+          type: string
+          enum: [INVALID_REQUEST, UNAUTHORIZED, INTERNAL_ERROR]
+        message:
+          type: string
+        detail:
+          type: [string, 'null']
+
+    LivenessResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    ExternalServiceHealth:
+      type: object
+      required: [status, services]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        services:
+          type: object
+          properties:
+            embedding:
+              $ref: '#/components/schemas/ServiceProbe'
+            qdrant:
+              $ref: '#/components/schemas/ServiceProbe'
+
+    ServiceProbe:
+      type: object
+      required: [healthy, status_code, latency_ms, message]
+      properties:
+        healthy:
+          type: boolean
+        status_code:
+          type: [integer, 'null']
+        latency_ms:
+          type: integer
+        message:
+          type: string

@@ -63,6 +63,15 @@
             <el-input v-model="settings.PREDICT_AUTH_KEY" type="password" show-password />
           </el-form-item>
 
+          <el-divider content-position="left">{{ $t('settings.upstreamAgentTitle') }}</el-divider>
+          <el-form-item :label="$t('settings.upstreamAgentUrl')">
+            <el-input v-model="settings.AGENT_API_URL" placeholder="https://yuanfang.bupt.edu.cn/ac/api" />
+          </el-form-item>
+          <el-form-item :label="$t('settings.upstreamAgentLabelIds')">
+            <el-input v-model="settings.AGENT_API_LABEL_IDS" placeholder="87,88,89" />
+            <div class="field-hint">{{ $t('settings.upstreamAgentHint') }}</div>
+          </el-form-item>
+
           <el-divider :content-position="'left'">{{ $t('settings.llmTitle') }}</el-divider>
           <el-form-item :label="$t('settings.llmProvider')">
             <el-select v-model="settings.LLM_PROVIDER" style="width: 100%">
@@ -75,6 +84,10 @@
             <div style="font-size: 12px; color: #909399; margin-top: 4px;">
               {{ $t('settings.providerHint') }}
             </div>
+          </el-form-item>
+          <el-form-item :label="$t('settings.llmApiKey')">
+            <el-input v-model="settings.LLM_API_KEY" type="password" show-password autocomplete="new-password" />
+            <div class="field-hint">{{ $t('settings.llmApiKeyHint') }}</div>
           </el-form-item>
           <el-row :gutter="20">
             <el-col :span="24">
@@ -207,7 +220,10 @@ const settings = ref<SystemSettings>({
   QDRANT_URL: 'http://app.qdrant.free4inno.com',
   PREDICT_AUTH_KEY: null,
   EMBEDDING_SERVICE_URL: 'http://embedding.free4inno.com/embed',
+  AGENT_API_URL: 'https://yuanfang.bupt.edu.cn/ac/api',
+  AGENT_API_LABEL_IDS: '87,88,89',
   LLM_PROVIDER: 'deepseek',
+  LLM_API_KEY: null,
   LLM_BASE_URL: null,
   LLM_MODEL: null,
   LLM_TEMPERATURE: 0.7,
@@ -229,7 +245,10 @@ const normalizeSettings = (data: any): SystemSettings => ({
   QDRANT_COLLECTION: data.QDRANT_COLLECTION ?? '',
   PREDICT_AUTH_KEY: data.PREDICT_AUTH_KEY ?? null,
   EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
+  AGENT_API_URL: data.AGENT_API_URL ?? 'https://yuanfang.bupt.edu.cn/ac/api',
+  AGENT_API_LABEL_IDS: data.AGENT_API_LABEL_IDS ?? '87,88,89',
   LLM_PROVIDER: data.LLM_PROVIDER ?? 'deepseek',
+  LLM_API_KEY: data.LLM_API_KEY ?? null,
   LLM_BASE_URL: data.LLM_BASE_URL ?? null,
   LLM_MODEL: data.LLM_MODEL ?? null,
   LLM_TEMPERATURE: data.LLM_TEMPERATURE ?? 0.7,
@@ -333,7 +352,7 @@ const handleImportCollection = async () => {
 
 const prepareSettingsForSubmit = (data: SystemSettings): Partial<SystemSettings> => {
   const result: any = { ...data };
-  ['QDRANT_API_KEY', 'AGENT_API_TOKEN', 'LLM_API_KEY', 'DEEPSEEK_API_KEY', 'API_KEYS', 'PREDICT_AUTH_KEY', 'DEFAULT_PASSWORD', 'AUTH_CODE', 'AUTH_ENABLED'].forEach(key => delete result[key]);
+  ['QDRANT_API_KEY', 'DEEPSEEK_API_KEY', 'API_KEYS', 'PREDICT_AUTH_KEY', 'DEFAULT_PASSWORD', 'AUTH_CODE', 'AUTH_ENABLED'].forEach(key => delete result[key]);
   const nullableFields: (keyof SystemSettings)[] = [
     'LLM_BASE_URL',
     'LLM_MODEL'

@@ -36,7 +36,6 @@ def upstream_route(route_id, source_id, name, snapshot, overrides=None):
 
 def test_agent_source_deduplicates_labels_and_parses_corpora(monkeypatch):
     monkeypatch.setattr(Config, "AGENT_API_URL", "https://agents.example/api/")
-    monkeypatch.setattr(Config, "AGENT_API_TOKEN", "token")
     monkeypatch.setattr(Config, "AGENT_API_LABEL_IDS", "87,88")
     calls = []
 
@@ -71,7 +70,7 @@ def test_agent_source_deduplicates_labels_and_parses_corpora(monkeypatch):
     assert agents[0]["utterances"] == ["today", "tomorrow"]
     assert agents[0]["negative_samples"] == ["sports"]
     assert len([call for call in calls if call[0].endswith("/detail")]) == 1
-    assert all(call[1]["headers"] == {"Authorization": "Bearer token"} for call in calls)
+    assert all("headers" not in call[1] for call in calls)
 
 
 def test_pull_preserves_overrides_allocates_local_ids_and_disables_missing(tmp_path):

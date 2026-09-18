@@ -37,7 +37,7 @@ curl -X POST http://localhost:5000/predict \
 
 手工点击“同步”只会提交后台 hash 检查任务，页面无需等待。任务仅重新生成新增或内容 hash 变化的意图向量，跳过未变化项，并清理已删除项；完成后界面显示新增、更新、删除和跳过数量。模型、向量维度或 Collection 迁移仍应使用显式全量重建能力。
 
-如通过后端配置了可选的上游 Agent API，可以从意图实体页拉取 Agent。拉取操作只更新本地配置，不回写上游，也不立即更新向量。人工修改的上游字段会被标记为覆盖项，后续拉取不会覆盖；点击列表中的差异状态可查看或恢复为最近一次上游快照。
+可从设置页修改上游 Agent API 地址和拉取标签 IDs；默认沿用 BUPT 来源 `https://yuanfang.bupt.edu.cn/ac/api` 与标签 `87,88,89`。上游拉取不使用 Token。拉取操作只更新本地配置，不回写上游，也不立即更新向量。人工修改的上游字段会被标记为覆盖项，后续拉取不会覆盖；点击列表中的差异状态可查看或恢复为最近一次上游快照。
 
 ## 数据文件
 
@@ -48,7 +48,7 @@ curl -X POST http://localhost:5000/predict \
 
 ## 统一版本的登录与数据迁移
 
-管理台在两种 API profile 下都使用相同登录界面；启动前在进程环境设置 `DEFAULT_PASSWORD`。LLM、Qdrant、上游访问密钥由运行环境提供，设置页面不再编辑或返回密钥。已有 JSON 设置中的密钥不会自动生效，也不会自动删除原文件。
+管理台在两种 API profile 下都使用相同登录界面，固定使用 `admin / telestar`，不依赖 `DEFAULT_PASSWORD` 环境变量。LLM API Key 可在设置页配置并保存到本地 `settings.json`；Qdrant 等其余访问密钥仍由运行环境提供。已有 JSON 设置中的密钥不会自动删除。
 
 首次升级先备份并按[统一方案中的迁移步骤](docs/changes/branch-unification/README.md)执行 dry-run。旧 JSON 保留为输入/导出格式；SQLite 是唯一业务数据源，不能继续编辑旧 JSON 来更新运行数据。
 

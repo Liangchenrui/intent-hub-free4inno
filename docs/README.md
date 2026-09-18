@@ -5,6 +5,7 @@
 - `API.md`：后端接口与鉴权说明
 - `ARCHITECTURE.md`：代码结构、运行时数据布局、兼容层说明
 - `intent-hub-openapi.json`：可导入 Apifox 等工具的 OpenAPI 文档
+- `bupt-routing-api.openapi.yaml`：BUPT 契约对外路由接口（`POST /compat/bupt/route`、`POST /route`）的 OpenAPI 3.1 契约，含鉴权方式、字段语义、错误与示例
 - `superpowers/`：过程性设计与计划文档
 - [大模型兜底需求与交付记录](changes/llm-fallback/README.md)：需求、设计取舍、实现入口、验收证据、本地运行与待验证项
 - [master 与 BUPT 统一方案](changes/branch-unification/README.md)：需求、实现与兼容契约、迁移工具、验证证据及交付状态

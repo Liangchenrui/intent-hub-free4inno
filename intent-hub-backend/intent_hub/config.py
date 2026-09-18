@@ -90,7 +90,7 @@ class Config:
     DEFAULT_ROUTE_TEXT = "没有找到合适的 Agent"
     SYNC_WAIT_SECONDS = 240
     NEGATIVE_SAMPLE_GENERATION_PROMPT = "为 {name}（{description}）生成 {count} 条容易混淆但不属于该意图的负例，避免重复 {negative_samples}。{format_instructions}"
-    SECRET_KEYS = {"QDRANT_API_KEY", "AGENT_API_TOKEN", "LLM_API_KEY", "DEEPSEEK_API_KEY", "API_KEYS", "PREDICT_AUTH_KEY", "DEFAULT_PASSWORD", "AUTH_CODE"}
+    SECRET_KEYS = {"QDRANT_API_KEY", "DEEPSEEK_API_KEY", "API_KEYS", "PREDICT_AUTH_KEY", "AUTH_CODE"}
     # Flask配置
     FLASK_HOST: str = "0.0.0.0"
     FLASK_PORT: int = 5000
@@ -113,9 +113,11 @@ class Config:
     EMBEDDING_HEALTH_URL: Optional[str] = None
 
     # 可选的只读上游 Agent 数据源
-    AGENT_API_URL: Optional[str] = None
-    AGENT_API_TOKEN: Optional[str] = None
-    AGENT_API_LABEL_IDS: str = "87,88,89" if API_COMPAT_PROFILE == "bupt" else ""
+    # Keep the BUPT source available out of the box. The endpoint and label
+    # selection remain editable in settings.json; this upstream API is called
+    # without a credential.
+    AGENT_API_URL: Optional[str] = "https://yuanfang.bupt.edu.cn/ac/api"
+    AGENT_API_LABEL_IDS: str = "87,88,89"
 
     # 默认路由配置
     DEFAULT_ROUTE_ID: int = 0
@@ -145,8 +147,10 @@ class Config:
     PREDICT_AUTH_KEY: Optional[str] = None
 
     # 用户配置
+    # The management UI intentionally has fixed local credentials. They are
+    # neither loaded from settings.json nor overridden through the environment.
     DEFAULT_USERNAME: str = "admin"
-    DEFAULT_PASSWORD: str = ""
+    DEFAULT_PASSWORD: str = "telestar"
 
     # LLM配置
     LLM_PROVIDER: str = "deepseek"
@@ -217,8 +221,10 @@ class Config:
         # Credentials are environment-only; operational overrides are explicit.
         for key in cls.SECRET_KEYS:
             setattr(cls, key, os.environ.get(key, ""))
-        for key in ("QDRANT_URL", "QDRANT_COLLECTION", "EMBEDDING_SERVICE_URL", "EMBEDDING_MODEL_NAME", "EMBEDDING_API_FORMAT", "AGENT_API_URL", "AGENT_API_LABEL_IDS", "LLM_PROVIDER", "LLM_BASE_URL", "LLM_MODEL", "ROUTES_CONFIG_PATH", "DEFAULT_USERNAME"):
-            if key in os.environ:
+        for key in ("QDRANT_URL", "QDRANT_COLLECTION", "EMBEDDING_SERVICE_URL", "EMBEDDING_MODEL_NAME", "EMBEDDING_API_FORMAT", "AGENT_API_URL", "AGENT_API_LABEL_IDS", "LLM_PROVIDER", "LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "ROUTES_CONFIG_PATH"):
+            # Docker Compose exports an empty string for optional variables.
+            # Treat that as unset so it does not erase a value saved in Settings.
+            if str(os.environ.get(key, "")).strip():
                 setattr(cls, key, os.environ[key])
         if cls.API_COMPAT_PROFILE not in {"master", "bupt"}:
             raise ValueError("API_COMPAT_PROFILE must be master or bupt")
@@ -232,6 +238,12 @@ class Config:
     @classmethod
     def _apply_backward_compatibility(cls):
         """Normalize settings written by earlier releases."""
+        # Earlier unified settings files stored the optional upstream source as
+        # empty values. Migrate them to the established BUPT defaults.
+        if not str(cls.AGENT_API_URL or "").strip():
+            cls.AGENT_API_URL = "https://yuanfang.bupt.edu.cn/ac/api"
+        if not str(cls.AGENT_API_LABEL_IDS or "").strip():
+            cls.AGENT_API_LABEL_IDS = "87,88,89"
         if (
             str(cls.EMBEDDING_SERVICE_URL).rstrip("/")
             == "http://embedding.free4inno.com"
@@ -279,6 +291,14 @@ class Config:
             raise ValueError("QDRANT_WRITE_BATCH_SIZE must be a positive integer")
         if merged['EMBEDDING_API_FORMAT'] not in {'tei', 'qwen'}:
             raise ValueError("EMBEDDING_API_FORMAT must be tei or qwen")
+        agent_api_url = str(merged['AGENT_API_URL'] or '').strip()
+        if agent_api_url and not agent_api_url.startswith(('http://', 'https://')):
+            raise ValueError("AGENT_API_URL must start with http:// or https://")
+        label_ids = [item.strip() for item in str(merged['AGENT_API_LABEL_IDS'] or '').split(',') if item.strip()]
+        if not label_ids or not all(item.isdigit() for item in label_ids):
+            raise ValueError("AGENT_API_LABEL_IDS must be a comma-separated list of numeric label IDs")
+        merged['AGENT_API_URL'] = agent_api_url.rstrip('/')
+        merged['AGENT_API_LABEL_IDS'] = ','.join(label_ids)
         changed = merged['QDRANT_COLLECTION'] != cls.QDRANT_COLLECTION
         path = cls.get_settings_path()
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -332,6 +352,7 @@ class Config:
             "AGENT_API_LABEL_IDS": cls.AGENT_API_LABEL_IDS,
             # LLM配置（通用）
             "LLM_PROVIDER": cls.LLM_PROVIDER,
+            "LLM_API_KEY": cls.LLM_API_KEY,
             "LLM_BASE_URL": cls.LLM_BASE_URL,
             "LLM_MODEL": cls.LLM_MODEL,
             "LLM_TEMPERATURE": cls.LLM_TEMPERATURE,
@@ -347,7 +368,6 @@ class Config:
             "SKILL_ROUTE_IMPORT_PROMPT": cls.SKILL_ROUTE_IMPORT_PROMPT,
             # 认证配置
             "AUTH_ENABLED": cls.AUTH_ENABLED,
-            "DEFAULT_USERNAME": cls.DEFAULT_USERNAME,
             "NEGATIVE_SAMPLE_GENERATION_PROMPT": cls.NEGATIVE_SAMPLE_GENERATION_PROMPT,
             "DEFAULT_ROUTE_TEXT": cls.DEFAULT_ROUTE_TEXT,
             # 其他配置

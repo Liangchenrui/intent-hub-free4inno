@@ -41,10 +41,11 @@
           </div>
           <div class="toolbar-actions">
             <el-button
+              v-if="selectedRouteIds.length > 0"
               type="danger"
               plain
+              :icon="Delete"
               @click="handleBatchDelete"
-              :disabled="selectedRouteIds.length === 0"
               :loading="batchDeleting"
             >
               {{ $t('agent.batchDelete', { count: selectedRouteIds.length }) }}
@@ -52,8 +53,6 @@
             <el-button 
               @click="handleReindex" 
               :loading="reindexing"
-              type="warning"
-              plain
               :icon="Refresh"
             >
               {{ $t('agent.reindex') }}
@@ -62,25 +61,27 @@
               type="primary"
               plain
               :loading="pullingUpstream"
+              :icon="Download"
               @click="handlePullUpstream"
             >
-              {{ $t('agent.pullUpstream') }}
+              {{ $t('agent.syncUpstream') }}
             </el-button>
-            <el-button
-              type="info"
-              plain
-              @click="handleExport"
-            >
-              {{ $t('agent.export') }}
-            </el-button>
-            <el-button
-              type="info"
-              plain
-              @click="triggerImport"
-              :loading="importing"
-            >
-              {{ $t('agent.import') }}
-            </el-button>
+            <el-dropdown trigger="click" @command="handleDataManagement">
+              <el-button :icon="FolderOpened">
+                {{ $t('agent.dataManagement') }}
+                <el-icon class="data-menu-caret"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="export" :icon="Download">
+                    {{ $t('agent.export') }}
+                  </el-dropdown-item>
+                  <el-dropdown-item command="import" :icon="Upload" :disabled="importing">
+                    {{ $t('agent.import') }}
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <el-button type="primary" :icon="Plus" @click="handleAdd">{{ $t('agent.add') }}</el-button>
           </div>
         </div>
@@ -234,7 +235,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="$t('agent.actions')" width="205" align="center" fixed="right">
+          <el-table-column :label="$t('agent.actions')" width="205" align="center">
             <template #default="{ row }">
               <el-button link type="primary" @click="handleEdit(row)">{{ $t('common.edit') }}</el-button>
               <el-button link type="warning" @click="handleMerge(row)">{{ $t('agent.mergeAction') }}</el-button>
@@ -419,7 +420,7 @@ import { debounce } from 'lodash-es';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Search, Plus, Refresh, MagicStick } from '@element-plus/icons-vue';
+import { ArrowDown, Delete, Download, FolderOpened, Plus, Refresh, Search, Upload, MagicStick } from '@element-plus/icons-vue';
 import {
   clearSession,
   getRoutes,
@@ -776,6 +777,14 @@ const handleExport = () => {
   }
 };
 
+const handleDataManagement = (command: string) => {
+  if (command === 'export') {
+    handleExport();
+  } else if (command === 'import') {
+    triggerImport();
+  }
+};
+
 const handleImportFileChange = async (evt: Event) => {
   const input = evt.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -1056,6 +1065,11 @@ const handleBatchDelete = async () => {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.data-menu-caret {
+  margin-left: 6px;
+  font-size: 12px;
 }
 
 .agent-info {

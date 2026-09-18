@@ -30,6 +30,11 @@ def create_qdrant_collection():
 
 @handle_errors
 def update_settings():
+    with Config.LOCK:
+        return _update_settings()
+
+
+def _update_settings():
     """更新系统配置项"""
     data = request.get_json()
     if not data:

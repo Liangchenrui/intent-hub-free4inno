@@ -115,7 +115,8 @@
           <el-table-column :label="$t('agent.nameDesc')" min-width="200">
             <template #default="{ row }">
               <div class="agent-info">
-                <div class="agent-name">{{ row.name }}</div>
+                <div class="agent-name">{{ row.name }}
+                    <el-tag v-if="row.lifecycle_status && row.lifecycle_status !== 'active'" type="info" size="small">{{ $t('agent.inactiveState') }}</el-tag></div>
                 <div class="agent-route-key">{{ row.route_key }}</div>
                 <div class="agent-description">{{ row.description || $t('agent.noDescription') }}</div>
                 <el-tag
@@ -233,9 +234,10 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="$t('agent.actions')" width="150" align="center" fixed="right">
+          <el-table-column :label="$t('agent.actions')" width="205" align="center" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" @click="handleEdit(row)">{{ $t('common.edit') }}</el-button>
+              <el-button link type="warning" @click="handleMerge(row)">{{ $t('agent.mergeAction') }}</el-button>
               <el-divider direction="vertical" />
               <el-button link type="danger" @click="handleDelete(row.id)">{{ $t('common.delete') }}</el-button>
             </template>
@@ -363,6 +365,7 @@
           </div>
         </el-form-item>
         <el-form-item :label="$t('agent.negativeSamplesLabel')">
+          <el-button v-if="isEdit" size="small" :loading="generatingNegative" @click="handleRecommendNegative">{{ $t('agent.recommendNegative') }}</el-button>
           <el-input 
             v-model="negativeSamplesText" 
             type="textarea" 
@@ -425,6 +428,8 @@ import {
   updateRoute,
   createRoute,
   generateUtterances,
+  recommendNegativeSamples,
+  mergeRoutes,
   reindex,
   importRoutes,
   importRouteFromSkill,
@@ -670,6 +675,24 @@ const editForm = ref<Partial<RouteConfig>>({
   negative_samples: []
 });
 const utterancesText = ref('');
+const generatingNegative = ref(false);
+const handleRecommendNegative = async () => {
+  generatingNegative.value = true;
+  try {
+    const { data } = await recommendNegativeSamples(editForm.value.id!, genCount.value);
+    negativeSamplesText.value = [...new Set([...negativeSamplesText.value.split('\n').filter(Boolean), ...data.items])].join('\n');
+  } catch (error: any) { ElMessage.error(error.response?.data?.detail || t('common.error')); }
+  finally { generatingNegative.value = false; }
+};
+const handleMerge = async (row: { id: number; name: string }) => {
+  try {
+    const { value: target } = await ElMessageBox.prompt(t('agent.mergeTarget'), t('agent.mergeAction'), { inputPattern: /^\d+$/, inputErrorMessage: t('agent.mergeTarget') });
+    const { value: title } = await ElMessageBox.prompt(t('agent.nameLabel'), t('agent.mergeAction'), { inputValue: row.name, inputValidator: (value: string) => !!value.trim() });
+    await ElMessageBox.confirm(t('agent.mergeWarning'), t('agent.mergeAction'), { type: 'warning' });
+    await mergeRoutes(row.id, Number(target), title);
+    await fetchAgents(searchQuery.value);
+  } catch (error: any) { if (error !== 'cancel' && error !== 'close') ElMessage.error(error.response?.data?.detail || t('common.error')); }
+};
 const negativeSamplesText = ref('');
 
 const openModal = (agent?: RouteConfig) => {

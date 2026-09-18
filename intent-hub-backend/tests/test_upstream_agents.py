@@ -135,7 +135,7 @@ def test_pull_preserves_overrides_allocates_local_ids_and_disables_missing(tmp_p
     assert created_c.id == 12
     assert created_c.route_key != updated_a.route_key
     assert set(result["affected_route_ids"]) == {10, 11, 12}
-    assert json.loads(path.read_text(encoding="utf-8"))[0]["source"]["source_snapshot"]
+    assert RouteManager(str(path)).get_all_routes()[0].source.source_snapshot
 
 
 def test_manual_edit_is_tracked_and_can_restore_upstream_field(tmp_path):

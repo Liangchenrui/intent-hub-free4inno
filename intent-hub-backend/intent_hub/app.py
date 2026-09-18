@@ -309,3 +309,79 @@ def init_app():
     get_sync_task_service(component_manager)
 
     return app
+
+
+@app.post('/routes/<int:route_id>/recommendations')
+@require_auth
+def recommend_samples(route_id):
+    from flask import request, jsonify
+    from intent_hub.compat_models import RecommendationRequest
+    from intent_hub.services.llm_service import LLMService
+    from intent_hub.utils.error_handler import handle_errors
+    @handle_errors
+    def invoke():
+        components = get_component_manager()
+        route = components.route_manager.get_route(route_id)
+        if route is None:
+            return jsonify({'error': 'Route not found'}), 404
+        payload = RecommendationRequest(**(request.get_json() or {}))
+        return jsonify({'items': LLMService().recommendations(components.agent_store.from_route(route), payload), 'polarity': payload.polarity})
+    return invoke()
+
+
+@app.post('/routes/merge')
+@require_auth
+def merge_routes():
+    from flask import request, jsonify
+    from intent_hub.compat_models import MergeAgentsRequest
+    from intent_hub.utils.error_handler import handle_errors
+    @handle_errors
+    def invoke():
+        components = get_component_manager()
+        data = MergeAgentsRequest(**(request.get_json() or {}))
+        source = components.route_manager.get_route(data.source_agent_id)
+        target = components.route_manager.get_route(data.target_agent_id)
+        if source is None or target is None:
+            return jsonify({'error': 'Route not found'}), 404
+        store = components.agent_store
+        result = store.merge(store.from_route(source).id, store.from_route(target).id, data.title, data.text)
+        from intent_hub.services.sync_task_service import get_sync_task_service
+        merged_id = store.internal_id(result.id)
+        get_sync_task_service(components).enqueue_routes([source.id, target.id, merged_id])
+        return jsonify(components.route_manager.get_route(merged_id).model_dump()), 201
+    return invoke()
+
+
+def register_compatibility():
+    from intent_hub.compat_api import app as bupt
+    from intent_hub.config import Config
+    import re
+    original = list(app.url_map.iter_rules())
+    for rule in original:
+        if rule.endpoint == 'static':
+            continue
+        app.add_url_rule('/compat/master' + rule.rule, 'master_' + rule.endpoint,
+                         app.view_functions[rule.endpoint], methods=rule.methods)
+    app.register_blueprint(bupt, url_prefix='/compat/bupt')
+    bupt_rules = [r for r in app.url_map.iter_rules() if r.endpoint.startswith('bupt.')]
+    for rule in bupt_rules:
+        path = rule.rule.removeprefix('/compat/bupt')
+        methods = rule.methods - {'HEAD', 'OPTIONS'}
+        collisions = [r for r in original if re.sub(r'<[^>]+>', '<>', r.rule) == re.sub(r'<[^>]+>', '<>', path) and methods.intersection(r.methods)]
+        if collisions:
+            if Config.API_COMPAT_PROFILE == 'bupt':
+                for old in collisions:
+                    fn = app.view_functions[rule.endpoint]
+                    old_names = [x.split(':')[-1] for x in re.findall(r'<([^>]+)>', old.rule)]
+                    new_names = [x.split(':')[-1] for x in re.findall(r'<([^>]+)>', path)]
+                    names = dict(zip(old_names, new_names))
+                    def adapted(_fn=fn, _names=names, **kwargs):
+                        return _fn(**{_names.get(k, k): v for k, v in kwargs.items()})
+                    app.view_functions[old.endpoint] = adapted
+                if all(r.rule != path for r in collisions):
+                    app.add_url_rule(path, 'bupt_root_' + rule.endpoint, fn, methods=rule.methods)
+        else:
+            app.add_url_rule(path, 'bupt_root_' + rule.endpoint, app.view_functions[rule.endpoint], methods=rule.methods)
+
+
+register_compatibility()

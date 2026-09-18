@@ -15,9 +15,16 @@ Intent Hub is a single-workspace intent-routing service with a Flask backend and
 - Settings: `/settings`
 - Prediction: `/predict`
 
-Runtime data is stored directly in `intent-hub-backend/data/`: `routes.json`, `settings.json`, and `diagnostics_cache.json`.
+Runtime data is stored directly in `intent-hub-backend/data/`: `routes.sqlite3`, `settings.json`, and `diagnostics_cache.json`.
 
 ```bash
 pytest intent-hub-backend/tests -q
 cd intent-hub-frontend && npm install && npm run build
 ```
+
+
+## Unified master / BUPT version
+
+Both contracts share one SQLite repository, routing core and sync queue. Set `API_COMPAT_PROFILE=master` (default) or `bupt` for root API aliases; `/compat/master/*` and `/compat/bupt/*` remain explicit. The administration UI uses the master namespace on either profile. Set `DEFAULT_PASSWORD` for management login and `AUTH_CODE` for BUPT API access in the process environment; there is no built-in password. Provider keys are also environment-only.
+
+For populated installations, use the [migration and compatibility guide](docs/changes/branch-unification/README.md). Do not reuse a BUPT index without rebuilding against migrated internal IDs. Deployment is deferred by user request.

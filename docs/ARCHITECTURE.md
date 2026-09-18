@@ -9,11 +9,9 @@ intent-hub-backend/
 │   ├── core/
 │   └── services/
 └── data/
-    ├── routes.json
-    ├── routes.json.sequence
+    ├── routes.sqlite3
     ├── settings.json
-    ├── diagnostics_cache.json
-    └── sync_tasks.json
+    └── diagnostics_cache.json
 ```
 
 One component manager creates the encoder, Qdrant client, and route manager. Qdrant and embedding endpoints are complete URLs passed without inferred ports. Management login keys and the external `PREDICT_AUTH_KEY` are separate.
@@ -24,7 +22,7 @@ Each synced route also has one Qdrant metadata point containing the complete `Ro
 
 When ordinary routing yields no eligible match, the optional fallback reuses the query embedding, retrieves eligible intent definitions from the same collection, and invokes the configured LLM with a constrained JSON decision. The model may select one candidate, abstain, or report ambiguity. The service validates candidate IDs and current route hashes; timeouts and invalid responses preserve the default route. Description similarity and model self-reported confidence are not substituted for the existing utterance similarity score. This feature is disabled by default and does not alter successful ordinary matches.
 
-Route configuration is the source of truth and Qdrant is a derived index. Route writes atomically persist `routes.json`, increment a route version, enqueue a durable task in `sync_tasks.json`, and return without waiting for embedding or Qdrant. A single background worker coalesces queued edits, retries transient failures, and marks a route synced only when the indexed version still matches the current local version. Route IDs are stable and monotonically allocated through `routes.json.sequence`.
+SQLite is the source of truth and Qdrant is a derived index. `repository.py` stores entities, legacy identities, a transactional outbox, tasks and migration metadata. `RouteManager` and `AgentStore` are model adapters over that same repository. Each business write and a unique outbox token commit together; persisting an older task cannot consume a newer mutation's token. A single background worker coalesces queued edits, retries transient failures and checks the entity version before marking it synced. IDs are allocated transactionally. The default database is `routes.sqlite3`; an existing `routes.json` is imported once without rewriting its contents. Explicit migration is recommended before upgrading populated installations.
 
 The normal manual sync endpoint enqueues a durable `incremental_reindex` task and returns before initializing Embedding or Qdrant. The worker compares local route hashes with Qdrant metadata, embeds only new or changed routes, deletes removed routes, and records its counts on the task. Repeated requests coalesce while a scan is queued; a request made during a running scan creates one follow-up scan so concurrent edits are not missed.
 
@@ -32,4 +30,11 @@ Explicit full reindex remains available for embedding-model or collection migrat
 
 Manual reindex writes Qdrant points in bounded batches and verifies the final point count, route IDs, and route hashes. Incremental reindex rejects an unexpectedly large deletion set according to `MAX_DELETE_RATIO`; an intentional large replacement must use the explicit full-reindex path.
 
-An optional read-only Agent API adapter can merge selected upstream Agents into the same route store. Upstream IDs are retained as `source.source_id`, while local route IDs and `route_key` values remain master-owned. Each pull records a source snapshot, preserves manually overridden fields, and disables records that disappear upstream. Pulling changes only local route state; vector writes remain explicit. Restoring an overridden field follows the normal background synchronization path.
+An optional read-only Agent API adapter can merge selected upstream Agents into the same route store. Upstream IDs are retained as `source.source_id`, while local route IDs and `route_key` values remain master-owned. Each pull records a source snapshot, preserves manually overridden fields, and disables records that disappear upstream. Pulling commits local state and sync intent; vector writes are performed by the common worker. Restoring an overridden field follows the normal background synchronization path.
+
+
+The same application exposes `/compat/master/*` and `/compat/bupt/*`. `API_COMPAT_PROFILE` selects root aliases; neither request payloads nor tokens choose a contract. BUPT serializers preserve Agent details and legacy signed IDs. Its completion-style sync API waits on the same durable executor used by the master asynchronous API. Configuration changes supersede queued tasks for a different index target rather than writing to the wrong collection.
+
+Secrets come only from process environment variables, not editable settings or frontend bundles. The unified frontend uses the master namespace and login on both deployment profiles. No proxy credential injection is enabled. Only one sync worker per database is supported; this release does not implement distributed scheduling.
+
+Migration, recovery boundaries and verification evidence: [branch unification](changes/branch-unification/README.md).

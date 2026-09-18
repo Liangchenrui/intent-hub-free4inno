@@ -114,6 +114,12 @@ export default {
     requestError: 'Request failed. Please try again.',
   },
   agent: {
+    inactiveState: 'Inactive',
+    mergeAction: 'Merge',
+    mergeTarget: 'Enter target entity ID',
+    mergeWarning: 'Create a merged entity and disable both originals?',
+    recommendNegative: 'Suggest negatives',
+
     title: 'Intent Hub',
     searchPlaceholder: 'Search intent names, descriptions, or utterances...',
     reindex: 'Sync',

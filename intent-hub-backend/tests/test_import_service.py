@@ -48,7 +48,7 @@ def test_create_route_marks_source_as_web_manual(test_dir):
 
     assert route.source is not None
     assert route.source.type == "web_manual"
-    saved = json.loads((test_dir / "routes.json").read_text(encoding="utf-8"))
+    saved = [r.model_dump() for r in RouteManager(str(test_dir / "routes.json")).get_all_routes()]
     assert saved[0]["source"]["type"] == "web_manual"
 
 
@@ -74,7 +74,7 @@ def test_import_service_marks_imported_routes_as_json_import(test_dir):
     )
 
     assert result["created"] == 1
-    saved = json.loads((test_dir / "routes.json").read_text(encoding="utf-8"))
+    saved = [r.model_dump() for r in RouteManager(str(test_dir / "routes.json")).get_all_routes()]
     assert saved[0]["source"]["type"] == "json_import"
     assert saved[0]["source"]["import_origin"] == "api_import"
 
@@ -172,7 +172,7 @@ def test_import_service_rejects_managed_route_key_override(test_dir):
         import_origin="skill_scan",
     )
     assert created["created"] == 1
-    saved = json.loads((test_dir / "routes.json").read_text(encoding="utf-8"))
+    saved = [r.model_dump() for r in RouteManager(str(test_dir / "routes.json")).get_all_routes()]
     route_id = saved[0]["id"]
 
     with pytest.raises(ValueError, match="托管字段冲突"):

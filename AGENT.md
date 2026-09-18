@@ -19,7 +19,7 @@
 ## 常用验证命令
 
 - 后端测试：`pytest intent-hub-backend/tests -q`
-- API 文档一致性：`python -m scripts.api_docs check`
+- API 文档一致性：在后端目录执行 `python -m intent_hub.openapi --check`
 - 前端构建：在 `intent-hub-frontend/` 下执行 `npm run build`
 
 ## 清理规则

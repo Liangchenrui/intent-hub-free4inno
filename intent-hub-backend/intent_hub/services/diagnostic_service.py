@@ -101,7 +101,7 @@ class DiagnosticService:
 
         # 1. 获取当前路由信息
         current_route = route_manager.get_route(route_id)
-        if not current_route:
+        if not current_route or current_route.lifecycle_status != "active":
             raise ValueError(f"路由ID {route_id} 不存在")
 
         # 2. 获取当前路由的所有向量并计算质心
@@ -130,7 +130,7 @@ class DiagnosticService:
         centroid_current = np.mean(current_vectors, axis=0)
 
         # 3. 获取所有其他路由
-        all_routes = route_manager.get_all_routes()
+        all_routes = [r for r in route_manager.get_all_routes() if r.lifecycle_status == "active"]
         overlaps = []
 
         for other_route in all_routes:
@@ -220,7 +220,11 @@ class DiagnosticService:
                 logger.info("Reading diagnostic result from cache")
                 results = []
                 for r_id_str, r_data in cache.items():
+                    active_ids = {r.id for r in self.component_manager.route_manager.get_all_routes() if r.lifecycle_status == 'active'}
                     res = DiagnosticResult(**r_data)
+                    if res.route_id not in active_ids:
+                        continue
+                    res.overlaps = [o for o in res.overlaps if o.target_route_id in active_ids]
                     if res.overlaps:
                         # 在此处也应用 max_conflicts_per_pair 限制
                         if max_conflicts_per_pair is not None:
@@ -445,6 +449,9 @@ class DiagnosticService:
             v = p.get("vector")
             pl = p.get("payload") or {}
             if v is None:
+                continue
+            entity = self.component_manager.route_manager.get_route(pl.get("route_id"))
+            if entity is None or entity.lifecycle_status != "active":
                 continue
             if pl.get("route_id") is None:
                 continue

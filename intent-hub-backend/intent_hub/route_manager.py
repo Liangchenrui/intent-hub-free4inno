@@ -1,327 +1,108 @@
-"""路由管理器 - 负责内存缓存和热加载"""
-
+"""Route-shaped adapter over the shared SQLite repository."""
 import hashlib
 import json
 import os
 import re
-import tempfile
 from pathlib import Path
 from threading import RLock
-from typing import Dict, List, Optional
-
+from typing import List, Dict, Optional
 from intent_hub.config import Config
 from intent_hub.models import RouteConfig
+from intent_hub.repository import Repository
 from intent_hub.utils.logger import logger
 
-
 class RouteManager:
-    """路由管理器，维护内存缓存和热加载机制"""
+    def __init__(self, config_path=None):
+        path = Path(config_path or Config.ROUTES_CONFIG_PATH)
+        if not path.is_absolute():
+            path = Path(__file__).parent / path
+        self.config_path = str(path)
+        self.repository = Repository(path if path.suffix in {'.db', '.sqlite', '.sqlite3'} else path.with_suffix('.sqlite3'))
+        self._lock = self.repository._lock
+        # Legacy JSON is read only once. It is never rewritten or used as a second store.
+        if path.suffix == '.json' and path.exists() and not self.repository.metadata('legacy_imported'):
+            if self.repository.all():
+                raise ValueError('Existing database requires explicit migration')
+            raw = json.loads(path.read_text(encoding='utf-8'))
+            raw, _ = self._migrate_route_keys(raw)
+            routes = [RouteConfig(**item) for item in raw]
+            if len({r.id for r in routes}) != len(routes):
+                raise ValueError('Duplicate entity IDs')
+            with self.repository.transaction() as db:
+                for route in routes:
+                    self.repository.save(route, db, enqueue=False)
+                db.execute("INSERT INTO metadata VALUES ('legacy_imported','1')")
 
-    def __init__(self, config_path: Optional[str] = None):
-        """初始化路由管理器
+    def get_route(self, route_id):
+        return self.repository.get(route_id)
 
-        Args:
-            config_path: 路由配置文件路径（绝对路径或相对于intent_hub包目录的路径）
-        """
-        if config_path:
-            raw_path = config_path
-        else:
-            raw_path = Config.ROUTES_CONFIG_PATH
+    def get_all_routes(self):
+        return self.repository.all()
 
-        current_file = Path(__file__).resolve()
-        intent_hub_dir = current_file.parent
+    def replace_routes(self, routes):
+        if len({r.id for r in routes}) != len(routes) or len({r.route_key for r in routes}) != len(routes):
+            raise ValueError('Duplicate route ID or route_key')
+        with self.repository.transaction() as db:
+            ids = {r.id for r in routes}
+            for row in db.execute('SELECT id FROM entities').fetchall():
+                if row[0] not in ids:
+                    self.repository.delete(row[0], db)
+            for route in routes:
+                self.repository.save(route, db)
 
-        if os.path.isabs(raw_path):
-            self.config_path = raw_path
-        else:
-            self.config_path = str(intent_hub_dir / raw_path)
+    def get_route_by_key(self, route_key):
+        return next((r for r in self.get_all_routes() if r.route_key == route_key), None)
 
-        self._routes_cache: Dict[int, RouteConfig] = {}
-        self._lock = RLock()
-        self._sequence_path = f"{self.config_path}.sequence"
-        self._last_route_id = 0
+    def is_route_key_unique(self, route_key, exclude_route_id=None):
+        return not any(r.route_key == route_key and r.id != exclude_route_id for r in self.get_all_routes())
 
-        logger.info(f"Routes config path: {self.config_path}")
+    def search_routes(self, query):
+        q = query.lower()
+        return [r for r in self.get_all_routes() if not q or any(q in s.lower() for s in [r.name, r.description, *r.utterances])]
 
-        config_dir = os.path.dirname(self.config_path)
-        if config_dir:  # 如果路径包含目录
-            os.makedirs(config_dir, exist_ok=True)
-
-        self._load_from_file()
-        self._last_route_id = max(
-            self._read_route_sequence(),
-            max(self._routes_cache.keys(), default=0),
-        )
-
-    def _load_from_file(self):
-        """从文件加载路由配置"""
-        if os.path.exists(self.config_path):
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    routes_data = json.load(f)
-                    logger.debug(f"Parsed {len(routes_data)} route entries from JSON")
-                    routes_data, migrated = self._migrate_route_keys(routes_data)
-                    routes = [RouteConfig(**route) for route in routes_data]
-                    self._routes_cache = {route.id: route for route in routes}
-                logger.info(
-                    f"Loaded {len(self._routes_cache)} routes from file: {[r.name for r in routes]}"
-                )
-                if migrated:
-                    self._save_to_file()
-                    logger.info("Persisted migrated route_key values to routes config")
-            except Exception as e:
-                logger.error(f"Failed to load routes config: {e}", exc_info=True)
-                logger.error(f"Config path: {self.config_path}")
-                self._routes_cache = {}
-        else:
-            logger.warning(
-                f"Routes config file not found, initializing empty: {self.config_path}"
-            )
-            self._routes_cache = {}
-            try:
-                # 自动创建一个空的配置文件
-                self._save_to_file()
-            except Exception as e:
-                logger.error(f"Failed to create empty routes config: {e}")
-
-    def _save_to_file(self):
-        """Atomically persist route configuration."""
-        try:
-            routes_data = [
-                route.model_dump()
-                if hasattr(route, "model_dump")
-                else route.dict()
-                for route in self._routes_cache.values()
-            ]
-            config_dir = os.path.dirname(self.config_path) or "."
-            fd, temp_path = tempfile.mkstemp(prefix="routes-", suffix=".tmp", dir=config_dir)
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    json.dump(routes_data, f, ensure_ascii=False, indent=2)
-                    f.flush()
-                    os.fsync(f.fileno())
-                os.replace(temp_path, self.config_path)
-            finally:
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
-            logger.info(f"Routes config saved: {self.config_path}")
-        except Exception as e:
-            logger.error(f"Failed to save routes config: {e}", exc_info=True)
-            raise
-
-    def get_route(self, route_id: int) -> Optional[RouteConfig]:
-        """获取路由配置
-
-        Args:
-            route_id: 路由ID
-
-        Returns:
-            路由配置，不存在返回None
-        """
-        with self._lock:
-            return self._routes_cache.get(route_id)
-
-    def get_all_routes(self) -> List[RouteConfig]:
-        """获取所有路由配置
-
-        Returns:
-            路由配置列表
-        """
-        with self._lock:
-            return list(self._routes_cache.values())
-
-    def replace_routes(self, routes: List[RouteConfig]) -> None:
-        """Atomically replace the local route list and persist it once."""
-        with self._lock:
-            self._routes_cache = {route.id: route for route in routes}
-            self._observe_route_id(max(self._routes_cache.keys(), default=0))
-            self._save_to_file()
-            logger.info(f"Replaced local routes: {len(routes)} routes")
-
-    def get_route_by_key(self, route_key: str) -> Optional[RouteConfig]:
-        """按业务路由标识获取路由配置"""
-        with self._lock:
-            for route in self._routes_cache.values():
-                if route.route_key == route_key:
-                    return route
-        return None
-
-    def is_route_key_unique(
-        self, route_key: str, exclude_route_id: Optional[int] = None
-    ) -> bool:
-        """检查 route_key 是否唯一"""
-        with self._lock:
-            for route in self._routes_cache.values():
-                if exclude_route_id is not None and route.id == exclude_route_id:
-                    continue
-                if route.route_key == route_key:
-                    return False
+    def add_route(self, route):
+        route.route_key = self.normalize_route_key(route.route_key)
+        if not route.route_key:
+            raise ValueError('route_key is required')
+        if not self.is_route_key_unique(route.route_key, route.id):
+            raise ValueError(f"route_key '{route.route_key}' already exists")
+        self.repository.save(route)
         return True
 
-    def search_routes(self, query: str) -> List[RouteConfig]:
-        """通过名称、描述或例句搜索路由
+    def update_route(self, route_id, route):
+        if self.get_route(route_id) is None:
+            return False
+        route.id = route_id
+        return self.add_route(route)
 
-        Args:
-            query: 搜索关键词
+    def delete_route(self, route_id):
+        return self.repository.delete(route_id)
 
-        Returns:
-            匹配的路由配置列表
-        """
-        if not query:
-            return self.get_all_routes()
+    def allocate_route_id(self):
+        return self.repository.allocate()
 
-        query = query.lower()
-        results = []
-
-        with self._lock:
-            for route in self._routes_cache.values():
-                # 检查名称
-                if route.name and query in route.name.lower():
-                    results.append(route)
-                    continue
-
-                # 检查描述
-                if route.description and query in route.description.lower():
-                    results.append(route)
-                    continue
-
-                # 检查例句
-                if route.utterances:
-                    if any(query in utt.lower() for utt in route.utterances):
-                        results.append(route)
-                        continue
-
-        return results
-
-    def add_route(self, route: RouteConfig) -> bool:
-        """添加路由配置
-
-        Args:
-            route: 路由配置
-
-        Returns:
-            是否成功添加
-        """
-        with self._lock:
-            route.route_key = self.normalize_route_key(route.route_key)
-            if not route.route_key:
-                raise ValueError("route_key is required")
-            if not self.is_route_key_unique(route.route_key, exclude_route_id=route.id):
-                raise ValueError(f"route_key '{route.route_key}' already exists")
-            if route.id in self._routes_cache:
-                logger.warning(f"Route ID {route.id} already exists, updating")
-            self._routes_cache[route.id] = route
-            self._observe_route_id(route.id)
-            self._save_to_file()
-            logger.info(f"Route added/updated: {route.name} (ID: {route.id})")
-            return True
-
-    def update_route(self, route_id: int, route: RouteConfig) -> bool:
-        """更新路由配置
-
-        Args:
-            route_id: 路由ID
-            route: 新的路由配置
-
-        Returns:
-            是否成功更新
-        """
-        with self._lock:
-            if route_id not in self._routes_cache:
-                logger.warning(f"Route ID {route_id} not found")
-                return False
-
-            # 确保ID一致
-            route.route_key = self.normalize_route_key(route.route_key)
-            if not route.route_key:
-                raise ValueError("route_key is required")
-            if not self.is_route_key_unique(route.route_key, exclude_route_id=route_id):
-                raise ValueError(f"route_key '{route.route_key}' already exists")
-            route.id = route_id
-            self._routes_cache[route_id] = route
-            self._save_to_file()
-            logger.info(f"Route updated: {route.name} (ID: {route_id})")
-            return True
-
-    def delete_route(self, route_id: int) -> bool:
-        """Delete a route while preserving all other stable IDs.
-
-        Args:
-            route_id: 路由ID
-
-        Returns:
-            是否成功删除
-        """
-        with self._lock:
-            if route_id not in self._routes_cache:
-                logger.warning(f"Route ID {route_id} not found")
-                return False
-
-            route_name = self._routes_cache[route_id].name
-            del self._routes_cache[route_id]
-
-            self._save_to_file()
-            logger.info(f"Route deleted: {route_name} (ID: {route_id})")
-            return True
-
-    def allocate_route_id(self) -> int:
-        """Return a durable, monotonically increasing route ID."""
-        with self._lock:
-            self._last_route_id += 1
-            self._write_route_sequence()
-            return self._last_route_id
-
-    def _observe_route_id(self, route_id: int) -> None:
-        if route_id > self._last_route_id:
-            self._last_route_id = route_id
-            self._write_route_sequence()
-
-    def _read_route_sequence(self) -> int:
-        try:
-            return int(Path(self._sequence_path).read_text(encoding="utf-8").strip())
-        except (OSError, ValueError):
-            return 0
-
-    def _write_route_sequence(self) -> None:
-        sequence_path = Path(self._sequence_path)
-        sequence_path.parent.mkdir(parents=True, exist_ok=True)
-        temp_path = sequence_path.with_suffix(sequence_path.suffix + ".tmp")
-        temp_path.write_text(str(self._last_route_id), encoding="utf-8")
-        os.replace(temp_path, sequence_path)
-
-    def update_sync_state(self, route_id: int, **changes) -> Optional[RouteConfig]:
-        """Update sync metadata without changing the index-content version."""
-        with self._lock:
-            route = self._routes_cache.get(route_id)
-            if route is None:
+    def update_sync_state(self, route_id, **changes):
+        with self.repository.transaction() as db:
+            row = db.execute('SELECT body FROM entities WHERE id=?', (route_id,)).fetchone()
+            if not row:
                 return None
+            route = RouteConfig.model_validate_json(row[0])
             route.sync = route.sync or RouteConfig.RouteSync()
+            expected = changes.pop('expected_version', None)
+            if expected is not None and route.sync.version != expected:
+                return None
             for key, value in changes.items():
                 if hasattr(route.sync, key):
                     setattr(route.sync, key, value)
-            self._save_to_file()
+            self.repository.save(route, db, enqueue=False)
             return route
 
-    def get_score_threshold(self, route_id: int) -> Optional[float]:
-        """获取路由的相似度阈值
-
-        Args:
-            route_id: 路由ID
-
-        Returns:
-            相似度阈值，不存在返回None
-        """
+    def get_score_threshold(self, route_id):
         route = self.get_route(route_id)
         return route.score_threshold if route else None
 
     def reload(self):
-        """重新加载配置文件（热加载）"""
-        logger.info("Hot reload: reloading routes config")
-        with self._lock:
-            old_count = len(self._routes_cache)
-            self._load_from_file()
-            new_count = len(self._routes_cache)
-            logger.info(f"Hot reload done: {old_count} -> {new_count} routes")
+        pass  # Every read already observes SQLite's committed state.
 
     @staticmethod
     def compute_route_hash(route: RouteConfig) -> str:
@@ -368,8 +149,8 @@ class RouteManager:
         """
         with self._lock:
             return {
-                route_id: self.compute_route_hash(route)
-                for route_id, route in self._routes_cache.items()
+                route.id: self.compute_route_hash(route)
+                for route in self.get_all_routes()
             }
 
     @staticmethod

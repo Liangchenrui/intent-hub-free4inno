@@ -1,6 +1,8 @@
 """配置管理模块"""
 
 import json
+import os
+from threading import RLock
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -12,7 +14,7 @@ _backend_root = _current_file.parent.parent
 
 # 统一使用后端目录下的 data 文件夹
 PROJECT_ROOT = _backend_root
-DATA_DIR = PROJECT_ROOT / "data"
+DATA_DIR = Path(os.environ.get("INTENT_HUB_DATA_DIR", str(PROJECT_ROOT / "data")))
 
 # 新创建 settings.json 时写入的默认提示词
 DEFAULT_UTTERANCE_GENERATION_PROMPT = """你是一个资深的用户意图分析专家。你的任务是为特定的 AI Agent 生成高质量的测试数据集（Utterances），用于后续的意图识别和路由分发系统训练。 ### Agent 背景信息 - **Agent 名称**: {name} - **功能描述**: {description} - **参考示例（请参照这些示例的风格和范围，生成新的句子，但绝对不能重复这些示例）**: {reference_utterances} ### 生成要求 你需要生成 {count} 条**全新的**用户提问（必须与参考示例不同），请严格遵守以下准则： 1. **分布控制**：    - **关键词/短语 (50%)**: 极其简短，如"查天气"、"翻译一下"、"写代码"。这类词对路由最关键。    - **简单指令 (50%)**: 直接的命令句，如"帮我写个请假条"、"帮我分析这行代码"。 2. **多样性与覆盖面**：    - 提取描述中的"核心动词" and "核心名词"，进行交叉组合。    - 包含同义词替换（例如：从"预定"扩展到"帮我订一个"、"我想约一个"）。    - 必须沿用参考示例的语气和专业深度，但不要重复原话。 3. **路由判别性**：    - 生成的提问必须与该 Agent 的核心功能高度相关，避免产生可能导致路由误判到其他通用 Agent 的极其模糊的句子。 4. **格式要求**：    - 仅输出生成的问题列表，不要包含任何解释性文字。 {format_instructions}"""
@@ -81,6 +83,14 @@ DEFAULT_SKILL_ROUTE_IMPORT_PROMPT = """你是一个资深的意图路由设计�
 class Config:
     """应用配置类"""
 
+    LOCK = RLock()
+    API_COMPAT_PROFILE = os.environ.get("API_COMPAT_PROFILE", "master")
+    SOURCE_INSTANCE = os.environ.get("SOURCE_INSTANCE", "default")
+    AUTH_CODE = os.environ.get("AUTH_CODE", "")
+    DEFAULT_ROUTE_TEXT = "没有找到合适的 Agent"
+    SYNC_WAIT_SECONDS = 240
+    NEGATIVE_SAMPLE_GENERATION_PROMPT = "为 {name}（{description}）生成 {count} 条容易混淆但不属于该意图的负例，避免重复 {negative_samples}。{format_instructions}"
+    SECRET_KEYS = {"QDRANT_API_KEY", "AGENT_API_TOKEN", "LLM_API_KEY", "DEEPSEEK_API_KEY", "API_KEYS", "PREDICT_AUTH_KEY", "DEFAULT_PASSWORD", "AUTH_CODE"}
     # Flask配置
     FLASK_HOST: str = "0.0.0.0"
     FLASK_PORT: int = 5000
@@ -105,7 +115,7 @@ class Config:
     # 可选的只读上游 Agent 数据源
     AGENT_API_URL: Optional[str] = None
     AGENT_API_TOKEN: Optional[str] = None
-    AGENT_API_LABEL_IDS: str = ""
+    AGENT_API_LABEL_IDS: str = "87,88,89" if API_COMPAT_PROFILE == "bupt" else ""
 
     # 默认路由配置
     DEFAULT_ROUTE_ID: int = 0
@@ -136,7 +146,7 @@ class Config:
 
     # 用户配置
     DEFAULT_USERNAME: str = "admin"
-    DEFAULT_PASSWORD: str = "123456"
+    DEFAULT_PASSWORD: str = ""
 
     # LLM配置
     LLM_PROVIDER: str = "deepseek"
@@ -199,11 +209,22 @@ class Config:
                 with open(path, "r", encoding="utf-8") as f:
                     settings = json.load(f)
                     for key, value in settings.items():
-                        if hasattr(cls, key) and not key.startswith("_"):
+                        if key in cls.to_dict() and key not in cls.SECRET_KEYS:
                             setattr(cls, key, value)
             except Exception as e:
                 logger.error(f"加载配置文件失败: {e}")
 
+        # Credentials are environment-only; operational overrides are explicit.
+        for key in cls.SECRET_KEYS:
+            setattr(cls, key, os.environ.get(key, ""))
+        for key in ("QDRANT_URL", "QDRANT_COLLECTION", "EMBEDDING_SERVICE_URL", "EMBEDDING_MODEL_NAME", "EMBEDDING_API_FORMAT", "AGENT_API_URL", "AGENT_API_LABEL_IDS", "LLM_PROVIDER", "LLM_BASE_URL", "LLM_MODEL", "ROUTES_CONFIG_PATH", "DEFAULT_USERNAME"):
+            if key in os.environ:
+                setattr(cls, key, os.environ[key])
+        if cls.API_COMPAT_PROFILE not in {"master", "bupt"}:
+            raise ValueError("API_COMPAT_PROFILE must be master or bupt")
+        default_text_file = Path(cls.DATA_DIR) / 'default_route.txt'
+        if default_text_file.exists():
+            cls.DEFAULT_ROUTE_TEXT = default_text_file.read_text(encoding='utf-8').strip()
         # 处理向后兼容
         cls._apply_backward_compatibility()
         cls._apply_prompt_defaults()
@@ -239,58 +260,44 @@ class Config:
 
     @classmethod
     def save(cls, settings_dict: Dict[str, Any]) -> bool:
-        """保存配置到文件并更新类属性
+        with cls.LOCK:
+            return cls._save(settings_dict)
 
-        Args:
-            settings_dict: 要保存的配置字典
-
-        Returns:
-            如果 QDRANT_COLLECTION 发生变化，返回 True；否则返回 False
-        """
+    @classmethod
+    def _save(cls, settings_dict: Dict[str, Any]) -> bool:
+        forbidden = set(settings_dict) & (cls.SECRET_KEYS | {"AUTH_ENABLED", "DATA_DIR", "ROUTES_CONFIG_PATH", "SETTINGS_FILE_PATH", "API_COMPAT_PROFILE"})
+        if forbidden:
+            raise ValueError("These settings are environment/startup-only: " + ", ".join(sorted(forbidden)))
+        unknown = set(settings_dict) - set(cls.to_dict())
+        if unknown:
+            raise ValueError("Unsupported settings: " + ", ".join(sorted(unknown)))
         cls.validate_fallback_settings(settings_dict)
-        # 检测 QDRANT_COLLECTION 是否发生变化
-        old_collection = cls.QDRANT_COLLECTION
-        collection_changed = False
-
-        # 过滤并更新
-        update_data = {}
-        for key, value in settings_dict.items():
-            if (
-                hasattr(cls, key)
-                and not key.startswith("_")
-                and not callable(getattr(cls, key))
-            ):
-                # 检测 QDRANT_COLLECTION 变化
-                if key == "QDRANT_COLLECTION" and value != old_collection:
-                    collection_changed = True
-                    logger.info(
-                        f"检测到 QDRANT_COLLECTION 变化: {old_collection} -> {value}"
-                    )
-
-                setattr(cls, key, value)
-                update_data[key] = value
-
-        # 写入文件
+        merged = {**cls.to_dict(), **settings_dict}
+        if type(merged['BATCH_SIZE']) is not int or merged['BATCH_SIZE'] <= 0:
+            raise ValueError("BATCH_SIZE must be a positive integer")
+        if type(merged['QDRANT_WRITE_BATCH_SIZE']) is not int or merged['QDRANT_WRITE_BATCH_SIZE'] <= 0:
+            raise ValueError("QDRANT_WRITE_BATCH_SIZE must be a positive integer")
+        if merged['EMBEDDING_API_FORMAT'] not in {'tei', 'qwen'}:
+            raise ValueError("EMBEDDING_API_FORMAT must be tei or qwen")
+        changed = merged['QDRANT_COLLECTION'] != cls.QDRANT_COLLECTION
         path = cls.get_settings_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        import tempfile
+        descriptor, temp_path = tempfile.mkstemp(dir=path.parent, prefix='settings-', suffix='.tmp')
         try:
-            existing_settings = {}
-            if path.exists():
-                with open(path, "r", encoding="utf-8") as f:
-                    existing_settings = json.load(f)
-
-            existing_settings.update(update_data)
-
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(existing_settings, f, indent=4, ensure_ascii=False)
-            # 保存后应用向后兼容性
-            cls._apply_backward_compatibility()
-            cls._apply_prompt_defaults()
-
-        except Exception as e:
-            logger.error(f"保存配置文件失败: {e}")
-            raise e
-
-        return collection_changed
+            with os.fdopen(descriptor, 'w', encoding='utf-8') as handle:
+                json.dump(merged, handle, ensure_ascii=False, indent=2)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, path)
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+        for key, value in merged.items():
+            setattr(cls, key, value)
+        cls._apply_backward_compatibility()
+        cls._apply_prompt_defaults()
+        return changed
 
     @classmethod
     def validate_fallback_settings(cls, settings: Dict[str, Any]) -> None:
@@ -314,7 +321,6 @@ class Config:
             # Qdrant配置
             "QDRANT_URL": cls.QDRANT_URL,
             "QDRANT_COLLECTION": cls.QDRANT_COLLECTION,
-            "QDRANT_API_KEY": cls.QDRANT_API_KEY,
             "QDRANT_HEALTH_URL": cls.QDRANT_HEALTH_URL,
             # Embedding服务配置
             "EMBEDDING_SERVICE_URL": cls.EMBEDDING_SERVICE_URL,
@@ -323,11 +329,9 @@ class Config:
             "EMBEDDING_API_FORMAT": cls.EMBEDDING_API_FORMAT,
             "EMBEDDING_HEALTH_URL": cls.EMBEDDING_HEALTH_URL,
             "AGENT_API_URL": cls.AGENT_API_URL,
-            "AGENT_API_TOKEN": cls.AGENT_API_TOKEN,
             "AGENT_API_LABEL_IDS": cls.AGENT_API_LABEL_IDS,
             # LLM配置（通用）
             "LLM_PROVIDER": cls.LLM_PROVIDER,
-            "LLM_API_KEY": cls.LLM_API_KEY,
             "LLM_BASE_URL": cls.LLM_BASE_URL,
             "LLM_MODEL": cls.LLM_MODEL,
             "LLM_TEMPERATURE": cls.LLM_TEMPERATURE,
@@ -335,7 +339,6 @@ class Config:
             "LLM_FALLBACK_TOP_K": cls.LLM_FALLBACK_TOP_K,
             "LLM_FALLBACK_TIMEOUT_SECONDS": cls.LLM_FALLBACK_TIMEOUT_SECONDS,
             # DeepSeek配置（向后兼容）
-            "DEEPSEEK_API_KEY": cls.DEEPSEEK_API_KEY,
             "DEEPSEEK_BASE_URL": cls.DEEPSEEK_BASE_URL,
             "DEEPSEEK_MODEL": cls.DEEPSEEK_MODEL,
             # 提示词配置
@@ -344,9 +347,9 @@ class Config:
             "SKILL_ROUTE_IMPORT_PROMPT": cls.SKILL_ROUTE_IMPORT_PROMPT,
             # 认证配置
             "AUTH_ENABLED": cls.AUTH_ENABLED,
-            "PREDICT_AUTH_KEY": cls.PREDICT_AUTH_KEY,
             "DEFAULT_USERNAME": cls.DEFAULT_USERNAME,
-            "DEFAULT_PASSWORD": cls.DEFAULT_PASSWORD,
+            "NEGATIVE_SAMPLE_GENERATION_PROMPT": cls.NEGATIVE_SAMPLE_GENERATION_PROMPT,
+            "DEFAULT_ROUTE_TEXT": cls.DEFAULT_ROUTE_TEXT,
             # 其他配置
             "BATCH_SIZE": cls.BATCH_SIZE,
             "QDRANT_WRITE_BATCH_SIZE": cls.QDRANT_WRITE_BATCH_SIZE,

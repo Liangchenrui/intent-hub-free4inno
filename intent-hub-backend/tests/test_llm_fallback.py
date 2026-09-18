@@ -292,7 +292,7 @@ def test_settings_api_saves_fallback_controls_and_rejects_bad_values(tmp_path, m
         "LLM_FALLBACK_ENABLED": True, "LLM_FALLBACK_TOP_K": 3, "LLM_FALLBACK_TIMEOUT_SECONDS": 4,
     })
     assert response.status_code == 200 and resets == [True]
-    assert json.loads((tmp_path / "settings.json").read_text())["LLM_FALLBACK_TOP_K"] == 3
+    assert json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))["LLM_FALLBACK_TOP_K"] == 3
     assert client.get("/settings").get_json()["LLM_FALLBACK_ENABLED"] is True
     assert client.post("/settings", json={"LLM_FALLBACK_TOP_K": -1}).status_code == 400
     assert Config.LLM_FALLBACK_TOP_K == 3 and resets == [True]
@@ -310,7 +310,7 @@ def test_invalid_settings_rejected_before_any_mutation(tmp_path, monkeypatch, va
     before = Config.to_dict()
     with pytest.raises(ValueError):
         Config.save(values)
-    assert path.read_text() == '{}'
+    assert path.read_text(encoding="utf-8") == '{}'
     assert Config.to_dict() == before
 
 

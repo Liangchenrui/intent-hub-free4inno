@@ -10,13 +10,14 @@ from intent_hub.config import Config
 
 
 class AgentSource:
-    def __init__(self, session=None):
+    def __init__(self, session=None, label_ids=None):
         self.session = session or requests.Session()
+        self.label_ids = label_ids
 
     def fetch_all(self) -> list[dict[str, Any]]:
         base_url = str(Config.AGENT_API_URL or "").strip().rstrip("/")
         token = str(Config.AGENT_API_TOKEN or "").strip()
-        label_ids = [item.strip() for item in str(Config.AGENT_API_LABEL_IDS or "").split(",") if item.strip()]
+        label_ids = [item.strip() for item in str(self.label_ids if self.label_ids is not None else Config.AGENT_API_LABEL_IDS or "").split(",") if item.strip()]
         if not base_url or not token or not label_ids:
             raise ValueError("请先配置 AGENT_API_URL、AGENT_API_TOKEN 和 AGENT_API_LABEL_IDS")
 
@@ -34,6 +35,7 @@ class AgentSource:
             agents.append(
                 {
                     "source_id": str(details.get("id", source_id)),
+                    "details": details,
                     "name": str(details.get("title") or "").strip(),
                     "description": str(details.get("text") or "").strip(),
                     "utterances": self._parse_corpus(details.get("extent00")),

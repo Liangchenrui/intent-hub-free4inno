@@ -40,6 +40,7 @@ class SyncTaskService:
         self.max_attempts = max(1, int(Config.SYNC_MAX_ATTEMPTS))
         self._lock = threading.RLock()
         self._condition = threading.Condition(self._lock)
+        self._processing = threading.Lock()
         self._tasks = self._load_tasks()
         self._worker: Optional[threading.Thread] = None
         self._stopped = False
@@ -78,6 +79,8 @@ class SyncTaskService:
         if not route_ids:
             raise ValueError("At least one route ID is required")
 
+        repository = getattr(self.route_manager, "repository", None)
+        tokens = repository.pending_tokens() if repository else {}
         versions: dict[str, int] = {}
         for route_id in route_ids:
             route = self.route_manager.get_route(route_id)
@@ -88,13 +91,14 @@ class SyncTaskService:
                 (
                     task
                     for task in reversed(self._tasks)
-                    if task["kind"] == "route_sync" and task["status"] == "queued"
+                    if task["kind"] == "route_sync" and task["status"] == "queued" and task.get("target") == self._target()
                 ),
                 None,
             )
             if queued is None:
                 queued = {
                     "id": uuid.uuid4().hex,
+                    "target": self._target(),
                     "kind": "route_sync",
                     "route_ids": [],
                     "route_versions": {},
@@ -109,6 +113,7 @@ class SyncTaskService:
 
             queued["route_ids"] = list(dict.fromkeys(queued["route_ids"] + route_ids))
             queued["route_versions"].update(versions)
+            queued.setdefault("outbox_tokens", {}).update({str(i): tokens[str(i)] for i in route_ids if str(i) in tokens})
             queued["updated_at"] = _utc_now()
             queued["error"] = None
             queued["next_attempt_at"] = 0.0
@@ -130,21 +135,26 @@ class SyncTaskService:
             return dict(queued)
 
     def enqueue_incremental_reindex(self) -> dict[str, Any]:
+        return self.enqueue_reindex(False)
+
+    def enqueue_reindex(self, full=False) -> dict[str, Any]:
         """Queue one hash-based index scan without touching remote services."""
         with self._condition:
             queued = next(
                 (
                     task
                     for task in reversed(self._tasks)
-                    if task["kind"] == "incremental_reindex"
+                    if task["kind"] == ("full_reindex" if full else "incremental_reindex")
                     and task["status"] == "queued"
+                    and task.get("target") == self._target()
                 ),
                 None,
             )
             if queued is None:
                 queued = {
                     "id": uuid.uuid4().hex,
-                    "kind": "incremental_reindex",
+                    "target": self._target(),
+                    "kind": "full_reindex" if full else "incremental_reindex",
                     "route_ids": [],
                     "route_versions": {},
                     "status": "queued",
@@ -209,7 +219,17 @@ class SyncTaskService:
                 self._save_tasks()
                 self._condition.notify_all()
 
+    @staticmethod
+    def _target():
+        return {key: getattr(Config, key) for key in (
+            "QDRANT_URL", "QDRANT_COLLECTION", "EMBEDDING_SERVICE_URL",
+            "EMBEDDING_MODEL_NAME", "EMBEDDING_API_FORMAT")}
+
     def process_next(self) -> bool:
+        with self._processing:
+            return self._process_next()
+
+    def _process_next(self) -> bool:
         """Process one ready task; exposed for deterministic unit tests."""
         with self._condition:
             task = self._next_ready_task()
@@ -238,9 +258,12 @@ class SyncTaskService:
 
     def _execute_task(self, task: dict[str, Any]) -> None:
         with SyncService.execution_lock:
-            if task["kind"] == "incremental_reindex":
+            if task.get("target") != self._target():
+                task["status"] = "superseded"
+                return
+            if task["kind"] in {"incremental_reindex", "full_reindex"}:
                 sync_service = self.sync_service_factory(self.component_manager)
-                task["result"] = sync_service.reindex(force_full=False)
+                task["result"] = sync_service.reindex(force_full=task["kind"] == "full_reindex")
                 return
             self._execute_route_task_locked(task)
 
@@ -275,6 +298,7 @@ class SyncTaskService:
                 last_synced_at=_utc_now(),
                 task_id=task["id"],
                 error=None,
+                **({'expected_version': expected_version} if hasattr(self.route_manager, 'repository') else {}),
             )
             if latest is not None:
                 self.component_manager.qdrant_client.update_route_metadata_state(latest)
@@ -310,6 +334,7 @@ class SyncTaskService:
                     status=status,
                     task_id=task["id"],
                     error=error,
+                    **({'expected_version': expected} if hasattr(self.route_manager, 'repository') else {}),
                 )
 
     def _worker_loop(self) -> None:
@@ -375,6 +400,8 @@ class SyncTaskService:
             if task.get("status") in {"queued", "running"}
             for route_id in task.get("route_ids", [])
         }
+        repository = getattr(self.route_manager, "repository", None)
+        outbox = repository.pending() if repository else []
         missing = [
             route.id
             for route in self.route_manager.get_all_routes()
@@ -382,31 +409,24 @@ class SyncTaskService:
             and route.sync.status in {"pending", "queued", "syncing"}
             and route.id not in queued_ids
         ]
+        missing = list(set(missing) | set(outbox))
         if missing:
             self.enqueue_routes(missing)
 
     def _load_tasks(self) -> list[dict[str, Any]]:
-        if not self.task_path.exists():
-            return []
-        try:
-            data = json.loads(self.task_path.read_text(encoding="utf-8"))
-            return data if isinstance(data, list) else []
-        except Exception as exc:
-            logger.error("Failed to load sync tasks: %s", exc)
-            return []
+        repository = getattr(self.route_manager, "repository", None)
+        if repository:
+            return repository.load_tasks()
+        # Only test doubles without a repository use the legacy task file.
+        return json.loads(self.task_path.read_text(encoding="utf-8")) if self.task_path.exists() else []
 
     def _save_tasks(self) -> None:
+        repository = getattr(self.route_manager, "repository", None)
+        if repository:
+            repository.save_tasks(self._tasks)
+            return
         self.task_path.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_path = tempfile.mkstemp(prefix="sync-tasks-", suffix=".tmp", dir=self.task_path.parent)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                json.dump(self._tasks, handle, ensure_ascii=False, indent=2)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temp_path, self.task_path)
-        finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
+        self.task_path.write_text(json.dumps(self._tasks), encoding="utf-8")
 
     def _find_task(self, task_id: str) -> Optional[dict[str, Any]]:
         return next((task for task in self._tasks if task["id"] == task_id), None)

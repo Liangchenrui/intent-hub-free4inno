@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 
 from intent_hub.agent_source import AgentSource
+from intent_hub.config import Config
 from intent_hub.models import RouteConfig
 from intent_hub.route_compare import COMPARABLE_FIELDS, snapshots_equal
 from intent_hub.services.route_service import RouteService
@@ -13,9 +14,10 @@ def now_iso() -> str:
 
 
 class UpstreamAgentService:
-    def __init__(self, component_manager, source=None):
+    def __init__(self, component_manager, source=None, default_threshold=0.75):
         self.components = component_manager
         self.source = source or AgentSource()
+        self.default_threshold = default_threshold
 
     def pull(self) -> dict:
         incoming = self.source.fetch_all()
@@ -35,7 +37,7 @@ class UpstreamAgentService:
         by_source_id = {
             route.source.source_id: route
             for route in current_routes
-            if route.source and route.source.type == "upstream_agent" and route.source.source_id
+            if route.source and route.source.type == "upstream_agent" and route.source.source_id and route.source.instance == Config.SOURCE_INSTANCE
         }
         incoming_ids = {item["source_id"] for item in incoming}
         routes_by_id = {route.id: route for route in current_routes}
@@ -52,6 +54,8 @@ class UpstreamAgentService:
                 used_keys.add(route_key)
                 route = RouteConfig(
                     id=route_id,
+                    details=item.get("details", {}),
+                    score_threshold=self.default_threshold,
                     name=item["name"] or f"Agent {item['source_id']}",
                     route_key=route_key,
                     description=item["description"],
@@ -59,6 +63,7 @@ class UpstreamAgentService:
                     negative_samples=item["negative_samples"],
                     source=RouteConfig.RouteSource(
                         type="upstream_agent",
+                        instance=Config.SOURCE_INSTANCE,
                         source_id=item["source_id"],
                         import_origin="agent_api",
                         managed_fields=list(COMPARABLE_FIELDS),
@@ -74,6 +79,7 @@ class UpstreamAgentService:
                 continue
 
             route = current.model_copy(deep=True)
+            route.details = item.get("details", route.details)
             previous_snapshot = route.source.source_snapshot or {}
             source_changed = not snapshots_equal(previous_snapshot, snapshot)
             overrides = set(route.sync.manual_overrides if route.sync else [])
@@ -86,7 +92,7 @@ class UpstreamAgentService:
             route.source.source_snapshot = snapshot
             route.source.upstream_present = True
             route.source.last_pulled_at = pulled_at
-            if route.lifecycle_status == "disabled":
+            if route.lifecycle_status == "disabled" and "lifecycle_status" not in overrides:
                 route.lifecycle_status = "active"
             after_hash = self.components.route_manager.compute_route_hash(route)
             if before_hash != after_hash:

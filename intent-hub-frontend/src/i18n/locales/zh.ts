@@ -114,6 +114,12 @@ export default {
     requestError: '请求发送失败，请重试',
   },
   agent: {
+    inactiveState: '未启用',
+    mergeAction: '合并',
+    mergeTarget: '输入目标实体 ID',
+    mergeWarning: '合并会新建实体并停用两个原实体，确认继续？',
+    recommendNegative: '推荐负例',
+
     title: 'Intent Hub',
     searchPlaceholder: '搜索意图名称、描述或语料...',
     reindex: '同步',

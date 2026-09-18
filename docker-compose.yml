@@ -1,14 +1,24 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: ./intent-hub-backend
       dockerfile: Dockerfile
       args:
-        - BASE_IMAGE=${PYTHON_BASE}
+        - BASE_IMAGE=${PYTHON_BASE:-ghcr.io/astral-sh/uv:python3.11-bookworm-slim}
         - PIP_INDEX_URL=${PIP_INDEX_URL}
     container_name: intent-hub-backend
+    environment:
+      API_COMPAT_PROFILE: ${API_COMPAT_PROFILE:-master}
+      SOURCE_INSTANCE: ${SOURCE_INSTANCE:-default}
+      DEFAULT_PASSWORD: ${DEFAULT_PASSWORD:-}
+      DEFAULT_USERNAME: ${DEFAULT_USERNAME:-admin}
+      AUTH_CODE: ${AUTH_CODE:-}
+      API_KEYS: ${API_KEYS:-}
+      PREDICT_AUTH_KEY: ${PREDICT_AUTH_KEY:-}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      AGENT_API_TOKEN: ${AGENT_API_TOKEN:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
     image: ${IMAGE_PREFIX}intent-hub-backend:latest
     volumes:
       - ./intent-hub-backend/intent_hub:/app/intent_hub
@@ -23,8 +33,8 @@ services:
       context: ./intent-hub-frontend
       dockerfile: Dockerfile
       args:
-        - BASE_IMAGE=${NODE_BASE}
-        - NGINX_BASE=${NGINX_BASE}
+        - BASE_IMAGE=${NODE_BASE:-node:20-alpine}
+        - NGINX_BASE=${NGINX_BASE:-nginx:alpine}
         - NPM_REGISTRY=${NPM_REGISTRY}
     container_name: intent-hub-frontend
     image: ${IMAGE_PREFIX}intent-hub-frontend:latest

@@ -29,7 +29,7 @@ def login(login_req: LoginRequest):
 
     api_key = auth_manager.generate_key(login_req.username)
     logger.info(
-        f"用户 {login_req.username} 登录成功，API key: {api_key[:8]}...，当前有效key数量: {auth_manager.count()}"
+        f"用户 {login_req.username} 登录成功，API key: [redacted]，当前有效key数量: {auth_manager.count()}"
     )
 
     return jsonify(

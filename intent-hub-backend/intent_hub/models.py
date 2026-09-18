@@ -19,6 +19,7 @@ class RouteConfig(BaseModel):
 
     class RouteSource(BaseModel):
         type: Literal["web_manual", "json_import", "upstream_agent"] = Field(..., description="正式路由来源类型")
+        instance: str = "default"
         source_id: Optional[str] = Field(default=None, description="来源侧稳定 ID")
         import_origin: Optional[str] = Field(default=None, description="导入来源标识")
         managed_fields: List[str] = Field(default_factory=list, description="受来源托管的字段")
@@ -55,9 +56,11 @@ class RouteConfig(BaseModel):
         ge=0.0,
         le=1.0,
     )
+    updated_at: Optional[str] = None
+    details: Dict[str, Any] = Field(default_factory=dict)
     source: Optional[RouteSource] = Field(default=None, description="来源元数据")
     sync: Optional[RouteSync] = Field(default=None, description="同步元数据")
-    lifecycle_status: Literal["active", "draft", "stale", "disabled"] = Field(
+    lifecycle_status: Literal["active", "draft", "stale", "disabled", "deleted"] = Field(
         default="active", description="生命周期状态"
     )
 

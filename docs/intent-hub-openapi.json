@@ -1,0 +1,3358 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Unified Intent Hub",
+    "version": "0.2.0",
+    "description": "Generated route inventory for master profile. Fixed compatibility namespaces are stable; root aliases follow API_COMPAT_PROFILE."
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": []
+      }
+    },
+    "/health/services": {
+      "get": {
+        "operationId": "service_health_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "login_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/predict": {
+      "post": {
+        "operationId": "predict_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PredictResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routes": {
+      "get": {
+        "operationId": "get_routes_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "create_route_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteConfig"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routes/search": {
+      "get": {
+        "operationId": "search_routes_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/routes/upstream-pull": {
+      "post": {
+        "operationId": "pull_upstream_agents_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/routes/{route_id}/upstream-diff": {
+      "get": {
+        "operationId": "get_upstream_diff_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/routes/{route_id}/restore-upstream-fields": {
+      "post": {
+        "operationId": "restore_upstream_fields_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/routes/{route_id}": {
+      "put": {
+        "operationId": "update_route_put",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "delete_route_delete",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/routes/generate-utterances": {
+      "post": {
+        "operationId": "generate_utterances_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/routes/import-skill": {
+      "post": {
+        "operationId": "import_route_from_skill_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/routes/import": {
+      "post": {
+        "operationId": "import_routes_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/routes/{route_id}/negative-samples": {
+      "post": {
+        "operationId": "add_negative_samples_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "delete_negative_samples_delete",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/routes/{route_id}/feedback/positive": {
+      "delete": {
+        "operationId": "positive_feedback_delete",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "positive_feedback_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/routes/{route_id}/feedback/negative": {
+      "delete": {
+        "operationId": "negative_feedback_delete",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "negative_feedback_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/reindex": {
+      "post": {
+        "operationId": "reindex_route_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          },
+          "202": {
+            "description": "Incremental task queued; full rebuild returns 200 on completion."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/reindex/sync-route": {
+      "post": {
+        "operationId": "sync_route_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/sync-tasks": {
+      "get": {
+        "operationId": "list_sync_tasks_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/sync-tasks/{task_id}/retry": {
+      "post": {
+        "operationId": "retry_sync_task_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/diagnostics/overlap": {
+      "get": {
+        "operationId": "analyze_all_overlaps_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/diagnostics/overlap/{route_id}": {
+      "get": {
+        "operationId": "analyze_overlap_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/diagnostics/umap": {
+      "get": {
+        "operationId": "diagnostics_umap_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/diagnostics/repair": {
+      "post": {
+        "operationId": "get_repair_suggestions_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/diagnostics/apply-repair": {
+      "post": {
+        "operationId": "apply_repair_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/settings": {
+      "get": {
+        "operationId": "get_settings_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "update_settings_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/settings/qdrant-collections": {
+      "get": {
+        "operationId": "list_qdrant_collections_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "create_qdrant_collection_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/settings/qdrant-import": {
+      "post": {
+        "operationId": "import_routes_from_qdrant_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/routes/{route_id}/recommendations": {
+      "post": {
+        "operationId": "recommend_samples_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/routes/merge": {
+      "post": {
+        "operationId": "merge_routes_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeAgentsRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compat/master/health": {
+      "get": {
+        "operationId": "master_health_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": []
+      }
+    },
+    "/compat/master/health/services": {
+      "get": {
+        "operationId": "master_service_health_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/auth/login": {
+      "post": {
+        "operationId": "master_login_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compat/master/predict": {
+      "post": {
+        "operationId": "master_predict_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PredictResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compat/master/routes": {
+      "get": {
+        "operationId": "master_get_routes_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "master_create_route_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteConfig"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compat/master/routes/search": {
+      "get": {
+        "operationId": "master_search_routes_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/upstream-pull": {
+      "post": {
+        "operationId": "master_pull_upstream_agents_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/{route_id}/upstream-diff": {
+      "get": {
+        "operationId": "master_get_upstream_diff_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/{route_id}/restore-upstream-fields": {
+      "post": {
+        "operationId": "master_restore_upstream_fields_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/{route_id}": {
+      "put": {
+        "operationId": "master_update_route_put",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "master_delete_route_delete",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/generate-utterances": {
+      "post": {
+        "operationId": "master_generate_utterances_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/import-skill": {
+      "post": {
+        "operationId": "master_import_route_from_skill_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/import": {
+      "post": {
+        "operationId": "master_import_routes_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/{route_id}/negative-samples": {
+      "post": {
+        "operationId": "master_add_negative_samples_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "master_delete_negative_samples_delete",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/{route_id}/feedback/positive": {
+      "delete": {
+        "operationId": "master_positive_feedback_delete",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "master_positive_feedback_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/{route_id}/feedback/negative": {
+      "delete": {
+        "operationId": "master_negative_feedback_delete",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "master_negative_feedback_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/master/reindex": {
+      "post": {
+        "operationId": "master_reindex_route_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          },
+          "202": {
+            "description": "Incremental task queued; full rebuild returns 200 on completion."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/reindex/sync-route": {
+      "post": {
+        "operationId": "master_sync_route_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/sync-tasks": {
+      "get": {
+        "operationId": "master_list_sync_tasks_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/sync-tasks/{task_id}/retry": {
+      "post": {
+        "operationId": "master_retry_sync_task_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/master/diagnostics/overlap": {
+      "get": {
+        "operationId": "master_analyze_all_overlaps_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/diagnostics/overlap/{route_id}": {
+      "get": {
+        "operationId": "master_analyze_overlap_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/master/diagnostics/umap": {
+      "get": {
+        "operationId": "master_diagnostics_umap_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/diagnostics/repair": {
+      "post": {
+        "operationId": "master_get_repair_suggestions_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/diagnostics/apply-repair": {
+      "post": {
+        "operationId": "master_apply_repair_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/settings": {
+      "get": {
+        "operationId": "master_get_settings_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "master_update_settings_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/settings/qdrant-collections": {
+      "get": {
+        "operationId": "master_list_qdrant_collections_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "master_create_qdrant_collection_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/settings/qdrant-import": {
+      "post": {
+        "operationId": "master_import_routes_from_qdrant_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/{route_id}/recommendations": {
+      "post": {
+        "operationId": "master_recommend_samples_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/master/routes/merge": {
+      "post": {
+        "operationId": "master_merge_routes_post",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeAgentsRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compat/bupt/health": {
+      "get": {
+        "operationId": "bupt_health_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": []
+      }
+    },
+    "/compat/bupt/health/services": {
+      "get": {
+        "operationId": "bupt_external_services_health_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/agents": {
+      "get": {
+        "operationId": "bupt_agents_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "bupt_create_agent_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compat/bupt/agents/{agent_id}/diff": {
+      "get": {
+        "operationId": "bupt_agent_diff_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/bupt/agents/{agent_id}": {
+      "patch": {
+        "operationId": "bupt_update_agent_patch",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "bupt_delete_agent_delete",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/bupt/agents/{agent_id}/restore-fields": {
+      "post": {
+        "operationId": "bupt_restore_agent_fields_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/bupt/agents/{agent_id}/recommendations": {
+      "post": {
+        "operationId": "bupt_recommend_agent_corpus_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/bupt/agents/{agent_id}/thresholds": {
+      "patch": {
+        "operationId": "bupt_update_agent_thresholds_patch",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/bupt/agents/pull": {
+      "post": {
+        "operationId": "bupt_pull_agents_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/vectors/sync": {
+      "post": {
+        "operationId": "bupt_sync_vectors_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/sync": {
+      "post": {
+        "operationId": "bupt_sync_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/sync/status": {
+      "get": {
+        "operationId": "bupt_sync_status_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/route": {
+      "post": {
+        "operationId": "bupt_route_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "BUPT success/data/error envelope; data.agents contains agent details and nullable score."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compat/bupt/settings": {
+      "get": {
+        "operationId": "bupt_settings_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "bupt_update_settings_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/collections": {
+      "get": {
+        "operationId": "bupt_collections_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "bupt_create_collection_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/collections/restore": {
+      "post": {
+        "operationId": "bupt_restore_collection_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/diagnostics/overlap": {
+      "get": {
+        "operationId": "bupt_diagnostics_overlap_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/diagnostics/overlap/{agent_id}": {
+      "get": {
+        "operationId": "bupt_diagnostics_agent_overlap_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/compat/bupt/diagnostics/umap": {
+      "get": {
+        "operationId": "bupt_diagnostics_umap_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/diagnostics/repair": {
+      "post": {
+        "operationId": "bupt_diagnostics_repair_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/diagnostics/apply-repair": {
+      "post": {
+        "operationId": "bupt_diagnostics_apply_repair_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/compat/bupt/diagnostics/merge": {
+      "post": {
+        "operationId": "bupt_diagnostics_merge_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeAgentsRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents": {
+      "get": {
+        "operationId": "bupt_root_bupt_agents_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "bupt_root_bupt_create_agent_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents/{agent_id}/diff": {
+      "get": {
+        "operationId": "bupt_root_bupt_agent_diff_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/agents/{agent_id}": {
+      "patch": {
+        "operationId": "bupt_root_bupt_update_agent_patch",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "bupt_root_bupt_delete_agent_delete",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/agents/{agent_id}/restore-fields": {
+      "post": {
+        "operationId": "bupt_root_bupt_restore_agent_fields_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/agents/{agent_id}/recommendations": {
+      "post": {
+        "operationId": "bupt_root_bupt_recommend_agent_corpus_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/agents/{agent_id}/thresholds": {
+      "patch": {
+        "operationId": "bupt_root_bupt_update_agent_thresholds_patch",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/agents/pull": {
+      "post": {
+        "operationId": "bupt_root_bupt_pull_agents_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/vectors/sync": {
+      "post": {
+        "operationId": "bupt_root_bupt_sync_vectors_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/sync": {
+      "post": {
+        "operationId": "bupt_root_bupt_sync_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/sync/status": {
+      "get": {
+        "operationId": "bupt_root_bupt_sync_status_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/route": {
+      "post": {
+        "operationId": "bupt_root_bupt_route_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "BUPT success/data/error envelope; data.agents contains agent details and nullable score."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collections": {
+      "get": {
+        "operationId": "bupt_root_bupt_collections_get",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "bupt_root_bupt_create_collection_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/collections/restore": {
+      "post": {
+        "operationId": "bupt_root_bupt_restore_collection_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/diagnostics/merge": {
+      "post": {
+        "operationId": "bupt_root_bupt_diagnostics_merge_post",
+        "tags": [
+          "bupt"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeAgentsRequest"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PredictRequest": {
+        "description": "预测请求模型",
+        "properties": {
+          "text": {
+            "description": "待匹配的文本",
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "PredictRequest",
+        "type": "object"
+      },
+      "PredictResponse": {
+        "description": "预测响应模型",
+        "properties": {
+          "id": {
+            "description": "匹配到的路由ID",
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "description": "匹配到的路由名称",
+            "title": "Name",
+            "type": "string"
+          },
+          "route_key": {
+            "description": "稳定的业务路由标识",
+            "title": "Route Key",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "相似度分数",
+            "title": "Score"
+          },
+          "match_source": {
+            "default": "semantic",
+            "enum": [
+              "semantic",
+              "llm_fallback",
+              "default"
+            ],
+            "title": "Match Source",
+            "type": "string"
+          },
+          "fallback_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "matched",
+                  "no_match",
+                  "ambiguous",
+                  "no_candidates",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Fallback Status"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "route_key"
+        ],
+        "title": "PredictResponse",
+        "type": "object"
+      },
+      "RouteSource": {
+        "properties": {
+          "type": {
+            "description": "正式路由来源类型",
+            "enum": [
+              "web_manual",
+              "json_import",
+              "upstream_agent"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "instance": {
+            "default": "default",
+            "title": "Instance",
+            "type": "string"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "来源侧稳定 ID",
+            "title": "Source Id"
+          },
+          "import_origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "导入来源标识",
+            "title": "Import Origin"
+          },
+          "managed_fields": {
+            "description": "受来源托管的字段",
+            "items": {
+              "type": "string"
+            },
+            "title": "Managed Fields",
+            "type": "array"
+          },
+          "source_snapshot": {
+            "additionalProperties": true,
+            "description": "最近一次上游快照",
+            "title": "Source Snapshot",
+            "type": "object"
+          },
+          "upstream_present": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "最近拉取时上游是否存在",
+            "title": "Upstream Present"
+          },
+          "last_pulled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "最近成功拉取时间",
+            "title": "Last Pulled At"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "RouteSource",
+        "type": "object"
+      },
+      "RouteSync": {
+        "properties": {
+          "status": {
+            "default": "pending",
+            "description": "同步状态",
+            "enum": [
+              "pending",
+              "queued",
+              "syncing",
+              "synced",
+              "stale",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "最近同步时间",
+            "title": "Last Synced At"
+          },
+          "version": {
+            "default": 0,
+            "description": "本地路由版本",
+            "minimum": 0,
+            "title": "Version",
+            "type": "integer"
+          },
+          "synced_version": {
+            "default": 0,
+            "description": "已写入向量库的版本",
+            "minimum": 0,
+            "title": "Synced Version",
+            "type": "integer"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "当前后台同步任务 ID",
+            "title": "Task Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "最近一次同步错误",
+            "title": "Error"
+          },
+          "manual_overrides": {
+            "description": "人工覆盖字段",
+            "items": {
+              "type": "string"
+            },
+            "title": "Manual Overrides",
+            "type": "array"
+          }
+        },
+        "title": "RouteSync",
+        "type": "object"
+      },
+      "RouteConfig": {
+        "description": "路由配置模型（用于CRUD操作）",
+        "properties": {
+          "id": {
+            "description": "路由ID",
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "description": "路由名称",
+            "title": "Name",
+            "type": "string"
+          },
+          "route_key": {
+            "description": "稳定的业务路由标识",
+            "minLength": 1,
+            "title": "Route Key",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "description": "路由描述",
+            "title": "Description",
+            "type": "string"
+          },
+          "utterances": {
+            "description": "示例语句列表",
+            "items": {
+              "type": "string"
+            },
+            "title": "Utterances",
+            "type": "array"
+          },
+          "negative_samples": {
+            "description": "负例语句列表，用于排除不应该匹配到该路由的查询",
+            "items": {
+              "type": "string"
+            },
+            "title": "Negative Samples",
+            "type": "array"
+          },
+          "score_threshold": {
+            "default": 0.75,
+            "description": "相似度阈值",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score Threshold",
+            "type": "number"
+          },
+          "negative_threshold": {
+            "default": 0.95,
+            "description": "负例相似度阈值，当查询与负例向量相似度超过此值时排除该路由",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Negative Threshold",
+            "type": "number"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Updated At"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "来源元数据"
+          },
+          "sync": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteSync"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "同步元数据"
+          },
+          "lifecycle_status": {
+            "default": "active",
+            "description": "生命周期状态",
+            "enum": [
+              "active",
+              "draft",
+              "stale",
+              "disabled",
+              "deleted"
+            ],
+            "title": "Lifecycle Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "route_key",
+          "utterances"
+        ],
+        "title": "RouteConfig",
+        "type": "object"
+      },
+      "LoginRequest": {
+        "description": "登录请求模型",
+        "properties": {
+          "username": {
+            "description": "用户名",
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          },
+          "password": {
+            "description": "密码",
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "RouteRequest": {
+        "properties": {
+          "query": {
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "RouteRequest",
+        "type": "object"
+      },
+      "Agent": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "utterances": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Utterances",
+            "type": "array"
+          },
+          "negative_samples": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Negative Samples",
+            "type": "array"
+          },
+          "score_threshold": {
+            "default": 0.8,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score Threshold",
+            "type": "number"
+          },
+          "negative_threshold": {
+            "default": 0.95,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Negative Threshold",
+            "type": "number"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "source_type": {
+            "default": "upstream",
+            "enum": [
+              "upstream",
+              "local"
+            ],
+            "title": "Source Type",
+            "type": "string"
+          },
+          "upstream_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Upstream Id"
+          },
+          "upstream_present": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Upstream Present"
+          },
+          "manual_overrides": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Manual Overrides",
+            "type": "array"
+          },
+          "lifecycle_status": {
+            "default": "active",
+            "enum": [
+              "active",
+              "inactive",
+              "deleted"
+            ],
+            "title": "Lifecycle Status",
+            "type": "string"
+          },
+          "source_snapshot": {
+            "additionalProperties": true,
+            "title": "Source Snapshot",
+            "type": "object"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "Agent",
+        "type": "object"
+      },
+      "AgentCreate": {
+        "properties": {
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "utterances": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Utterances",
+            "type": "array"
+          },
+          "negative_samples": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Negative Samples",
+            "type": "array"
+          },
+          "score_threshold": {
+            "default": 0.8,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score Threshold",
+            "type": "number"
+          },
+          "negative_threshold": {
+            "default": 0.95,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Negative Threshold",
+            "type": "number"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "AgentCreate",
+        "type": "object"
+      },
+      "AgentUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Text"
+          },
+          "utterances": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Utterances"
+          },
+          "negative_samples": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Negative Samples"
+          },
+          "score_threshold": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Score Threshold"
+          },
+          "negative_threshold": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Negative Threshold"
+          },
+          "lifecycle_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "active",
+                  "inactive",
+                  "deleted"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Lifecycle Status"
+          }
+        },
+        "title": "AgentUpdate",
+        "type": "object"
+      },
+      "MergeAgentsRequest": {
+        "properties": {
+          "source_agent_id": {
+            "title": "Source Agent Id",
+            "type": "integer"
+          },
+          "target_agent_id": {
+            "title": "Target Agent Id",
+            "type": "integer"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_agent_id",
+          "target_agent_id",
+          "title"
+        ],
+        "title": "MergeAgentsRequest",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

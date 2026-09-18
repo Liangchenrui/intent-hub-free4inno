@@ -55,6 +55,11 @@ class ComponentManager:
             )
         return self._route_manager
 
+    @property
+    def agent_store(self):
+        from intent_hub.agent_store import AgentStore
+        return AgentStore(self)
+
     def is_ready(self) -> bool:
         try:
             self.ensure_ready()

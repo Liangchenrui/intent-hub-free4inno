@@ -49,7 +49,8 @@ def test_load_routes_migrates_missing_route_key(test_dir):
     assert route is not None
     assert route.route_key == "天气服务"
 
-    saved_routes = json.loads(config_path.read_text(encoding="utf-8"))
+    assert "route_key" not in json.loads(config_path.read_text(encoding="utf-8"))[0]
+    saved_routes = [r.model_dump() for r in RouteManager(str(config_path)).get_all_routes()]
     assert saved_routes[0]["route_key"] == "天气服务"
 
 

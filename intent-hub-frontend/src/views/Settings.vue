@@ -77,20 +77,7 @@
             </div>
           </el-form-item>
           <el-row :gutter="20">
-            <el-col :span="16">
-              <el-form-item :label="$t('settings.apiKey')">
-                <el-input 
-                  v-model="settings.LLM_API_KEY" 
-                  type="password" 
-                  show-password 
-                  :placeholder="getApiKeyPlaceholder()"
-                />
-                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-                  {{ $t('settings.apiKeyHint') }}
-                </div>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
+            <el-col :span="24">
               <el-form-item :label="$t('settings.model')">
                 <el-input 
                   v-model="settings.LLM_MODEL" 
@@ -221,7 +208,6 @@ const settings = ref<SystemSettings>({
   PREDICT_AUTH_KEY: null,
   EMBEDDING_SERVICE_URL: 'http://embedding.free4inno.com/embed',
   LLM_PROVIDER: 'deepseek',
-  LLM_API_KEY: null,
   LLM_BASE_URL: null,
   LLM_MODEL: null,
   LLM_TEMPERATURE: 0.7,
@@ -241,11 +227,9 @@ const settings = ref<SystemSettings>({
 const normalizeSettings = (data: any): SystemSettings => ({
   QDRANT_URL: data.QDRANT_URL ?? '',
   QDRANT_COLLECTION: data.QDRANT_COLLECTION ?? '',
-  QDRANT_API_KEY: data.QDRANT_API_KEY ?? null,
   PREDICT_AUTH_KEY: data.PREDICT_AUTH_KEY ?? null,
   EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
   LLM_PROVIDER: data.LLM_PROVIDER ?? 'deepseek',
-  LLM_API_KEY: data.LLM_API_KEY ?? null,
   LLM_BASE_URL: data.LLM_BASE_URL ?? null,
   LLM_MODEL: data.LLM_MODEL ?? null,
   LLM_TEMPERATURE: data.LLM_TEMPERATURE ?? 0.7,
@@ -349,8 +333,8 @@ const handleImportCollection = async () => {
 
 const prepareSettingsForSubmit = (data: SystemSettings): Partial<SystemSettings> => {
   const result: any = { ...data };
+  ['QDRANT_API_KEY', 'AGENT_API_TOKEN', 'LLM_API_KEY', 'DEEPSEEK_API_KEY', 'API_KEYS', 'PREDICT_AUTH_KEY', 'DEFAULT_PASSWORD', 'AUTH_CODE', 'AUTH_ENABLED'].forEach(key => delete result[key]);
   const nullableFields: (keyof SystemSettings)[] = [
-    'LLM_API_KEY',
     'LLM_BASE_URL',
     'LLM_MODEL'
   ];
@@ -405,17 +389,6 @@ const handleTabChange = (tabName: any) => {
   } else if (tabName === 'diagnostics') {
     router.push('/diagnostics');
   }
-};
-
-const getApiKeyPlaceholder = () => {
-  const placeholders: Record<string, string> = {
-    deepseek: 'DeepSeek API Key',
-    openrouter: 'OpenRouter API Key',
-    doubao: '豆包 API Key',
-    qwen: '通义千问 API Key',
-    gemini: 'Gemini API Key'
-  };
-  return placeholders[settings.value.LLM_PROVIDER] || 'API Key';
 };
 
 const getModelPlaceholder = () => {

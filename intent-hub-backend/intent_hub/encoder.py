@@ -108,9 +108,7 @@ class QwenEmbeddingEncoder:
                     batch_embeddings = [item["embedding"] for item in embeddings_data]
 
                 if len(batch_embeddings) != len(batch_texts):
-                    logger.warning(
-                        f"Expected {len(batch_texts)} embeddings, got {len(batch_embeddings)}"
-                    )
+                    raise ValueError(f"Expected {len(batch_texts)} embeddings, got {len(batch_embeddings)}")
 
                 all_embeddings.extend(batch_embeddings)
 

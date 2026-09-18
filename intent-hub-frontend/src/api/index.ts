@@ -1,7 +1,7 @@
 import axios, { type AxiosResponse } from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: '/api/compat/master',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -420,3 +420,8 @@ export const addNegativeSamples = (routeId: number, data: AddNegativeSamplesRequ
   );
 
 export default api;
+
+export const recommendNegativeSamples = (id: number, count: number) =>
+  api.post<{ items: string[] }>(`/routes/${id}/recommendations`, { polarity: 'negative', count });
+export const mergeRoutes = (source: number, target: number, title: string) =>
+  api.post('/routes/merge', { source_agent_id: source, target_agent_id: target, title });

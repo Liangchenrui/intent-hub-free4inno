@@ -84,6 +84,8 @@ class PredictionService:
             route_id = payload[qdrant_client.ROUTE_ID_KEY]
             route_name = payload[qdrant_client.ROUTE_NAME_KEY]
             route = route_manager.get_route(route_id)
+            if route is None or route.lifecycle_status != "active":
+                continue
             route_key = route.route_key if route else f"route.{route_id}"
             route_name = route.name if route else route_name
 

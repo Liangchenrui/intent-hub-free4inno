@@ -14,7 +14,7 @@ from intent_hub.utils.logger import logger
 class SyncService:
     """同步服务类 - 处理索引同步的核心业务逻辑"""
 
-    execution_lock = RLock()
+    execution_lock = Config.LOCK
 
     def __init__(self, component_manager: ComponentManager):
         """初始化同步服务
@@ -43,7 +43,7 @@ class SyncService:
         route_manager.reload()
 
         # 2. 获取配置文件中的路由
-        config_routes = [route.model_copy(deep=True) for route in route_manager.get_all_routes()]
+        config_routes = [route.model_copy(deep=True) for route in route_manager.get_all_routes() if route.lifecycle_status == "active"]
         config_route_ids = {route.id for route in config_routes}
 
         if force_full:
@@ -311,6 +311,10 @@ class SyncService:
         qdrant_client.delete_route(route_id)
         qdrant_client.delete_route_negative_samples(route_id)
 
+        if route.lifecycle_status != "active":
+            self._mark_synced_if_current(route.id, route.sync.version if route.sync else 0)
+            return {"route_id": route.id, "total_points": 0, "total_negative_points": 0}
+
         # 重新编码并插入新的正例向量点
         embeddings = encoder.encode(route.utterances)
         qdrant_client.upsert_route_utterances(
@@ -397,6 +401,7 @@ class SyncService:
             return None
         return route_manager.update_sync_state(
             route_id,
+            **({"expected_version": expected_version} if hasattr(route_manager, "repository") else {}),
             status="synced",
             synced_version=expected_version,
             last_synced_at=datetime.now(timezone.utc).isoformat(),

@@ -41,8 +41,15 @@ curl -X POST http://localhost:5000/predict \
 
 ## 数据文件
 
-- `intent-hub-backend/data/routes.json`
+- `intent-hub-backend/data/routes.sqlite3`
 - `intent-hub-backend/data/settings.json`
 - `intent-hub-backend/data/diagnostics_cache.json`
-- `intent-hub-backend/data/sync_tasks.json`
-- `intent-hub-backend/data/routes.json.sequence`
+
+
+## 统一版本的登录与数据迁移
+
+管理台在两种 API profile 下都使用相同登录界面；启动前在进程环境设置 `DEFAULT_PASSWORD`。LLM、Qdrant、上游访问密钥由运行环境提供，设置页面不再编辑或返回密钥。已有 JSON 设置中的密钥不会自动生效，也不会自动删除原文件。
+
+首次升级先备份并按[统一方案中的迁移步骤](docs/changes/branch-unification/README.md)执行 dry-run。旧 JSON 保留为输入/导出格式；SQLite 是唯一业务数据源，不能继续编辑旧 JSON 来更新运行数据。
+
+编辑已保存的实体时可“推荐负例”，结果先回填表单，保存后才生效。“合并”会新建实体、合并两边语料并停用原实体，不删除历史实体。列表用“未启用”标识非 active 实体；这些实体不会参与路由。

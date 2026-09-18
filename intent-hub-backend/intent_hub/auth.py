@@ -36,7 +36,7 @@ class AuthManager:
         from intent_hub.config import Config
 
         return (
-            username == Config.DEFAULT_USERNAME and password == Config.DEFAULT_PASSWORD
+            bool(Config.DEFAULT_PASSWORD) and username == Config.DEFAULT_USERNAME and password == Config.DEFAULT_PASSWORD
         )
 
     def _load_initial_keys(self):
@@ -69,7 +69,7 @@ class AuthManager:
 
             # 检查key是否过期
             if time.time() - created_at < self.KEY_TTL:
-                logger.info(f"User {username} using existing API key: {key[:8]}...")
+                logger.info(f"User {username} using existing API key: [redacted]")
                 return key
             else:
                 logger.info(f"User {username} API key expired, generating new key")
@@ -83,7 +83,7 @@ class AuthManager:
         self._user_keys[username] = {"key": new_key, "created_at": current_time}
         self._key_to_user[new_key] = username
 
-        logger.info(f"Generated new API key for user {username}: {new_key[:8]}...")
+        logger.info(f"Generated new API key for user {username}: [redacted]")
         return new_key
 
     def add_key(self, key: str) -> bool:
@@ -93,7 +93,7 @@ class AuthManager:
         key = key.strip()
         # 添加到兼容映射中（无TTL限制）
         self._key_to_user[key] = "__legacy__"
-        logger.info(f"Added API key: {key[:8]}... (legacy mode, no TTL)")
+        logger.info(f"Added API key: [redacted] (legacy mode, no TTL)")
         return True
 
     def remove_key(self, key: str) -> bool:
@@ -109,7 +109,7 @@ class AuthManager:
                 if self._user_keys[username].get("key") == key:
                     del self._user_keys[username]
             del self._key_to_user[key]
-            logger.info(f"Removed API key: {key[:8]}...")
+            logger.info(f"Removed API key: [redacted]")
             return True
         return False
 
@@ -161,7 +161,7 @@ class AuthManager:
                 del self._key_to_user[key]
             del self._user_keys[username]
             cleaned_count += 1
-            logger.info(f"Cleaned expired API key: {key[:8]}... (user: {username})")
+            logger.info(f"Cleaned expired API key: [redacted] (user: {username})")
 
         if cleaned_count > 0:
             logger.info(f"Cleaned {cleaned_count} expired API key(s)")
@@ -258,7 +258,7 @@ def require_auth(f):
         # 验证API key（会自动清理过期key）
         if not auth_manager.is_valid(api_key):
             logger.warning(
-                f"无效或已过期的API key: {api_key[:8]}... (请求路径: {request.path})"
+                f"无效或已过期的 API key (请求路径: {request.path})"
             )
             return jsonify(
                 ErrorResponse(
@@ -315,7 +315,7 @@ def require_telestar_auth(f):
         logger.warning(f"Predict auth failed: {request.path}")
         error_detail = "Invalid authorization."
         if predict_key:
-            error_detail += f" Provide valid Predict Key in header (config: {predict_key[:2]}***)."
+            error_detail += " Provide valid Predict Key in header."
         if auth_enabled:
             error_detail += " Or valid API Key."
 

@@ -126,7 +126,8 @@ class RouteService:
             raise ValueError(f"Route ID {route_id} does not exist")
         route.route_key = self._normalize_and_validate_route_key(route.route_key)
         self._ensure_route_key_unique(route.route_key, exclude_route_id=route_id)
-        route.source = route.source or RouteConfig.RouteSource(type="web_manual")
+        route.details = previous.details if "details" not in route.model_fields_set else route.details
+        route.source = route.source or previous.source or RouteConfig.RouteSource(type="web_manual")
         if previous.source and previous.source.type == "upstream_agent":
             route.source = previous.source.model_copy(deep=True)
             route.sync = route.sync or RouteConfig.RouteSync()
@@ -382,6 +383,8 @@ class RouteService:
         manual_overrides: List[str] | None = None,
     ) -> None:
         """Assign a new local version and preserve only prior sync history."""
+        from datetime import datetime, timezone
+        route.updated_at = datetime.now(timezone.utc).isoformat()
         previous_sync = previous.sync if previous is not None else None
         previous_version = previous_sync.version if previous_sync is not None else 0
         route.sync = RouteConfig.RouteSync(

@@ -1,0 +1,14 @@
+{
+  "date": "2026-09-18",
+  "environment": "localhost:5188; isolated SQLite; in-memory Qdrant; deterministic encoder/LLM",
+  "observed": [
+    "Synthetic account login succeeds",
+    "Negative suggestions populate two samples and save persists",
+    "Merge creates entity 3 and retains originals 1 and 2",
+    "Reload shows both originals inactive and all three sync states succeeded"
+  ],
+  "limits": [
+    "Narrow viewport uses existing horizontally scrolling table",
+    "No real provider or production endpoint validated"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "observed_at": "2026-09-10T16:56:29.410227+08:00",
+  "environment": "local production frontend build served at 127.0.0.1:5184 with read-only simulated API",
+  "external_service_calls": false,
+  "checks": [
+    {
+      "scenario": "matched",
+      "query": "包裹走到哪了",
+      "observed": "大模型兜底；Agent ID 7；不提供相似度分数；无 score 进度条",
+      "passed": true
+    },
+    {
+      "scenario": "ambiguous",
+      "query": "帮我取消一下",
+      "observed": "未命中 Agent；请求存在歧义，请补充操作对象或希望完成的动作",
+      "passed": true
+    },
+    {
+      "scenario": "settings",
+      "observed": "候选意图数量 5，超时 8 秒；关闭开关后两项均 disabled",
+      "passed": true
+    }
+  ],
+  "limitation": "Browser UI interactions and screenshot inspected in this task; model responses simulated, no settings saved. No remote classification claim."
+}

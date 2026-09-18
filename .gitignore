@@ -122,3 +122,10 @@ pytest-cache-files-*/
 ScreenShot_*.png
 intent-hub-frontend/dist.tar.gz
 intent-hub-frontend/dist.tar.gz
+
+# Unified SQLite runtime files
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.db-wal
+*.db-shm

@@ -16,4 +16,4 @@ dist/assets/index-NilkHdCG.js   2,284.06 kB │ gzip: 747.93 kB
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 9.62s
+✓ built in 8.35s

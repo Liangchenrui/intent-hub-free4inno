@@ -1,6 +1,6 @@
 # master 与 intentHub-BUPT 统一：需求、设计与实施计划
 
-日期：2026-09-17（设计），2026-09-18（实施更新）。状态：**统一实现与本地验证已完成主要工作，正在完成历史合并；用户明确暂不部署**。
+日期：2026-09-17（设计），2026-09-18（实施更新）。状态：**统一实现、本地验证和历史冲突解决完成；用户明确暂不部署**。
 
 本文件是本次统一工作的唯一权威记录，承载意图、行为规格、设计取舍、实施顺序与验收依据。后续实现应更新本文件的状态和证据，不另建重复计划。
 
@@ -244,7 +244,7 @@ npm run build
 ### 本地证据
 
 - 基线：master 84 个测试通过（[原始输出](evidence/master-baseline.txt)）；BUPT 81 个测试通过（本会话隔离 worktree 执行，未保存原始日志，不与统一版测试数混算）。
-- 统一版：[后端输出](evidence/backend.txt)、[JUnit](evidence/backend.xml)；覆盖双契约、鉴权、迁移、负 ID、合并、重启、目标变化、并发 outbox 及原有回归。
+- 统一版：最终 **118 passed，5 warnings**（55.36 秒）；[后端输出](evidence/backend.txt)、[JUnit](evidence/backend.xml)；覆盖双契约、鉴权、迁移、负 ID、合并、重启、目标变化、并发 outbox 及原有回归。
 - 前端：[构建输出](evidence/frontend-build.txt)，TypeScript 检查及 Vite 构建通过；保留既有大 chunk 警告。
 - 浏览器：[可复现离线 fixture](evidence/ui_fixture.py)、[观察摘要](evidence/ui-check.json)。实际完成登录、推荐负例、保存、合并及刷新后停用/同步状态验证；SQLite 和内存 Qdrant 为真实组件，Embedding/LLM 为确定性替身。
 - [OpenAPI 清单](../../intent-hub-openapi.json) 由 `python -m intent_hub.openapi` 生成，`--check` 核对注册路由及模型；这是接口清单和主要 DTO schema，尚非每个响应的完整形式化规格。
@@ -259,3 +259,21 @@ npm run build
 - 向量恢复不能补齐 payload 中不存在的业务字段，旧向量 ID/模型不保证可直接沿用，恢复记录标为待同步。真实迁移后应显式重新索引。
 - UI 验证覆盖本次新增主流程，不声称所有原有页面全量端到端验收；真实 LLM 的推荐质量与路由准确率没有新增实测结论。
 - 未进行 Docker 镜像构建/启动或部署；已检查打包排除规则并通过 `docker compose config --quiet` 配置解析。用户原有运行时 JSON、脚本和研究文档保留。
+
+### Git 冲突处理记录
+
+统一实现先保存为 `f3a2f94`，随后以普通双亲 merge 合入 `origin/intentHub-BUPT` 的 `36df30b9`。按能力核对后采用如下解决方式：
+
+| 变化组 | 解决方式 |
+| --- | --- |
+| 存储、模型、路由、同步、鉴权、API 冲突 | 保留已通过 108 项回归的统一核心；BUPT 行为已接入 `compat_*`、`AgentStore` 适配层、来源比较和 LLM 推荐服务 |
+| BUPT 删除的 master API、登录、国际化、导入、反馈及历史文档 | 保留；这些是统一版必须继续支持的能力 |
+| Compose 自动生成重复 environment、前端万能访问码代理 | 使用统一版环境凭据与浏览器登录；不采用代理注入；入口脚本补齐 SQLite 挂载目录权限 |
+| BUPT 新增默认响应、配置示例、演示文档 | 保留；历史演示明确标为历史材料；运行数据仍不打进镜像 |
+| 测试 | 移植来源比较、LLM 提示词、镜像排除、TEI 编码测试；旧存储构造器/直接 provider 实现测试由统一仓库、兼容 API 和密钥隔离回归覆盖，原件可在 BUPT 历史查阅 |
+| 旧向量哈希 | 采用统一 RouteConfig 内容哈希；不承诺兼容旧内部哈希，迁移要求重建索引 |
+| BUPT 既有 fallback UI 证据 | 单独保存为 `evidence/bupt-prior-ui-check.json`，不混入本轮证据 |
+
+移植编码测试时发现旧测试会在构造器探测外部 Embedding URL，并得到 404；已为构造器注入测试替身。该探测不计作外部服务验证，后续回归使用离线替身。
+
+最终合并工作树已通过 118 项后端测试、前端 TypeScript/Vite 构建、OpenAPI 一致性和 Compose 配置解析。5 条后端警告为既有 Pydantic `dict()` 弃用提示；前端仍有既有的大 chunk 提示。没有以真实 Provider、生产数据或部署结果替代本地测试结论。

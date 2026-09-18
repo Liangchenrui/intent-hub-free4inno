@@ -9,6 +9,8 @@
 - [大模型兜底需求与交付记录](changes/llm-fallback/README.md)：需求、设计取舍、实现入口、验收证据、本地运行与待验证项
 - [master 与 BUPT 统一方案](changes/branch-unification/README.md)：需求、实现与兼容契约、迁移工具、验证证据及交付状态
 
-历史说明中的 `python -m scripts.api_docs check` 和 `update-api-md` 在当前仓库缺少对应模块，暂不可执行。接口契约先结合 `API.md`、Flask 路由实现和相关后端测试核对，不将缺失工具的检查标记为通过。
+历史说明中的 `python -m scripts.api_docs check` 和 `update-api-md` 在当前仓库缺少对应模块，暂不可执行。统一版本改用后端目录下的 `python -m intent_hub.openapi --check`，并结合 `API.md` 和相关后端测试核对。
 
 子项目仅在需要独立说明时保留局部文档。
+
+- [历史冲突演示](DEMO_CONFLICT_REPAIR.md)与[中英文讲稿](DEMO_ORAL_SCRIPT_BILINGUAL.md)：保留自 BUPT 的演示背景，不作为统一版本实测结论。

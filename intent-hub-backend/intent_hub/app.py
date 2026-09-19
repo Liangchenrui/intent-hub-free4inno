@@ -9,11 +9,35 @@ from intent_hub.core.components import get_component_manager
 app = Flask(__name__)
 Compress(app)
 
+from intent_hub.services.log_service import install_request_logging, list_records
+
+install_request_logging(app)
+
+
+@app.get("/logs/<kind>")
+def logs(kind):
+    from flask import request
+    from intent_hub.config import Config
+    from intent_hub.compat_auth import require_auth as require_bupt_auth
+
+    authenticate = (require_bupt_auth
+                    if Config.API_COMPAT_PROFILE == "bupt" and not request.path.startswith('/compat/master/')
+                    else require_auth)
+    return authenticate(list_records)(kind)
+
 
 @app.route("/health", methods=["GET"])
 def health():
     """Process-level liveness probe."""
     return {"status": "ok"}, 200
+
+
+@app.get("/health/ready")
+def routing_readiness():
+    manager = get_component_manager()
+    manager.start_warmup()
+    state = manager.readiness()
+    return state, 200 if state['status'] == 'ready' else 503
 
 
 @app.route("/health/services", methods=["GET"])
@@ -304,6 +328,10 @@ def init_app():
     """Initialize local storage and start remote work in the background."""
     component_manager = get_component_manager()
     component_manager.ensure_routes_ready()
+    component_manager.start_warmup()
+    from threading import Thread
+    from intent_hub.services.llm_runtime import warm_llm
+    Thread(target=warm_llm, name='llm-warmup', daemon=True).start()
     from intent_hub.services.sync_task_service import get_sync_task_service
 
     get_sync_task_service(component_manager)

@@ -53,11 +53,11 @@ def test_qdrant_complete_url_uses_url_port_instead_of_sdk_default(
 def test_embedding_complete_url_only_gets_endpoint_path(monkeypatch):
     calls = []
 
-    def post(url, **kwargs):
+    def post(self, url, **kwargs):
         calls.append(url)
         return FakeEmbeddingResponse()
 
-    monkeypatch.setattr("intent_hub.encoder.requests.post", post)
+    monkeypatch.setattr("intent_hub.encoder.httpx.Client.post", post)
     encoder = QwenEmbeddingEncoder("https://embedding.example.com:9443/api")
 
     assert encoder.endpoint_url == "https://embedding.example.com:9443/api/get_embeddings"
@@ -67,11 +67,11 @@ def test_embedding_complete_url_only_gets_endpoint_path(monkeypatch):
 def test_tei_embedding_uses_exact_endpoint_and_array_contract(monkeypatch):
     calls = []
 
-    def post(url, **kwargs):
+    def post(self, url, **kwargs):
         calls.append((url, kwargs["json"]))
         return FakeEmbeddingResponse([[0.1, 0.2], [0.3, 0.4]])
 
-    monkeypatch.setattr("intent_hub.encoder.requests.post", post)
+    monkeypatch.setattr("intent_hub.encoder.httpx.Client.post", post)
     encoder = QwenEmbeddingEncoder("https://embedding.example.com/embed", api_format="tei")
     result = encoder.encode(["one", "two"])
 

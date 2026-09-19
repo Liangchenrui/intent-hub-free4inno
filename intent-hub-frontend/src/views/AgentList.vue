@@ -20,6 +20,7 @@
           <el-tab-pane :label="$t('nav.test')" name="test"></el-tab-pane>
           <el-tab-pane :label="$t('nav.diagnostics')" name="diagnostics"></el-tab-pane>
           <el-tab-pane :label="$t('nav.settings')" name="settings"></el-tab-pane>
+          <el-tab-pane :label="$t('nav.logs')" name="logs"></el-tab-pane>
         </el-tabs>
       </div>
 
@@ -65,6 +66,9 @@
               @click="handlePullUpstream"
             >
               {{ $t('agent.syncUpstream') }}
+            </el-button>
+            <el-button v-if="pullRetryId && !pullingUpstream" @click="retryPullIndex">
+              {{ $t('agent.pullRetry') }}
             </el-button>
             <el-dropdown trigger="click" @command="handleDataManagement">
               <el-button :icon="FolderOpened">
@@ -112,14 +116,14 @@
           @selection-change="handleSelectionChange"
         >
           <el-table-column type="selection" width="48" align="center" />
-          <el-table-column prop="id" :label="$t('agent.id')" width="70" align="center" />
+          <el-table-column type="index" :index="displayIndex" :label="$t('agent.id')" width="70" align="center" />
           <el-table-column :label="$t('agent.nameDesc')" min-width="200">
             <template #default="{ row }">
               <div class="agent-info">
                 <div class="agent-name">{{ row.name }}
                     <el-tag v-if="row.lifecycle_status && row.lifecycle_status !== 'active'" type="info" size="small">{{ $t('agent.inactiveState') }}</el-tag></div>
                 <div class="agent-route-key">{{ row.route_key }}</div>
-                <div class="agent-description">{{ row.description || $t('agent.noDescription') }}</div>
+                <CollapsibleDescription :key="row.id" :text="row.description || $t('agent.noDescription')" />
                 <el-tag
                   v-if="row.source?.type === 'upstream_agent'"
                   size="small"
@@ -235,10 +239,9 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="$t('agent.actions')" width="205" align="center">
+          <el-table-column :label="$t('agent.actions')" width="150" align="center">
             <template #default="{ row }">
               <el-button link type="primary" @click="handleEdit(row)">{{ $t('common.edit') }}</el-button>
-              <el-button link type="warning" @click="handleMerge(row)">{{ $t('agent.mergeAction') }}</el-button>
               <el-divider direction="vertical" />
               <el-button link type="danger" @click="handleDelete(row.id)">{{ $t('common.delete') }}</el-button>
             </template>
@@ -430,7 +433,6 @@ import {
   createRoute,
   generateUtterances,
   recommendNegativeSamples,
-  mergeRoutes,
   reindex,
   importRoutes,
   importRouteFromSkill,
@@ -445,6 +447,7 @@ import {
   type GenerateUtterancesRequest
 } from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
+import CollapsibleDescription from '../components/CollapsibleDescription.vue';
 import ServiceHealthIndicators from '../components/ServiceHealthIndicators.vue';
 
 const { t } = useI18n();
@@ -460,6 +463,10 @@ const importing = ref(false);
 const importingSkill = ref(false);
 const batchDeleting = ref(false);
 const pullingUpstream = ref(false);
+const pullTaskId = ref<string>();
+let pullStatusWarningShown = false;
+const pullRetryId = ref<string>();
+let pullPolling = false;
 const diffVisible = ref(false);
 const diffLoading = ref(false);
 const upstreamDiff = ref<UpstreamRouteDiff>();
@@ -479,6 +486,8 @@ const paginatedAgents = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return agents.value.slice(start, start + pageSize);
 });
+
+const displayIndex = (index: number) => (currentPage.value - 1) * pageSize + index + 1;
 
 const syncTableSelection = async () => {
   await nextTick();
@@ -524,11 +533,13 @@ let syncPollTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
   fetchAgents();
   refreshReindexTask();
+  refreshPullTask();
   syncPollTimer = setInterval(() => {
     if (agents.value.some(agent => ['pending', 'queued', 'syncing'].includes(agent.sync?.status || 'pending'))) {
       fetchAgents(searchQuery.value, true);
     }
     if (reindexing.value || reindexTaskId.value) refreshReindexTask();
+    if (pullingUpstream.value) refreshPullTask();
   }, 2000);
 });
 onBeforeUnmount(() => syncPollTimer && clearInterval(syncPollTimer));
@@ -585,21 +596,85 @@ const comparisonTagType = (status?: string) => {
   return 'info';
 };
 
-const handlePullUpstream = async () => {
-  pullingUpstream.value = true;
+const refreshPullTask = async () => {
+  if (pullPolling) return;
+  pullPolling = true;
   try {
-    const { data } = await pullUpstreamAgents();
-    if (data.warning) ElMessage.warning(data.warning);
-    else ElMessage.success(t('agent.pullUpstreamSuccess', {
-      created: data.created,
-      updated: data.updated,
-      upstream_missing: data.upstream_missing,
-    }));
-    await fetchAgents(searchQuery.value);
+    const tasks = (await getSyncTasks()).data;
+    const task = pullTaskId.value
+      ? tasks.find(item => item.id === pullTaskId.value)
+      : [...tasks].reverse().find(item => item.kind === 'upstream_pull');
+    if (!task) return;
+    const notifyResult = pullingUpstream.value;
+    pullStatusWarningShown = false;
+    pullTaskId.value = task.id;
+    pullRetryId.value = undefined;
+    if (['queued', 'running'].includes(task.status)) {
+      pullingUpstream.value = true;
+      return;
+    }
+    const result = task.result;
+    const summary = result ? t('agent.pullSummary', {
+      created: result.created || 0, updated: result.effective_updated || 0,
+      baseline: result.baseline_updated || 0, unchanged: result.unchanged || 0,
+      missing: result.upstream_missing || 0, failed: result.failed || 0,
+    }) + (result.warning ? ` · ${result.warning}` : '') : '';
+    const indexTask = result?.sync_task_id ? tasks.find(item => item.id === result.sync_task_id) : undefined;
+    if (task.status === 'succeeded' && indexTask && ['queued', 'running'].includes(indexTask.status)) {
+      pullingUpstream.value = true;
+      return;
+    }
+    pullingUpstream.value = false;
+    let type: 'error' | 'warning' | 'success';
+    let message: string;
+    if (task.status !== 'succeeded' || (result?.sync_task_id && indexTask?.status !== 'succeeded')) {
+      type = 'error';
+      message = task.status !== 'succeeded'
+        ? (task.error || t('agent.pullUpstreamError'))
+        : t('agent.pullIndexFailed', { detail: indexTask?.error || indexTask?.status || 'unknown' });
+      if (task.status === 'error') pullRetryId.value = task.id;
+      else if (indexTask && ['error', 'superseded'].includes(indexTask.status)) pullRetryId.value = indexTask.id;
+    } else {
+      type = result?.failed || result?.warning ? 'warning' : 'success';
+      message = t(result?.failed || result?.warning ? 'agent.pullPartial' : 'agent.pullComplete');
+    }
+    if (notifyResult) {
+      ElMessage({ type, message: summary ? `${message}：${summary}` : message, duration: 5000, showClose: true });
+    }
+    await fetchAgents(searchQuery.value, true);
+  } catch (_) {
+    if (pullingUpstream.value && !pullStatusWarningShown) {
+      ElMessage.warning(t('agent.pullStatusUnavailable'));
+      pullStatusWarningShown = true;
+    }
+    // Keep polling an active operation; a status request failure is not task failure.
+  } finally {
+    pullPolling = false;
+  }
+};
+
+const retryPullIndex = async () => {
+  if (!pullRetryId.value) return;
+  try {
+    await retrySyncTask(pullRetryId.value);
+    pullingUpstream.value = true;
+    await refreshPullTask();
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || t('agent.pullUpstreamError'));
-  } finally {
+  }
+};
+
+const handlePullUpstream = async () => {
+  pullingUpstream.value = true;
+  pullRetryId.value = undefined;
+  pullStatusWarningShown = false;
+  try {
+    const { data } = await pullUpstreamAgents();
+    pullTaskId.value = data.id;
+    await refreshPullTask();
+  } catch (e: any) {
     pullingUpstream.value = false;
+    ElMessage.error(e?.response?.data?.detail || t('agent.pullUpstreamError'));
   }
 };
 
@@ -649,6 +724,7 @@ const handleLogout = async () => {
 };
 
 const handleTabChange = (tabName: any) => {
+  if (tabName === 'logs') { router.push('/logs'); return; }
   if (tabName === 'test') {
     router.push('/test');
   } else if (tabName === 'diagnostics') {
@@ -684,15 +760,6 @@ const handleRecommendNegative = async () => {
     negativeSamplesText.value = [...new Set([...negativeSamplesText.value.split('\n').filter(Boolean), ...data.items])].join('\n');
   } catch (error: any) { ElMessage.error(error.response?.data?.detail || t('common.error')); }
   finally { generatingNegative.value = false; }
-};
-const handleMerge = async (row: { id: number; name: string }) => {
-  try {
-    const { value: target } = await ElMessageBox.prompt(t('agent.mergeTarget'), t('agent.mergeAction'), { inputPattern: /^\d+$/, inputErrorMessage: t('agent.mergeTarget') });
-    const { value: title } = await ElMessageBox.prompt(t('agent.nameLabel'), t('agent.mergeAction'), { inputValue: row.name, inputValidator: (value: string) => !!value.trim() });
-    await ElMessageBox.confirm(t('agent.mergeWarning'), t('agent.mergeAction'), { type: 'warning' });
-    await mergeRoutes(row.id, Number(target), title);
-    await fetchAgents(searchQuery.value);
-  } catch (error: any) { if (error !== 'cancel' && error !== 'close') ElMessage.error(error.response?.data?.detail || t('common.error')); }
 };
 const negativeSamplesText = ref('');
 
@@ -1081,12 +1148,6 @@ const handleBatchDelete = async () => {
 .agent-name {
   font-weight: 600;
   color: #303133;
-}
-
-.agent-description {
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.4;
 }
 
 .agent-route-key {

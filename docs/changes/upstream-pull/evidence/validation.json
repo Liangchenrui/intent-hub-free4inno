@@ -1,0 +1,32 @@
+{
+  "date": "2026-09-19",
+  "environment": "Windows PowerShell; local source checkout; isolated test databases",
+  "backend": {
+    "command": "python -m pytest intent-hub-backend/tests -q --basetemp=.tmp/pytest-upstream-delivery --durations=5",
+    "passed": 191,
+    "warnings": 8,
+    "seconds": 113.44
+  },
+  "focused": {
+    "passed": 42,
+    "seconds": 38.85
+  },
+  "frontend": {
+    "command": "npm run build",
+    "result": "passed",
+    "warning": "large bundle chunks"
+  },
+  "openapi": {
+    "command": "python -m intent_hub.openapi --check",
+    "result": "passed"
+  },
+  "diff_check": "passed",
+  "ui_visual": {
+    "result": "blocked",
+    "reason": "cua.getState failed: nodeRepl.fetch request failed; no usable browser"
+  },
+  "live_upstream": "read-only GET verified; see live-read-only.json",
+  "real_embedding_qdrant_writes": false,
+  "existing_services_restarted": false,
+  "deployed": false
+}

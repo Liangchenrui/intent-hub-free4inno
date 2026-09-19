@@ -138,6 +138,7 @@ class Config:
     SYNC_TASKS_PATH: str = str(DATA_DIR / "sync_tasks.json")
     SYNC_MAX_ATTEMPTS: int = 5
     QDRANT_TIMEOUT_SECONDS: int = 30
+    SERVICE_HTTP_TRUST_ENV: bool = True
 
     # 认证配置
     API_KEYS: Optional[str] = None
@@ -150,7 +151,7 @@ class Config:
     # The management UI intentionally has fixed local credentials. They are
     # neither loaded from settings.json nor overridden through the environment.
     DEFAULT_USERNAME: str = "admin"
-    DEFAULT_PASSWORD: str = "telestar"
+    DEFAULT_PASSWORD: str = "123456"
 
     # LLM配置
     LLM_PROVIDER: str = "deepseek"
@@ -285,6 +286,8 @@ class Config:
             raise ValueError("Unsupported settings: " + ", ".join(sorted(unknown)))
         cls.validate_fallback_settings(settings_dict)
         merged = {**cls.to_dict(), **settings_dict}
+        if type(merged['SERVICE_HTTP_TRUST_ENV']) is not bool:
+            raise ValueError('SERVICE_HTTP_TRUST_ENV must be a boolean')
         if type(merged['BATCH_SIZE']) is not int or merged['BATCH_SIZE'] <= 0:
             raise ValueError("BATCH_SIZE must be a positive integer")
         if type(merged['QDRANT_WRITE_BATCH_SIZE']) is not int or merged['QDRANT_WRITE_BATCH_SIZE'] <= 0:
@@ -372,6 +375,7 @@ class Config:
             "DEFAULT_ROUTE_TEXT": cls.DEFAULT_ROUTE_TEXT,
             # 其他配置
             "BATCH_SIZE": cls.BATCH_SIZE,
+            "SERVICE_HTTP_TRUST_ENV": cls.SERVICE_HTTP_TRUST_ENV,
             "QDRANT_WRITE_BATCH_SIZE": cls.QDRANT_WRITE_BATCH_SIZE,
             "MAX_DELETE_RATIO": cls.MAX_DELETE_RATIO,
             "DEFAULT_ROUTE_ID": cls.DEFAULT_ROUTE_ID,

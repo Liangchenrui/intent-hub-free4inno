@@ -39,6 +39,7 @@ class RouteConfig(BaseModel):
         manual_overrides: List[str] = Field(default_factory=list, description="人工覆盖字段")
 
     id: int = Field(..., description="路由ID")
+    display_order: Optional[int] = Field(default=None, description="当前列表中的展示顺序，从 1 开始")
     name: str = Field(..., description="路由名称")
     route_key: str = Field(..., description="稳定的业务路由标识", min_length=1)
     description: str = Field(default="", description="路由描述")

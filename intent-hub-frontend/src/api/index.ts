@@ -92,12 +92,21 @@ export interface RouteSyncMeta {
 
 export interface SyncTask {
   id: string;
-  kind: 'route_sync' | 'incremental_reindex' | 'full_reindex';
+  kind: 'route_sync' | 'incremental_reindex' | 'full_reindex' | 'upstream_pull';
   route_ids: number[];
   status: string;
   attempts: number;
+  phase?: string;
   error?: string | null;
   result?: {
+    created?: number;
+    effective_updated?: number;
+    baseline_updated?: number;
+    unchanged?: number;
+    upstream_missing?: number;
+    failed?: number;
+    warning?: string;
+    sync_task_id?: string;
     mode?: string;
     routes_count?: number;
     new_routes?: number;
@@ -110,6 +119,7 @@ export interface SyncTask {
 
 export interface RouteConfig {
   id: number;
+  display_order?: number;
   name: string;
   route_key: string;
   description: string;
@@ -207,7 +217,7 @@ export const getServiceHealth = () =>
 
 export const getRoutes = () => api.get<RouteConfig[]>('/routes');
 export const pullUpstreamAgents = () =>
-  api.post<UpstreamPullResult>('/routes/upstream-pull', {}, { timeout: 120000 });
+  api.post<SyncTask>('/routes/upstream-pull', {});
 export const getUpstreamRouteDiff = (id: number) =>
   api.get<UpstreamRouteDiff>(`/routes/${id}/upstream-diff`);
 export const restoreUpstreamRouteFields = (id: number, fields: string[]) =>
@@ -363,6 +373,7 @@ export interface SystemSettings extends SharedLlmSettings {
   LLM_FALLBACK_TOP_K: number;
   LLM_FALLBACK_TIMEOUT_SECONDS: number;
   QDRANT_URL?: string;
+  SERVICE_HTTP_TRUST_ENV?: boolean;
   QDRANT_COLLECTION?: string;
   QDRANT_API_KEY?: string | null;
 
@@ -419,6 +430,53 @@ export const addNegativeSamples = (routeId: number, data: AddNegativeSamplesRequ
   );
 
 export default api;
+
+export type LogKind = 'runtime' | 'routing';
+export type LogCategory = 'routing' | 'sync' | 'diagnostics' | 'management' | 'system';
+export interface LogTiming {
+  stage: string;
+  offset_ms: number;
+  elapsed_ms: number;
+  status: 'succeeded' | 'failed';
+  error_type?: string;
+}
+export interface LogRecord {
+  id: number;
+  created_at: number;
+  request_id: string;
+  category?: LogCategory;
+  category_inferred?: boolean;
+  task_id?: string;
+  task_status?: string;
+  attempt?: number;
+  queue_wait_ms?: number;
+  lock_wait_ms?: number;
+  level?: string;
+  module?: string;
+  message?: string;
+  exception?: string | null;
+  input_text?: string;
+  status?: string;
+  status_code?: number;
+  path?: string;
+  method?: string;
+  elapsed_ms?: number;
+  result?: unknown;
+  events?: Array<Record<string, unknown> & { stage: string }>;
+  timings?: LogTiming[];
+}
+export interface LogQuery {
+  page: number;
+  page_size: number;
+  request_id?: string;
+  keyword?: string;
+  level?: string;
+  category?: LogCategory;
+  start?: number;
+  end?: number;
+}
+export const getLogs = (kind: LogKind, params: LogQuery) =>
+  api.get<{ items: LogRecord[]; total: number; page: number; page_size: number }>(`/logs/${kind}`, { params });
 
 export const recommendNegativeSamples = (id: number, count: number) =>
   api.post<{ items: string[] }>(`/routes/${id}/recommendations`, { polarity: 'negative', count });

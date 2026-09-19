@@ -20,11 +20,11 @@ def test_encode_uses_text_embeddings_inference_contract(monkeypatch):
         def json(self):
             return [[1.0, 2.0], [3.0, 4.0]]
 
-    def post(url, **kwargs):
+    def post(self, url, **kwargs):
         calls.append((url, kwargs))
         return Response()
 
-    monkeypatch.setattr("intent_hub.encoder.requests.post", post)
+    monkeypatch.setattr("intent_hub.encoder.httpx.Client.post", post)
     encoder = QwenEmbeddingEncoder("http://embedding.free4inno.com/embed", api_format="tei")
     calls.clear()
 

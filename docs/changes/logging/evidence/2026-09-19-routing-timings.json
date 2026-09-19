@@ -1,0 +1,136 @@
+[
+  {
+    "request_id": "fb19403b58894920837fb68c278f9651",
+    "created_at": 1789747644.9279501,
+    "input_text": "出国访问",
+    "status": "failed",
+    "elapsed_ms": 53818.966,
+    "category": "routing",
+    "timings": [
+      {
+        "stage": "preparing",
+        "offset_ms": 0.544,
+        "status": "succeeded",
+        "elapsed_ms": 21587.175
+      },
+      {
+        "stage": "encoding",
+        "offset_ms": 21587.745,
+        "status": "succeeded",
+        "elapsed_ms": 2151.409
+      },
+      {
+        "stage": "negative_search",
+        "offset_ms": 23739.174,
+        "status": "failed",
+        "error_type": "ResponseHandlingException",
+        "elapsed_ms": 30065.348
+      }
+    ],
+    "result": null
+  },
+  {
+    "request_id": "af3687287ef84942bf771c5b96613fab",
+    "created_at": 1789747729.7954965,
+    "input_text": "出国访问",
+    "status": "succeeded",
+    "elapsed_ms": 17530.277,
+    "category": "routing",
+    "timings": [
+      {
+        "stage": "preparing",
+        "offset_ms": 0.112,
+        "status": "succeeded",
+        "elapsed_ms": 0.699
+      },
+      {
+        "stage": "encoding",
+        "offset_ms": 0.83,
+        "status": "succeeded",
+        "elapsed_ms": 3804.749
+      },
+      {
+        "stage": "negative_search",
+        "offset_ms": 3805.602,
+        "status": "succeeded",
+        "elapsed_ms": 2152.869
+      },
+      {
+        "stage": "negative_filter",
+        "offset_ms": 5958.481,
+        "status": "succeeded",
+        "elapsed_ms": 0.013
+      },
+      {
+        "stage": "positive_search",
+        "offset_ms": 5958.499,
+        "status": "succeeded",
+        "elapsed_ms": 3918.534
+      },
+      {
+        "stage": "candidate_filter",
+        "offset_ms": 9877.062,
+        "status": "succeeded",
+        "elapsed_ms": 6.166
+      },
+      {
+        "stage": "fallback_prepare",
+        "offset_ms": 9883.248,
+        "status": "succeeded",
+        "elapsed_ms": 0.896
+      },
+      {
+        "stage": "description_search",
+        "offset_ms": 9884.152,
+        "status": "succeeded",
+        "elapsed_ms": 2408.651
+      },
+      {
+        "stage": "fallback_candidates",
+        "offset_ms": 12292.815,
+        "status": "succeeded",
+        "elapsed_ms": 0.187
+      },
+      {
+        "stage": "llm_prompt",
+        "offset_ms": 12293.006,
+        "status": "succeeded",
+        "elapsed_ms": 0.046
+      },
+      {
+        "stage": "llm_client_init",
+        "offset_ms": 12293.766,
+        "status": "succeeded",
+        "elapsed_ms": 2159.901
+      },
+      {
+        "stage": "llm_call",
+        "offset_ms": 14453.688,
+        "status": "succeeded",
+        "elapsed_ms": 3056.829
+      },
+      {
+        "stage": "llm_parse",
+        "offset_ms": 17511.696,
+        "status": "succeeded",
+        "elapsed_ms": 0.029
+      },
+      {
+        "stage": "route_revalidate",
+        "offset_ms": 17511.738,
+        "status": "succeeded",
+        "elapsed_ms": 0.739
+      }
+    ],
+    "result": [
+      {
+        "fallback_status": "matched",
+        "id": 103,
+        "match_source": "llm_fallback",
+        "name": "因公出国（赴港澳）任务申报",
+        "route_key": "因公出国（赴港澳）任务申报",
+        "score": null
+      }
+    ]
+  }
+]

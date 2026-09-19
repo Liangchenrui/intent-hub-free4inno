@@ -1,12 +1,9 @@
 """Retrieve intent definitions and ask an LLM to select or abstain."""
 
-import asyncio
 import json
-from contextlib import AsyncExitStack
 from time import monotonic
 from typing import Literal, Optional
 
-import httpx
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, ConfigDict, StrictInt, model_validator
@@ -16,6 +13,7 @@ from intent_hub.intent_description import description_hash
 from intent_hub.models import PredictResponse
 from intent_hub.services.llm_factory import LLMFactory
 from intent_hub.utils.logger import logger
+from intent_hub.utils.route_trace import trace_event, trace_stage
 
 
 SYSTEM_PROMPT = """你是意图路由判别器。判断哪个候选意图的职责能够完成用户请求。
@@ -57,13 +55,16 @@ class FallbackService:
         self.component_manager = component_manager
 
     def predict(self, text: str, query_vector: list, excluded_route_ids: set) -> PredictResponse:
+        trace_event("fallback_entered", enabled=bool(Config.LLM_FALLBACK_ENABLED))
         if not Config.LLM_FALLBACK_ENABLED:
+            trace_event("fallback_result", status="disabled", match_source="default")
             return default_response()
         started = monotonic()
         try:
             Config.validate_fallback_settings({})
             result = self._predict(text, query_vector, excluded_route_ids)
         except Exception as exc:
+            trace_event("fallback_error", error_type=type(exc).__name__)
             # Do not log provider exception bodies, which can contain request data.
             logger.warning("LLM fallback unavailable (%s)", type(exc).__name__)
             result = default_response("unavailable")
@@ -71,95 +72,101 @@ class FallbackService:
             "LLM fallback status=%s route_id=%s elapsed_ms=%.0f",
             result.fallback_status, result.id, (monotonic() - started) * 1000,
         )
+        trace_event("fallback_result", status=result.fallback_status,
+                    route_id=result.id, match_source=result.match_source,
+                    elapsed_ms=round((monotonic() - started) * 1000, 3))
         return result
 
     def _predict(self, text, query_vector, excluded_route_ids):
         manager = self.component_manager
-        routes = {
-            route.id: route.model_copy(deep=True) for route in manager.route_manager.get_all_routes()
-            if route.lifecycle_status == "active"
-            and route.id not in excluded_route_ids
-            and route.id != Config.DEFAULT_ROUTE_ID
-        }
+        with trace_stage("fallback_prepare"):
+            routes = {
+                route.id: route.model_copy(deep=True) for route in manager.route_manager.get_all_routes()
+                if route.lifecycle_status == "active"
+                and route.id not in excluded_route_ids
+                and route.id != Config.DEFAULT_ROUTE_ID
+            }
+
         if not routes:
             return default_response("no_candidates")
-        hits = manager.qdrant_client.search_route_descriptions(
-            query_vector, route_ids=list(routes), top_k=Config.LLM_FALLBACK_TOP_K
-        )
-        candidates = {}
-        for hit in hits:
-            payload = hit["payload"]
-            route = routes.get(payload.get("route_id"))
-            if route is None:
-                continue
-            # Pending edits and stale index entries must not describe a different capability.
-            if (
-                payload.get("description_hash") != description_hash(route, Config.EMBEDDING_MODEL_NAME)
-                or payload.get("route_hash") != manager.route_manager.compute_route_hash(route)
-            ):
-                continue
-            candidates[route.id] = route
-        if not candidates:
-            return default_response("no_candidates")
-        candidate_data = [
-            {
-                "route_id": route.id, "name": route.name, "description": route.description,
-                "utterances": route.utterances[:3], "negative_samples": route.negative_samples[:3],
-            }
-            for route in candidates.values()
-        ]
+        with trace_stage("description_search"):
+            hits = manager.qdrant_client.search_route_descriptions(
+                query_vector, route_ids=list(routes), top_k=Config.LLM_FALLBACK_TOP_K
+            )
+
+        with trace_stage("fallback_candidates"):
+            candidates = {}
+            for hit in hits:
+                payload = hit["payload"]
+                route = routes.get(payload.get("route_id"))
+                if route is None:
+                    trace_event("fallback_candidate", route_id=payload.get("route_id"),
+                                score=hit.get("score"), decision="ineligible")
+                    continue
+                # Pending edits and stale index entries must not describe a different capability.
+                if (
+                    payload.get("description_hash") != description_hash(route, getattr(manager, 'embedding_model_name', Config.EMBEDDING_MODEL_NAME))
+                    or payload.get("route_hash") != manager.route_manager.compute_route_hash(route)
+                ):
+                    trace_event("fallback_candidate", route_id=route.id,
+                                score=hit.get("score"), decision="stale_index")
+                    continue
+                candidates[route.id] = route
+                trace_event("fallback_candidate", route_id=route.id,
+                            score=hit.get("score"), decision="eligible")
+            if not candidates:
+                return default_response("no_candidates")
+            candidate_data = [
+                {
+                    "route_id": route.id, "name": route.name, "description": route.description,
+                    "utterances": route.utterances[:3], "negative_samples": route.negative_samples[:3],
+                }
+                for route in candidates.values()
+            ]
+
         decision = self._classify(text, candidate_data)
+        trace_event("llm_decision", status=decision.status, route_id=decision.route_id)
         if decision.status != "matched":
             return default_response(decision.status)
         selected = candidates.get(decision.route_id)
         if selected is None:
             return default_response("unavailable")
         # A request may overlap edits, deletion or background synchronization.
-        manager.route_manager.reload()
-        current = manager.route_manager.get_route(selected.id)
-        if (
-            current is None or current.lifecycle_status != "active"
-            or manager.route_manager.compute_route_hash(current)
-            != manager.route_manager.compute_route_hash(selected)
-        ):
-            return default_response("no_candidates")
-        return PredictResponse(
-            id=current.id, name=current.name, route_key=current.route_key, score=None,
-            match_source="llm_fallback", fallback_status="matched",
-        )
+        with trace_stage("route_revalidate"):
+            manager.route_manager.reload()
+            current = manager.route_manager.get_route(selected.id)
+            if (
+                current is None or current.lifecycle_status != "active"
+                or manager.route_manager.compute_route_hash(current)
+                != manager.route_manager.compute_route_hash(selected)
+            ):
+                return default_response("no_candidates")
+            return PredictResponse(
+                id=current.id, name=current.name, route_key=current.route_key, score=None,
+                match_source="llm_fallback", fallback_status="matched",
+            )
 
     @staticmethod
     def _classify(text, candidates) -> FallbackDecision:
         timeout = Config.LLM_FALLBACK_TIMEOUT_SECONDS
-        messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=json.dumps(
-                {"query": text, "candidates": candidates}, ensure_ascii=False
-            )),
-        ]
+        with trace_stage("llm_prompt"):
+            messages = [
+                SystemMessage(content=SYSTEM_PROMPT),
+                HumanMessage(content=json.dumps(
+                    {"query": text, "candidates": candidates}, ensure_ascii=False
+                )),
+            ]
 
-        async def invoke():
-            # LangChain caches its default async HTTP client across instances.
-            # Each Flask request owns a loop, so its transport must have the same lifetime.
-            async with AsyncExitStack() as stack:
-                options = {}
-                if Config.LLM_PROVIDER != "gemini":
-                    options["http_async_client"] = await stack.enter_async_context(
-                        httpx.AsyncClient(timeout=timeout)
-                    )
-                llm = LLMFactory.create_llm(
-                    temperature=0, timeout=timeout, max_retries=0, **options
+        from intent_hub.services.llm_runtime import get_llm_runtime
+        response = get_llm_runtime().invoke(messages)
+        with trace_stage("llm_parse"):
+            content = response.content
+            if isinstance(content, list):
+                content = "".join(
+                    block.get("text", "") for block in content
+                    if isinstance(block, dict) and block.get("type") == "text"
                 )
-                return await asyncio.wait_for(llm.ainvoke(messages), timeout=timeout)
-
-        response = asyncio.run(invoke())
-        content = response.content
-        if isinstance(content, list):
-            content = "".join(
-                block.get("text", "") for block in content
-                if isinstance(block, dict) and block.get("type") == "text"
-            )
-        content = content.strip()
-        if content.startswith("```json") and content.endswith("```"):
-            content = content[7:-3].strip()
-        return FallbackDecision.model_validate_json(content)
+            content = content.strip()
+            if content.startswith("```json") and content.endswith("```"):
+                content = content[7:-3].strip()
+            return FallbackDecision.model_validate_json(content)

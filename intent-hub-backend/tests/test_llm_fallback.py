@@ -22,6 +22,7 @@ from intent_hub.services.sync_task_service import SyncTaskService
 
 @pytest.fixture
 def system(tmp_path, monkeypatch):
+    monkeypatch.setattr(Config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(Config, "LLM_FALLBACK_ENABLED", True)
     monkeypatch.setattr(Config, "LLM_FALLBACK_TOP_K", 5)
     monkeypatch.setattr(Config, "LLM_FALLBACK_TIMEOUT_SECONDS", 1)
@@ -42,7 +43,8 @@ def system(tmp_path, monkeypatch):
             return [1.0, 0.0]
 
         def encode(self, texts):
-            return [[0.0, 1.0] for _ in texts]
+            # The delta planner batches descriptions together with sample texts.
+            return [self.encode_single(text) if text.startswith("名称：") else [0.0, 1.0] for text in texts]
 
     manager = SimpleNamespace(
         route_manager=route_manager, qdrant_client=client, encoder=Encoder(), ensure_ready=lambda: None,
@@ -69,6 +71,76 @@ def set_model(monkeypatch, output, calls=None):
             return AIMessage(content=output)
 
     monkeypatch.setattr(LLMFactory, "create_llm", lambda **kwargs: Model())
+
+
+def test_sync_task_emits_categorized_attempt_summary(system, tmp_path, caplog):
+    queue = SyncTaskService(system, task_path=str(tmp_path / 'tasks.json'),
+                            autostart=False, refresh_diagnostics=False)
+    task = queue.enqueue_routes([1])
+    assert queue.process_next()
+    summaries = [record for record in caplog.records if getattr(record, 'task_id', None) == task['id']]
+    assert len(summaries) == 1
+    record = summaries[0]
+    assert record.category == 'sync' and record.task_status == 'succeeded'
+    assert record.attempt == 1 and record.elapsed_ms >= 0
+    assert record.queue_wait_ms >= 0 and record.lock_wait_ms >= 0
+
+
+@pytest.mark.parametrize("enabled,output,expected", [
+    (False, None, "disabled"),
+    (True, '{"status":"matched","route_id":1}', "matched"),
+    (True, '{"status":"no_match","route_id":null}', "no_match"),
+    (True, RuntimeError("private provider body"), "unavailable"),
+])
+def test_request_trace_distinguishes_actual_llm_call(system, monkeypatch, enabled, output, expected):
+    from flask import Flask, g
+    monkeypatch.setattr(Config, "LLM_FALLBACK_ENABLED", enabled)
+    calls = []
+    set_model(monkeypatch, output, calls)
+    with Flask(__name__).test_request_context():
+        from time import monotonic
+        g.log_started = monotonic()
+        PredictionService(system).predict(PredictRequest(text="query"))
+        events = g.route_events
+        assert sum(e["stage"] == "llm_call_started" for e in events) == len(calls)
+        assert bool(calls) == enabled
+        assert events[-1]["stage"] == "fallback_result"
+        assert events[-1]["status"] == expected
+        assert "private provider body" not in str(events)
+        timings = {span['stage']: span for span in g.route_timings}
+        assert {'preparing', 'encoding', 'negative_search', 'positive_search'} <= timings.keys()
+        assert ('llm_call' in timings) == enabled
+        if enabled:
+            assert {'description_search', 'llm_client_init', 'llm_prompt'} <= timings.keys()
+            assert timings['llm_call']['status'] == ('failed' if isinstance(output, Exception) else 'succeeded')
+        assert all(span['elapsed_ms'] >= 0 and span['offset_ms'] >= 0 for span in timings.values())
+        searches = [timings[name] for name in ('negative_search', 'positive_search')]
+        assert all(span['offset_ms'] + span['elapsed_ms'] <= timings['negative_filter']['offset_ms'] + 0.002
+                   for span in searches)
+        assert 'private provider body' not in str(g.route_timings)
+    with Flask(__name__).test_request_context():
+        assert not hasattr(g, "route_events")
+
+
+def test_request_trace_records_filter_reasons(system, monkeypatch):
+    from flask import Flask, g
+    monkeypatch.setattr(Config, "LLM_FALLBACK_ENABLED", False)
+    monkeypatch.setattr(system.qdrant_client, "search", lambda *a, **kw: [
+        {"score": 0.2, "payload": {"route_id": 1, "route_name": "orders"}},
+        {"score": 0.99, "payload": {"route_id": 999, "route_name": "missing"}},
+    ])
+    with Flask(__name__).test_request_context():
+        PredictionService(system).predict(PredictRequest(text="query"))
+        candidates = [e for e in g.route_events if e["stage"] == "candidate"]
+        assert [e["decision"] for e in candidates] == ["below_threshold", "missing_or_inactive"]
+        assert candidates[0]["score"] == 0.2
+    monkeypatch.setattr(system.qdrant_client, "search_negative_samples", lambda *a, **kw: [
+        {"score": 0.99, "payload": {"route_id": 1, "negative_threshold": 0.9}}
+    ])
+    with Flask(__name__).test_request_context():
+        PredictionService(system).predict(PredictRequest(text="query"))
+        assert any(e.get("decision") == "negative_excluded" for e in g.route_events)
+        assert any(e.get("excluded") is True for e in g.route_events)
 
 
 def test_unmatched_retrieves_definitions_and_returns_validated_entity(system, monkeypatch):
@@ -201,8 +273,10 @@ def test_model_deadline_cancels_request_and_preserves_default(system, monkeypatc
     result = FallbackService(system).predict("query", [1.0, 0.0], set())
     assert result.fallback_status == "unavailable"
     assert cancelled == [True]
-    assert options[0].pop("http_async_client").is_closed
-    assert options == [{"temperature": 0, "timeout": 1, "max_retries": 0}]
+    # Timeout cancels the call; the shared transport remains available for the next request.
+    assert not options[0]["http_async_client"].is_closed
+    assert {k: options[0][k] for k in ('temperature', 'timeout', 'max_retries')} == {
+        "temperature": 0, "timeout": 1, "max_retries": 0}
 
 
 def test_description_sync_backfills_legacy_and_reuses_unchanged_vectors(system):
@@ -254,7 +328,8 @@ def test_background_task_preserves_description_vector(system, tmp_path):
     assert route.sync.task_id == task["id"]
     assert system.qdrant_client.get_description_embedding(route, Config.EMBEDDING_MODEL_NAME) == [1.0, 0.0]
     hits = system.qdrant_client.search_route_descriptions([1.0, 0.0], [1])
-    assert hits[0]["payload"]["route_config"]["sync"]["task_id"] == task["id"]
+    # No-op tasks update local task state without rewriting recovery metadata.
+    assert hits[0]["payload"]["route_config"]["sync"]["status"] == "synced"
 
 
 def test_http_predict_returns_fallback_contract_and_requires_auth(system, monkeypatch):
@@ -291,11 +366,11 @@ def test_settings_api_saves_fallback_controls_and_rejects_bad_values(tmp_path, m
     response = client.post("/settings", json={
         "LLM_FALLBACK_ENABLED": True, "LLM_FALLBACK_TOP_K": 3, "LLM_FALLBACK_TIMEOUT_SECONDS": 4,
     })
-    assert response.status_code == 200 and resets == [True]
+    assert response.status_code == 200 and resets == []
     assert json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))["LLM_FALLBACK_TOP_K"] == 3
     assert client.get("/settings").get_json()["LLM_FALLBACK_ENABLED"] is True
     assert client.post("/settings", json={"LLM_FALLBACK_TOP_K": -1}).status_code == 400
-    assert Config.LLM_FALLBACK_TOP_K == 3 and resets == [True]
+    assert Config.LLM_FALLBACK_TOP_K == 3 and resets == []
 
 
 @pytest.mark.parametrize("values", [

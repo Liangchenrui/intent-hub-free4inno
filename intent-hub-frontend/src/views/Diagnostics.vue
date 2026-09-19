@@ -20,6 +20,7 @@
           <el-tab-pane :label="$t('nav.test')" name="test"></el-tab-pane>
           <el-tab-pane :label="$t('nav.diagnostics')" name="diagnostics"></el-tab-pane>
           <el-tab-pane :label="$t('nav.settings')" name="settings"></el-tab-pane>
+          <el-tab-pane :label="$t('nav.logs')" name="logs"></el-tab-pane>
         </el-tabs>
       </div>
 
@@ -1567,6 +1568,7 @@ watch(viewMode, async (newMode) => {
 });
 
 const handleTabChange = (tabName: any) => {
+  if (tabName === 'logs') { router.push('/logs'); return; }
   if (tabName === 'list') {
     router.push('/');
   } else if (tabName === 'test') {

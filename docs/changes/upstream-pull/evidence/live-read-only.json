@@ -1,0 +1,83 @@
+{
+  "date": "2026-09-19",
+  "kind": "read-only upstream GET plus isolated SQLite replay",
+  "runs": [
+    {
+      "workers": 1,
+      "elapsed_ms": 1194.406,
+      "agents": 8,
+      "requests": 11,
+      "detail_requests": 8,
+      "failed": 0,
+      "complete": true
+    },
+    {
+      "workers": 8,
+      "elapsed_ms": 1809.359,
+      "agents": 8,
+      "requests": 11,
+      "detail_requests": 8,
+      "failed": 0,
+      "complete": true
+    }
+  ],
+  "same_data": true,
+  "isolated_replay": {
+    "created": 8,
+    "unchanged": 8,
+    "entity_writes": 0,
+    "outbox_rows": 0
+  },
+  "limitations": [
+    "One serial then one parallel sample; warm connections/server caches/order and network variation are not controlled.",
+    "No real Embedding or Qdrant writes; no changes to user database.",
+    "Small repeated read-only samples are not an SLA or p95 estimate."
+  ],
+  "shared_pool_samples": [
+    {
+      "workers": 8,
+      "elapsed_ms": 1462.238,
+      "agents": 8,
+      "failed": 0
+    },
+    {
+      "workers": 1,
+      "elapsed_ms": 592.425,
+      "agents": 8,
+      "failed": 0
+    },
+    {
+      "workers": 4,
+      "elapsed_ms": 1254.005,
+      "agents": 8,
+      "failed": 0
+    },
+    {
+      "workers": 1,
+      "elapsed_ms": 693.706,
+      "agents": 8,
+      "failed": 0
+    },
+    {
+      "workers": 8,
+      "elapsed_ms": 1683.805,
+      "agents": 8,
+      "failed": 0
+    },
+    {
+      "workers": 4,
+      "elapsed_ms": 1490.298,
+      "agents": 8,
+      "failed": 0
+    }
+  ],
+  "final_default_sample": {
+    "elapsed_ms": 623.766,
+    "agents": 8,
+    "requests": 11,
+    "detail_requests": 8,
+    "failed": 0,
+    "complete": true,
+    "policy": "serial reused connection for <=8 agents; up to 8 workers otherwise"
+  }
+}

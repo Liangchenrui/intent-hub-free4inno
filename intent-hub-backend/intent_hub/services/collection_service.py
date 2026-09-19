@@ -2,7 +2,7 @@
 
 import re
 
-import requests
+from intent_hub.utils import service_http as requests
 
 from intent_hub.config import Config
 from intent_hub.qdrant_wrapper import IntentHubQdrantClient
@@ -70,5 +70,6 @@ class CollectionService:
             api_key=Config.QDRANT_API_KEY,
             timeout=Config.QDRANT_TIMEOUT_SECONDS,
             write_batch_size=Config.QDRANT_WRITE_BATCH_SIZE,
+            trust_env=Config.SERVICE_HTTP_TRUST_ENV,
         )
         return {"name": name, "kind": "collection", "target": None}

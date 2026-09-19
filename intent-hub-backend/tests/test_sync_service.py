@@ -26,8 +26,8 @@ def test_incremental_sync_blocks_abnormal_mass_deletion(monkeypatch):
             return [route(1)]
 
     class Qdrant:
-        def get_existing_route_hashes(self):
-            return {item: "hash" for item in range(1, 11)}
+        def fast_index_summary(self):
+            return {'route_ids': list(range(1, 11))}
 
         def delete_route(self, _route_id):
             raise AssertionError("deletion must be rejected before changing Qdrant")
@@ -101,6 +101,13 @@ def test_incremental_sync_skips_route_when_hash_matches():
         metadata = []
 
         @staticmethod
+        def get_route_metadata(_ids):
+            from intent_hub.intent_description import description_hash
+            return {3: {'route_config': item.model_dump(), 'sync_schema': 1,
+                        'route_hash': 'matching-hash',
+                        'description_hash': description_hash(item, Config.EMBEDDING_MODEL_NAME)}}
+
+        @staticmethod
         def get_description_embedding(_route, _model_name):
             return [1.0, 0.0]
 
@@ -115,11 +122,13 @@ def test_incremental_sync_skips_route_when_hash_matches():
             self.metadata.append(route.id)
 
         @staticmethod
-        def index_summary():
+        def fast_index_summary():
             return {
                 "points_count": 3,
                 "route_ids": [3],
                 "route_hashes": {3: "matching-hash"},
+                "metadata": Qdrant.get_route_metadata([3]),
+                "manifests_valid": True,
             }
 
     manager = type(
@@ -137,4 +146,4 @@ def test_incremental_sync_skips_route_when_hash_matches():
 
     assert result["updated_routes"] == 0
     assert result["skipped_routes"] == 1
-    assert manager.qdrant_client.metadata == [3]
+    assert manager.qdrant_client.metadata == []

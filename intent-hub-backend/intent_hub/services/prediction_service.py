@@ -3,6 +3,7 @@
 from typing import Dict, List
 
 from intent_hub.utils.logger import logger
+from intent_hub.utils.route_trace import trace_event, trace_stage, run_parallel_searches
 
 from intent_hub.core.components import ComponentManager
 from intent_hub.models import PredictRequest, PredictResponse
@@ -30,109 +31,125 @@ class PredictionService:
             预测响应列表，包含所有相似度大于设定阈值的路由，按分数降序排列
         """
         # 确保组件已就绪
-        self.component_manager.ensure_ready()
-
-        encoder = self.component_manager.encoder
-        qdrant_client = self.component_manager.qdrant_client
-        route_manager = self.component_manager.route_manager
-        route_manager.reload()
-        result_limit = max(1, len(route_manager.get_all_routes()))
+        trace_event("preparing")
+        with trace_stage("preparing"):
+            manager = self.component_manager
+            if hasattr(manager, 'ready_snapshot'):
+                manager = manager.ready_snapshot()
+            else:
+                manager.ensure_ready()
+            encoder = manager.encoder
+            qdrant_client = manager.qdrant_client
+            route_manager = manager.route_manager
+            route_manager.reload()
+            result_limit = max(1, len(route_manager.get_all_routes()))
 
         # 1. 向量化
-        query_vector = encoder.encode_single(request.text)
-        logger.debug(f"Query text: {request.text}, vector dim: {len(query_vector)}")
+        trace_event("encoding")
+        with trace_stage("encoding"):
+            query_vector = encoder.encode_single(request.text)
+            logger.debug(f"Query text: {request.text}, vector dim: {len(query_vector)}")
 
         # 2. 负例检查：先检查查询是否与任何负例向量过于接近
         excluded_route_ids = set()
-        negative_search_results = qdrant_client.search_negative_samples(
-            query_vector, top_k=result_limit
+        negative_search_results, search_results = run_parallel_searches(
+            lambda: qdrant_client.search_negative_samples(query_vector, top_k=result_limit),
+            lambda: qdrant_client.search(query_vector, top_k=result_limit),
         )
 
-        for neg_result in negative_search_results:
-            score = neg_result["score"]
-            payload = neg_result["payload"]
-            route_id = payload[qdrant_client.ROUTE_ID_KEY]
-            negative_threshold = payload.get(
-                qdrant_client.NEGATIVE_THRESHOLD_KEY, 0.95  # 默认负例阈值
-            )
-
-            # 如果查询与负例向量相似度超过阈值，排除该路由
-            if score >= negative_threshold:
-                excluded_route_ids.add(route_id)
-                logger.info(
-                    f"Negative excluded: route_id={route_id}, "
-                    f"negative_score={score:.4f} >= negative_threshold={negative_threshold}, "
-                    f"negative_sample={payload.get(qdrant_client.UTTERANCE_KEY)}"
+        with trace_stage("negative_filter"):
+            for neg_result in negative_search_results:
+                score = neg_result["score"]
+                payload = neg_result["payload"]
+                route_id = payload[qdrant_client.ROUTE_ID_KEY]
+                negative_threshold = payload.get(
+                    qdrant_client.NEGATIVE_THRESHOLD_KEY, 0.95  # 默认负例阈值
                 )
 
-        # 3. 相似度检索 (获取较多的候选结果以便过滤)
-        search_results = qdrant_client.search(query_vector, top_k=result_limit)
-        logger.debug(f"Search raw result count: {len(search_results)}")
+                trace_event("negative_candidate", route_id=route_id, score=float(score),
+                            threshold=float(negative_threshold), excluded=score >= negative_threshold)
+                # 如果查询与负例向量相似度超过阈值，排除该路由
+                if score >= negative_threshold:
+                    excluded_route_ids.add(route_id)
+                    logger.info(
+                        f"Negative excluded: route_id={route_id}, "
+                        f"negative_score={score:.4f} >= negative_threshold={negative_threshold}, "
+                        f"negative_sample={payload.get(qdrant_client.UTTERANCE_KEY)}"
+                    )
 
         if not search_results:
-            return [FallbackService(self.component_manager).predict(
+            return [FallbackService(manager).predict(
                 request.text, query_vector, excluded_route_ids
             )]
 
         # 4. 按路由ID分组并进行阈值过滤（同时排除负例匹配的路由）
         # 因为 Qdrant 返回的是 utterance 级别的匹配，一个路由可能有多个匹配项，取最高分
-        matched_routes: Dict[int, PredictResponse] = {}
+        with trace_stage("candidate_filter"):
+            matched_routes: Dict[int, PredictResponse] = {}
 
-        for result in search_results:
-            score = result["score"]
-            payload = result["payload"]
-            route_id = payload[qdrant_client.ROUTE_ID_KEY]
-            route_name = payload[qdrant_client.ROUTE_NAME_KEY]
-            route = route_manager.get_route(route_id)
-            if route is None or route.lifecycle_status != "active":
-                continue
-            route_key = route.route_key if route else f"route.{route_id}"
-            route_name = route.name if route else route_name
+            for result in search_results:
+                score = result["score"]
+                payload = result["payload"]
+                route_id = payload[qdrant_client.ROUTE_ID_KEY]
+                route_name = payload[qdrant_client.ROUTE_NAME_KEY]
+                route = route_manager.get_route(route_id)
+                if route is None or route.lifecycle_status != "active":
+                    trace_event("candidate", route_id=route_id, score=float(score),
+                                decision="missing_or_inactive")
+                    continue
+                route_key = route.route_key if route else f"route.{route_id}"
+                route_name = route.name if route else route_name
 
-            # 跳过被负例排除的路由
-            if route_id in excluded_route_ids:
-                logger.debug(
-                    f"Skipping negative-excluded route: route_id={route_id}, score={score:.4f}"
-                )
-                continue
-
-            # 获取该路由的阈值
-            threshold = route_manager.get_score_threshold(route_id)
-            if threshold is None:
-                threshold = payload.get(qdrant_client.SCORE_THRESHOLD_KEY, 0.75)
-
-            # 阈值校验
-            if score >= threshold:
-                # 如果该路由已在匹配列表中，只保留最高分
-                if (
-                    route_id not in matched_routes
-                    or score > matched_routes[route_id].score
-                ):
-                    matched_routes[route_id] = PredictResponse(
-                        id=route_id,
-                        name=route_name,
-                        route_key=route_key,
-                        score=float(score),
-                    )
+                # 跳过被负例排除的路由
+                if route_id in excluded_route_ids:
+                    trace_event("candidate", route_id=route_id, score=float(score),
+                                decision="negative_excluded")
                     logger.debug(
-                        f"Match: route_id={route_id}, score={score:.4f} >= threshold={threshold}"
+                        f"Skipping negative-excluded route: route_id={route_id}, score={score:.4f}"
                     )
-            else:
-                logger.debug(
-                    f"Below threshold: route_id={route_id}, score={score:.4f} < threshold={threshold}"
-                )
+                    continue
 
-        # 5. 排序并转换结果
-        sorted_results = sorted(
-            matched_routes.values(),
-            key=lambda x: x.score if x.score is not None else 0,
-            reverse=True,
-        )
+                # 获取该路由的阈值
+                threshold = route_manager.get_score_threshold(route_id)
+                if threshold is None:
+                    threshold = payload.get(qdrant_client.SCORE_THRESHOLD_KEY, 0.75)
+
+                trace_event("candidate", route_id=route_id, route_name=route_name,
+                            score=float(score), threshold=float(threshold),
+                            decision="threshold_passed" if score >= threshold else "below_threshold")
+                # 阈值校验
+                if score >= threshold:
+                    # 如果该路由已在匹配列表中，只保留最高分
+                    if (
+                        route_id not in matched_routes
+                        or score > matched_routes[route_id].score
+                    ):
+                        matched_routes[route_id] = PredictResponse(
+                            id=route_id,
+                            name=route_name,
+                            route_key=route_key,
+                            score=float(score),
+                        )
+                        logger.debug(
+                            f"Match: route_id={route_id}, score={score:.4f} >= threshold={threshold}"
+                        )
+                else:
+                    logger.debug(
+                        f"Below threshold: route_id={route_id}, score={score:.4f} < threshold={threshold}"
+                    )
+
+            # 5. 排序并转换结果
+            sorted_results = sorted(
+                matched_routes.values(),
+                key=lambda x: x.score if x.score is not None else 0,
+                reverse=True,
+            )
 
         if not sorted_results:
-            return [FallbackService(self.component_manager).predict(
+            return [FallbackService(manager).predict(
                 request.text, query_vector, excluded_route_ids
             )]
 
         logger.info(f"Matched route count: {len(sorted_results)}")
+        trace_event("vector_result", route_ids=[r.id for r in sorted_results])
         return sorted_results

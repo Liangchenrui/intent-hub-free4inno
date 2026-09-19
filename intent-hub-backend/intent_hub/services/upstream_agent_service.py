@@ -1,11 +1,14 @@
 """Merge upstream Agents into the master route model without writing vectors."""
 
 from datetime import datetime, timezone
+import json
+import threading
+from time import perf_counter
 
 from intent_hub.agent_source import AgentSource
 from intent_hub.config import Config
 from intent_hub.models import RouteConfig
-from intent_hub.route_compare import COMPARABLE_FIELDS, snapshots_equal
+from intent_hub.route_compare import COMPARABLE_FIELDS, snapshots_equal, fields_equal
 from intent_hub.services.route_service import RouteService
 
 
@@ -19,113 +22,152 @@ class UpstreamAgentService:
         self.source = source or AgentSource()
         self.default_threshold = default_threshold
 
-    def pull(self) -> dict:
-        incoming = self.source.fetch_all()
-        current_routes = self.components.route_manager.get_all_routes()
-        if not incoming:
-            return {
-                "created": 0,
-                "updated": 0,
-                "unchanged": 0,
-                "preserved_overrides": 0,
-                "upstream_missing": 0,
-                "routes_count": len(current_routes),
-                "warning": "上游未返回 Agent，本地数据保持不变",
+    _pull_lock = threading.Lock()
+
+    def pull(self, progress=None, expected_source=None) -> dict:
+        # Serialize compatibility and background pulls; do not hold a DB lock over HTTP.
+        with self._pull_lock:
+            started = perf_counter()
+            source_instance = Config.SOURCE_INSTANCE
+            expected_source = expected_source or self.source_config()
+            scope = {
+                'url': getattr(self.source, 'base_url', None) or Config.AGENT_API_URL,
+                'labels': sorted(set(str(getattr(self.source, 'label_ids', None) or Config.AGENT_API_LABEL_IDS or '').split(','))),
             }
+            incoming = self.source.fetch_all()
+            fetched = perf_counter()
+            if progress:
+                progress("comparing")
+            if expected_source is not None and expected_source != self.source_config():
+                raise ValueError("上游配置已变更，请重新拉取")
+            repo = self.components.route_manager.repository
+            with repo.transaction() as db:
+                current = [RouteConfig.model_validate_json(row[0]) for row in
+                           db.execute("SELECT body FROM entities ORDER BY id")]
+                previous = db.execute('SELECT value FROM metadata WHERE key=?',
+                                      (f'upstream_pull:{source_instance}',)).fetchone()
+                previous = json.loads(previous[0]) if previous else None
+                candidates = None if previous is None else (
+                    set(previous.get('listed_source_ids', [])) if previous.get('scope') == scope else set())
+                result = self._merge(incoming, current, repo, db, source_instance, candidates)
+                result["timings_ms"] = {
+                    "fetch": round((fetched - started) * 1000, 3),
+                    "compare_save": round((perf_counter() - fetched) * 1000, 3),
+                }
+                result['upstream_requests'] = getattr(self.source, 'request_count', 0)
+                result['detail_requests'] = getattr(self.source, 'detail_request_count', 0)
+                # Preserve last complete membership across incomplete/empty fetches.
+                membership = sorted(set(getattr(self.source, 'listed_ids', set())) | {i['source_id'] for i in incoming})
+                if not incoming or not getattr(self.source, 'complete', True):
+                    membership = sorted(set(membership) | set(candidates or []))
+                db.execute("INSERT INTO metadata VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                           (f"upstream_pull:{source_instance}", json.dumps({**result, 'scope': scope, 'listed_source_ids': membership})))
+            return result
 
+    @staticmethod
+    def source_config():
+        return {key: getattr(Config, key) for key in
+                ("SOURCE_INSTANCE", "AGENT_API_URL", "AGENT_API_LABEL_IDS")}
+
+    def _merge(self, incoming, current_routes, repo, db, source_instance, missing_candidates=None):
         pulled_at = now_iso()
-        by_source_id = {
-            route.source.source_id: route
-            for route in current_routes
-            if route.source and route.source.type == "upstream_agent" and route.source.source_id and route.source.instance == Config.SOURCE_INSTANCE
-        }
-        incoming_ids = {item["source_id"] for item in incoming}
-        routes_by_id = {route.id: route for route in current_routes}
-        used_keys = {route.route_key for route in current_routes}
-        created = updated = unchanged = preserved = missing = 0
-        affected_ids: list[int] = []
-
+        result = dict(created=0, updated=0, effective_updated=0, baseline_updated=0,
+                      unchanged=0, preserved_overrides=0, upstream_missing=0,
+                      failed=len(getattr(self.source, "failed_ids", [])),
+                      failed_source_ids=getattr(self.source, "failed_ids", []),
+                      routes_count=len(current_routes), affected_route_ids=[], last_pulled_at=pulled_at)
+        if not incoming:
+            result["warning"] = "上游未返回可用 Agent，本地数据保持不变"
+            return result
+        source_routes = [r for r in current_routes
+                         if r.source and r.source.type == "upstream_agent"
+                         and r.source.instance == source_instance and r.source.source_id]
+        failed_ids = set(getattr(self.source, "failed_ids", []))
+        by_key = {r.route_key: r for r in current_routes}
+        incoming_keys = {}
         for item in incoming:
+            key = self.components.route_manager.normalize_route_key(item.get('route_key') or item['name'])
+            if not key:
+                raise ValueError('上游 Agent 缺少有效路由标识')
+            if key in incoming_keys:
+                raise ValueError(f'上游路由标识重复：{key}；本次拉取未保存')
+            incoming_keys[key] = item
+        matched_ids = set()
+        for route_key, item in incoming_keys.items():
             snapshot = {field: item[field] for field in COMPARABLE_FIELDS}
-            current = by_source_id.get(item["source_id"])
+            current = by_key.get(route_key)
             if current is None:
-                route_id = self.components.route_manager.allocate_route_id()
-                route_key = self._unique_route_key(item["name"], route_id, used_keys)
-                used_keys.add(route_key)
+                route_id = repo.allocate(db)
                 route = RouteConfig(
-                    id=route_id,
-                    details=item.get("details", {}),
+                    id=route_id, route_key=route_key, details=item.get("details", {}),
                     score_threshold=self.default_threshold,
-                    name=item["name"] or f"Agent {item['source_id']}",
-                    route_key=route_key,
-                    description=item["description"],
-                    utterances=item["utterances"],
-                    negative_samples=item["negative_samples"],
+                    **snapshot,
                     source=RouteConfig.RouteSource(
-                        type="upstream_agent",
-                        instance=Config.SOURCE_INSTANCE,
-                        source_id=item["source_id"],
-                        import_origin="agent_api",
-                        managed_fields=list(COMPARABLE_FIELDS),
-                        source_snapshot=snapshot,
-                        upstream_present=True,
-                        last_pulled_at=pulled_at,
-                    ),
-                    sync=RouteConfig.RouteSync(status="pending", version=1),
-                )
-                routes_by_id[route.id] = route
-                created += 1
-                affected_ids.append(route.id)
+                        type="upstream_agent", instance=source_instance, source_id=item["source_id"],
+                        import_origin="agent_api", managed_fields=list(COMPARABLE_FIELDS),
+                        source_snapshot=snapshot, upstream_present=True),
+                    sync=RouteConfig.RouteSync(status="pending", version=1))
+                repo.save(route, db)
+                result["created"] += 1
+                result["affected_route_ids"].append(route.id)
                 continue
-
+            matched_ids.add(current.id)
             route = current.model_copy(deep=True)
-            route.details = item.get("details", route.details)
-            previous_snapshot = route.source.source_snapshot or {}
-            source_changed = not snapshots_equal(previous_snapshot, snapshot)
+            if route.source is None or route.source.type != 'upstream_agent':
+                route.source = RouteConfig.RouteSource(type='upstream_agent', instance=source_instance,
+                    source_id=item['source_id'], import_origin='agent_api',
+                    managed_fields=list(COMPARABLE_FIELDS), source_snapshot={}, upstream_present=True)
+            route.source.instance = source_instance
+            route.source.source_id = item['source_id']
             overrides = set(route.sync.manual_overrides if route.sync else [])
-            before_hash = self.components.route_manager.compute_route_hash(route)
+            result["preserved_overrides"] += len(overrides & set(COMPARABLE_FIELDS))
+            source_changed = not snapshots_equal(route.source.source_snapshot or {}, snapshot)
+            if source_changed:
+                route.source.source_snapshot = snapshot
             for field, value in snapshot.items():
-                if field in overrides:
-                    preserved += 1
-                else:
+                if field not in overrides and not fields_equal(field, getattr(route, field), value):
                     setattr(route, field, value)
-            route.source.source_snapshot = snapshot
+            details = item.get("details", route.details)
+            # Raw corpus ordering/formatting is not a business mutation either.
+            managed_keys = {'title', 'text', 'extent00', 'extent01'}
+            details_changed = ({k: v for k, v in details.items() if k not in managed_keys}
+                               != {k: v for k, v in route.details.items() if k not in managed_keys})
+            if source_changed or details_changed:
+                route.details = details
             route.source.upstream_present = True
-            route.source.last_pulled_at = pulled_at
             if route.lifecycle_status == "disabled" and "lifecycle_status" not in overrides:
                 route.lifecycle_status = "active"
-            after_hash = self.components.route_manager.compute_route_hash(route)
-            if before_hash != after_hash:
+            effective_changed = self.components.route_manager.compute_route_hash(current) != self.components.route_manager.compute_route_hash(route)
+            if effective_changed:
                 RouteService._mark_changed(route, previous=current)
-                affected_ids.append(route.id)
-            routes_by_id[route.id] = route
-            updated += int(source_changed)
-            unchanged += int(not source_changed)
-
-        for source_id, current in by_source_id.items():
-            if source_id in incoming_ids or current.source.upstream_present is False:
-                continue
-            route = current.model_copy(deep=True)
-            route.source.upstream_present = False
-            route.source.last_pulled_at = pulled_at
-            route.lifecycle_status = "disabled"
-            RouteService._mark_changed(route, previous=current)
-            routes_by_id[route.id] = route
-            affected_ids.append(route.id)
-            missing += 1
-
-        routes = sorted(routes_by_id.values(), key=lambda route: route.id)
-        self.components.route_manager.replace_routes(routes)
-        return {
-            "created": created,
-            "updated": updated,
-            "unchanged": unchanged,
-            "preserved_overrides": preserved,
-            "upstream_missing": missing,
-            "routes_count": len(routes),
-            "affected_route_ids": sorted(set(affected_ids)),
-            "last_pulled_at": pulled_at,
-        }
+                result["affected_route_ids"].append(route.id)
+                result["effective_updated"] += 1
+            changed = route != current
+            if changed:
+                repo.save(route, db, enqueue=effective_changed)
+                if not effective_changed:
+                    result["baseline_updated"] += 1
+            else:
+                result["unchanged"] += 1
+            result["updated"] += int(source_changed)
+        if getattr(self.source, "complete", True):
+            for current in source_routes:
+                source_id = current.source.source_id
+                if missing_candidates is not None and source_id not in missing_candidates:
+                    continue
+                if current.id in matched_ids or source_id in failed_ids or current.source.upstream_present is False:
+                    continue
+                route = current.model_copy(deep=True)
+                route.source.upstream_present = False
+                route.lifecycle_status = "disabled"
+                RouteService._mark_changed(route, previous=current)
+                repo.save(route, db)
+                result["affected_route_ids"].append(route.id)
+                result["upstream_missing"] += 1
+        else:
+            result["warning"] = "上游列表不完整，已更新可用条目，未判定缺失 Agent"
+        result["routes_count"] += result["created"]
+        return result
 
     def restore_fields(self, route_id: int, fields: list[str]) -> RouteConfig:
         manager = self.components.route_manager
@@ -148,13 +190,3 @@ class UpstreamAgentService:
         )
         manager.update_route(route_id, route)
         return route
-
-    def _unique_route_key(self, name: str, route_id: int, used_keys: set[str]) -> str:
-        manager = self.components.route_manager
-        base = manager.normalize_route_key(name) or f"upstream.agent.{route_id}"
-        candidate = base
-        suffix = route_id
-        while candidate in used_keys:
-            candidate = f"{base}.{suffix}"
-            suffix += 1
-        return candidate

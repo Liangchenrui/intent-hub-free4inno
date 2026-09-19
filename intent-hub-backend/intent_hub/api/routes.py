@@ -20,8 +20,10 @@ from intent_hub.utils.logger import logger
 from intent_hub.route_compare import comparison_summary
 
 
-def _route_payload(route: RouteConfig) -> dict:
+def _route_payload(route: RouteConfig, display_order: int | None = None) -> dict:
     payload = route.model_dump()
+    if display_order is not None:
+        payload["display_order"] = display_order
     payload["comparison"] = comparison_summary(route)
     return payload
 
@@ -34,7 +36,7 @@ def get_routes():
     route_service = RouteService(component_manager)
     routes = route_service.get_all_routes()
 
-    return jsonify([_route_payload(route) for route in routes]), 200
+    return jsonify([_route_payload(route, index) for index, route in enumerate(routes, start=1)]), 200
 
 
 @handle_errors
@@ -48,7 +50,7 @@ def search_routes():
     route_service = RouteService(component_manager)
     routes = route_service.search_routes(query)
 
-    return jsonify([_route_payload(route) for route in routes]), 200
+    return jsonify([_route_payload(route, index) for index, route in enumerate(routes, start=1)]), 200
 
 
 @handle_errors

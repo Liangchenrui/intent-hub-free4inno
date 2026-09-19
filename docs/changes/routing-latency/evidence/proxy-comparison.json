@@ -1,0 +1,22 @@
+{
+  "source": "Retrospective transcription of this session read-only GET /collections probe; one sample per path",
+  "environment_proxy_schemes": [
+    "http",
+    "https",
+    "no"
+  ],
+  "samples": [
+    {
+      "trust_env": true,
+      "status": 200,
+      "elapsed_ms": 1418.06,
+      "connection": "close"
+    },
+    {
+      "trust_env": false,
+      "status": 200,
+      "elapsed_ms": 155.14,
+      "connection": "keep-alive"
+    }
+  ]
+}

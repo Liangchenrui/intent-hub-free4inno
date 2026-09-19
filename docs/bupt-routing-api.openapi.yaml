@@ -66,7 +66,7 @@ paths:
         - 未命中（`matched=false`）时 `agents` 为空数组，`text` 返回部署配置的默认文本（缺省 `没有找到合适的 Agent`，可由 `data/default_route.txt` 覆盖）。
         - `data.agents[].agent` 是该 Agent 的原始 `details` 载荷，字段由数据来源决定，同一部署内可能不稳定，也可能是空对象；不要按固定字段解析。
         - `match_source` 与 `fallback_status` 取排序后第一条结果的口径，即最高分命中者（或兜底结果）。
-        - 组件未就绪（Embedding / Qdrant 连接失败）统一返回 500 `INTERNAL_ERROR`，不向外部区分具体原因。
+        - 组件预热中或预热失败返回 503 `SERVICE_NOT_READY`；其他运行异常返回 500 `INTERNAL_ERROR`，不暴露内部详情。
       security:
         - BearerAuth: []
         - ApiKeyAuth: []
@@ -164,6 +164,8 @@ paths:
           $ref: '#/components/responses/BuptBadRequest'
         '401':
           $ref: '#/components/responses/BuptUnauthorized'
+        '503':
+          $ref: '#/components/responses/BuptNotReady'
         '500':
           $ref: '#/components/responses/BuptInternalError'
 
@@ -195,6 +197,8 @@ paths:
           $ref: '#/components/responses/BuptBadRequest'
         '401':
           $ref: '#/components/responses/BuptUnauthorized'
+        '503':
+          $ref: '#/components/responses/BuptNotReady'
         '500':
           $ref: '#/components/responses/BuptInternalError'
 
@@ -296,8 +300,21 @@ components:
                   code: UNAUTHORIZED
                   message: Authentication failed
                   detail: null
+    BuptNotReady:
+      description: 路由组件预热中或暂不可用，请稍后重试
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RouteEnvelope'
+          example:
+            success: false
+            data: null
+            error:
+              code: SERVICE_NOT_READY
+              message: 路由组件预热中或暂不可用，请稍后重试
+              detail: null
     BuptInternalError:
-      description: 服务异常（含组件未就绪），详情不向外暴露
+      description: 服务运行异常，详情不向外暴露
       content:
         application/json:
           schema:

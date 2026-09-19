@@ -20,12 +20,34 @@ def document():
                 'tags': ['bupt' if bupt else 'master'],
                 'responses': {'200': {'description': 'Completed response; see API.md for endpoint-specific statuses and errors.'}},
                 'security': [{'BearerAuth': []}]}
-            if path.endswith('/health') or path.endswith('/auth/login'):
+            if path.endswith(('/health', '/health/ready', '/auth/login')):
                 operation['security'] = []
             if rule.arguments:
                 operation['parameters'] = [{'name': name, 'in': 'path', 'required': True,
                     'schema': {'type': 'integer' if name != 'task_id' else 'string'}} for name in sorted(rule.arguments)]
             base = path.removeprefix('/compat/master').removeprefix('/compat/bupt')
+            if base == '/health/ready':
+                operation['responses']['503'] = {'description': 'Routing components warming or unavailable; retry shortly.'}
+            if base == '/logs/{kind}':
+                operation['parameters'] = [
+                    {'name': 'kind', 'in': 'path', 'required': True,
+                     'schema': {'type': 'string', 'enum': ['runtime', 'routing']}},
+                    *[{'name': name, 'in': 'query', 'schema': schema} for name, schema in {
+                        'page': {'type': 'integer', 'minimum': 1, 'default': 1},
+                        'page_size': {'type': 'integer', 'minimum': 1, 'maximum': 100, 'default': 20},
+                        'request_id': {'type': 'string'}, 'keyword': {'type': 'string'},
+                        'level': {'type': 'string', 'enum': ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']},
+                        'category': {'type': 'string', 'enum': ['routing', 'sync', 'diagnostics', 'management', 'system']},
+                        'start': {'type': 'number', 'description': 'Inclusive UTC Unix seconds'},
+                        'end': {'type': 'number', 'description': 'Inclusive UTC Unix seconds'},
+                    }.items()],
+                ]
+                operation['responses'].update({
+                    '400': {'description': 'Invalid filters or pagination'},
+                    '401': {'description': 'Management authentication required'},
+                    '404': {'description': 'Unknown log kind'},
+                    '503': {'description': 'Log storage unavailable'},
+                })
             request_type = None
             if method == 'POST':
                 request_type = {'/predict': 'PredictRequest', '/route': 'RouteRequest', '/auth/login': 'LoginRequest',
@@ -35,6 +57,8 @@ def document():
                 request_type = 'AgentUpdate'
             if request_type:
                 operation['requestBody'] = {'required': True, 'content': {'application/json': {'schema': {'$ref': '#/components/schemas/' + request_type}}}}
+            if base in {'/predict', '/route'}:
+                operation['responses']['503'] = {'description': 'Routing components warming or unavailable; retry shortly.'}
             if base == '/predict':
                 operation['responses']['200']['content'] = {'application/json': {'schema': {'type': 'array', 'items': {'$ref': '#/components/schemas/PredictResponse'}}}}
             if base == '/route':
@@ -43,6 +67,8 @@ def document():
                 operation['responses'] = {'201': {'description': 'Created'}}
             if base == '/reindex':
                 operation['responses']['202'] = {'description': 'Incremental task queued; full rebuild returns 200 on completion.'}
+            if base == '/routes/upstream-pull':
+                operation['responses'] = {'202': {'description': 'Durable upstream_pull task queued or reused; poll GET /sync-tasks. Result contains counts and optional sync_task_id for index completion.'}}
             paths.setdefault(path, {})[method.lower()] = operation
     schemas = {}
     for module, names in [(models, ['PredictRequest', 'PredictResponse', 'RouteConfig', 'LoginRequest']),

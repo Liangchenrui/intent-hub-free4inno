@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from time import perf_counter
 from urllib.parse import urlsplit, urlunsplit
 
-import requests
+from intent_hub.utils import service_http as requests
 
 from intent_hub.config import Config
 

@@ -2,7 +2,7 @@
 
 from functools import wraps
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 from flask_compress import Compress
 from pydantic import ValidationError
 
@@ -10,7 +10,7 @@ from intent_hub.agent_compare import comparison_detail, comparison_summary
 from intent_hub.compat_auth import require_auth
 from intent_hub.config import Config
 from intent_hub import compat_config
-from intent_hub.core.components import get_component_manager
+from intent_hub.core.components import get_component_manager, RoutingNotReady
 from intent_hub.compat_models import (
     AgentCreate, AgentUpdate, ApplyRepairRequest, MergeAgentsRequest,
     CollectionRequest, RecommendationRequest, RepairRequest, RouteRequest,
@@ -54,6 +54,10 @@ def api_errors(function):
                     "detail": str(error),
                 },
             }), 400
+        except RoutingNotReady:
+            return jsonify({'success': False, 'data': None, 'error': {
+                'code': 'SERVICE_NOT_READY', 'message': '路由组件预热中或暂不可用，请稍后重试',
+                'detail': None}}), 503
         except Exception as error:
             logger.exception("API request failed: %s", request.path)
             return jsonify({
@@ -200,6 +204,7 @@ def route():
     query = payload.query.strip()
     if not query:
         raise ValueError("query 不能为空")
+    g.route_input = payload.query
     return jsonify({
         "success": True,
         "data": PredictionService(get_component_manager()).route(query),
@@ -220,7 +225,7 @@ def update_settings():
     with Config.LOCK:
         compat_config.save(request.get_json() or {})
         get_component_manager().reset_components()
-    return jsonify({"message": "配置已保存，运行组件将在下次请求时重新连接", "settings": compat_config.settings()})
+    return jsonify({"message": "配置已保存，运行组件正在后台预热", "settings": compat_config.settings()})
 
 
 @app.get("/collections")

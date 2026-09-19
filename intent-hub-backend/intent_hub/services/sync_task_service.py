@@ -15,6 +15,7 @@ from typing import Any, Callable, Optional
 from intent_hub.config import Config
 from intent_hub.services.sync_service import SyncService
 from intent_hub.utils.logger import logger
+from intent_hub.utils.log_context import log_scope
 
 
 def _utc_now() -> str:
@@ -46,6 +47,7 @@ class SyncTaskService:
         self._stopped = False
         self._autostart = autostart
         self._refresh_diagnostics = refresh_diagnostics
+        self._diagnostics_dirty = False
         self._recover_interrupted_tasks()
         self._recover_pending_routes()
         if self._autostart:
@@ -137,6 +139,27 @@ class SyncTaskService:
     def enqueue_incremental_reindex(self) -> dict[str, Any]:
         return self.enqueue_reindex(False)
 
+    def enqueue_upstream_pull(self) -> dict[str, Any]:
+        from intent_hub.services.upstream_agent_service import UpstreamAgentService
+        source = UpstreamAgentService.source_config()
+        if not source['AGENT_API_URL'] or not source['AGENT_API_LABEL_IDS']:
+            raise ValueError('请先配置上游地址和标签')
+        with self._condition:
+            task = next((t for t in reversed(self._tasks)
+                         if t['kind'] == 'upstream_pull' and t['status'] in {'queued', 'running'}
+                         and t.get('source_config') == source), None)
+            if task is None:
+                task = dict(id=uuid.uuid4().hex, kind='upstream_pull', source_config=source,
+                            route_ids=[], route_versions={}, status='queued', phase='fetching',
+                            attempts=0, next_attempt_at=0.0, created_at=_utc_now(),
+                            updated_at=_utc_now(), error=None, result=None)
+                self._tasks.append(task)
+                self._save_tasks()
+            if self._autostart:
+                self.start()
+            self._condition.notify_all()
+            return dict(task)
+
     def enqueue_reindex(self, full=False) -> dict[str, Any]:
         """Queue one hash-based index scan without touching remote services."""
         with self._condition:
@@ -195,6 +218,7 @@ class SyncTaskService:
                 status="queued",
                 attempts=0,
                 next_attempt_at=0.0,
+                queued_at=_utc_now(),
                 updated_at=_utc_now(),
                 error=None,
             )
@@ -226,7 +250,7 @@ class SyncTaskService:
             "EMBEDDING_MODEL_NAME", "EMBEDDING_API_FORMAT")}
 
     def process_next(self) -> bool:
-        with self._processing:
+        with self._processing, log_scope("sync"):
             return self._process_next()
 
     def _process_next(self) -> bool:
@@ -238,26 +262,69 @@ class SyncTaskService:
             task["status"] = "running"
             task["attempts"] += 1
             task["updated_at"] = _utc_now()
+            task["started_at"] = task["updated_at"]
+            queued_at = task.get("queued_at", task["created_at"])
+            task["queue_wait_ms"] = max(0, round(
+                (datetime.fromisoformat(task["started_at"]) - datetime.fromisoformat(queued_at)).total_seconds() * 1000, 3))
             self._set_route_status(task, "syncing")
             self._save_tasks()
 
+        started = time.perf_counter()
         try:
             self._execute_task(task)
         except Exception as exc:
+            task["execution_ms"] = round((time.perf_counter() - started) * 1000, 3)
             self._handle_failure(task, exc)
         else:
             with self._condition:
+                task["execution_ms"] = round((time.perf_counter() - started) * 1000, 3)
                 if task["status"] != "superseded":
                     task["status"] = "succeeded"
                 task["updated_at"] = _utc_now()
                 task["error"] = None
                 self._save_tasks()
-            if task["kind"] != "incremental_reindex":
+            if task["kind"] == "route_sync" and task.get("index_changed", True):
+                self._diagnostics_dirty = True
+            if self._diagnostics_dirty:
                 self._refresh_diagnostics_if_idle()
+        logger.info("Sync task %s status=%s attempt=%s", task["id"], task["status"], task["attempts"],
+                    extra={"category": "sync", "task_id": task["id"], "task_status": task["status"],
+                           "attempt": task["attempts"], "elapsed_ms": task["execution_ms"],
+                           "queue_wait_ms": task.get("queue_wait_ms"), "lock_wait_ms": task.get("lock_wait_ms")})
         return True
 
     def _execute_task(self, task: dict[str, Any]) -> None:
+        if task['kind'] == 'upstream_pull':
+            from intent_hub.agent_source import AgentSource
+            from intent_hub.services.upstream_agent_service import UpstreamAgentService
+            source = task['source_config']
+            if source != UpstreamAgentService.source_config():
+                task['status'] = 'superseded'
+                return
+            def progress(phase):
+                with self._condition:
+                    task['phase'] = phase
+                    self._save_tasks()
+            progress('fetching')
+            result = UpstreamAgentService(self.component_manager, source=AgentSource(
+                label_ids=source['AGENT_API_LABEL_IDS'], base_url=source['AGENT_API_URL']
+            )).pull(progress=progress, expected_source=source)
+            task['result'] = result
+            # Also reconnect durable pending work after a crash between local commit
+            # and linking the index task, including an unchanged retry of the pull.
+            ids = sorted(set(result['affected_route_ids']) | {
+                r.id for r in self.route_manager.get_all_routes()
+                if r.source and r.source.type == 'upstream_agent'
+                and r.source.instance == source['SOURCE_INSTANCE']
+                and r.sync and r.sync.version != r.sync.synced_version
+            })
+            if ids:
+                result['sync_task_id'] = self.enqueue_routes(ids)['id']
+            task['phase'] = 'saved'
+            return
+        lock_started = time.perf_counter()
         with SyncService.execution_lock:
+            task['lock_wait_ms'] = round((time.perf_counter() - lock_started) * 1000, 3)
             if task.get("target") != self._target():
                 task["status"] = "superseded"
                 return
@@ -271,6 +338,7 @@ class SyncTaskService:
         sync_service = self.sync_service_factory(self.component_manager)
         synced_any = False
         superseded_any = False
+        task['index_changed'] = False
 
         for route_id in task["route_ids"]:
             expected_version = int(task["route_versions"].get(str(route_id), 0))
@@ -282,10 +350,15 @@ class SyncTaskService:
             if route is None:
                 qdrant = self.component_manager.qdrant_client
                 qdrant.delete_route(route_id)
+                task['index_changed'] = True
                 synced_any = True
                 continue
 
-            sync_service.sync_route(route_id)
+            result = sync_service.sync_route(route_id)
+            task['index_changed'] |= not isinstance(result, dict) or result.get('changed', True)
+            if isinstance(result, dict):
+                task["result"] = task.get("result") or {}
+                task["result"].setdefault("routes", {})[str(route_id)] = result
             latest = self.route_manager.get_route(route_id)
             if latest is None or latest.sync is None or latest.sync.version != expected_version:
                 superseded_any = True
@@ -300,7 +373,7 @@ class SyncTaskService:
                 error=None,
                 **({'expected_version': expected_version} if hasattr(self.route_manager, 'repository') else {}),
             )
-            if latest is not None:
+            if latest is not None and not (isinstance(result, dict) and result.get("metadata_committed")):
                 self.component_manager.qdrant_client.update_route_metadata_state(latest)
             synced_any = True
 
@@ -316,6 +389,7 @@ class SyncTaskService:
             if task["attempts"] < self.max_attempts:
                 delay_index = min(task["attempts"] - 1, len(self.RETRY_DELAYS) - 1)
                 task["status"] = "queued"
+                task["queued_at"] = _utc_now()
                 task["next_attempt_at"] = time.time() + self.RETRY_DELAYS[delay_index]
                 self._set_route_status(task, "queued", error)
             else:
@@ -380,6 +454,7 @@ class SyncTaskService:
             from intent_hub.services.diagnostic_service import DiagnosticService
 
             DiagnosticService(self.component_manager).run_async_diagnostics("full")
+            self._diagnostics_dirty = False
         except Exception as exc:  # diagnostics never changes sync success
             logger.error("Failed to schedule diagnostics refresh: %s", exc)
 
@@ -388,6 +463,7 @@ class SyncTaskService:
         for task in self._tasks:
             if task.get("status") == "running":
                 task["status"] = "queued"
+                task["queued_at"] = _utc_now()
                 task["next_attempt_at"] = 0.0
                 changed = True
         if changed:

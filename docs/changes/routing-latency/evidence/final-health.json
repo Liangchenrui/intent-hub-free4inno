@@ -1,0 +1,17 @@
+{
+  "services": {
+    "embedding": {
+      "healthy": true,
+      "latency_ms": 128,
+      "message": "ok",
+      "status_code": 200
+    },
+    "qdrant": {
+      "healthy": true,
+      "latency_ms": 154,
+      "message": "ok",
+      "status_code": 200
+    }
+  },
+  "status": "ok"
+}

@@ -20,6 +20,7 @@
           <el-tab-pane :label="$t('nav.test')" name="test"></el-tab-pane>
           <el-tab-pane :label="$t('nav.diagnostics')" name="diagnostics"></el-tab-pane>
           <el-tab-pane :label="$t('nav.settings')" name="settings"></el-tab-pane>
+          <el-tab-pane :label="$t('nav.logs')" name="logs"></el-tab-pane>
         </el-tabs>
       </div>
 
@@ -58,6 +59,10 @@
           </el-form-item>
           <el-form-item label="Embedding Service URL">
             <el-input v-model="settings.EMBEDDING_SERVICE_URL" placeholder="http://embedding.free4inno.com/embed" />
+          </el-form-item>
+          <el-form-item :label="$t('settings.serviceHttpTrustEnv')">
+            <el-switch v-model="settings.SERVICE_HTTP_TRUST_ENV" />
+            <div class="field-hint">{{ $t('settings.serviceHttpTrustEnvHint') }}</div>
           </el-form-item>
           <el-form-item label="Route API Key">
             <el-input v-model="settings.PREDICT_AUTH_KEY" type="password" show-password />
@@ -218,6 +223,7 @@ const creatingCollection = ref(false);
 
 const settings = ref<SystemSettings>({
   QDRANT_URL: 'http://app.qdrant.free4inno.com',
+  SERVICE_HTTP_TRUST_ENV: true,
   PREDICT_AUTH_KEY: null,
   EMBEDDING_SERVICE_URL: 'http://embedding.free4inno.com/embed',
   AGENT_API_URL: 'https://yuanfang.bupt.edu.cn/ac/api',
@@ -242,6 +248,7 @@ const settings = ref<SystemSettings>({
 
 const normalizeSettings = (data: any): SystemSettings => ({
   QDRANT_URL: data.QDRANT_URL ?? '',
+  SERVICE_HTTP_TRUST_ENV: data.SERVICE_HTTP_TRUST_ENV ?? true,
   QDRANT_COLLECTION: data.QDRANT_COLLECTION ?? '',
   PREDICT_AUTH_KEY: data.PREDICT_AUTH_KEY ?? null,
   EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
@@ -401,6 +408,7 @@ const handleLogout = () => {
 };
 
 const handleTabChange = (tabName: any) => {
+  if (tabName === 'logs') { router.push('/logs'); return; }
   if (tabName === 'list') {
     router.push('/');
   } else if (tabName === 'test') {

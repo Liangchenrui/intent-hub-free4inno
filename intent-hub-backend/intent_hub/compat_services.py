@@ -18,10 +18,13 @@ class PredictionService:
         self.components = components
 
     def route(self, query):
-        results = CorePrediction(self.components).predict(PredictRequest(text=query))
+        components = self.components
+        if hasattr(components, 'ready_snapshot'):
+            components = components.ready_snapshot()
+        results = CorePrediction(components).predict(PredictRequest(text=query))
         matched = [r for r in results if r.match_source != 'default']
         return {'matched': bool(matched), 'agents': [
-            {'agent': self.components.route_manager.get_route(r.id).details, 'score': r.score}
+            {'agent': components.route_manager.get_route(r.id).details, 'score': r.score}
             for r in matched], 'text': None if matched else Config.DEFAULT_ROUTE_TEXT,
             'match_source': results[0].match_source, 'fallback_status': results[0].fallback_status}
 

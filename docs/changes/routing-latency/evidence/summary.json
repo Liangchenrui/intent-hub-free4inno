@@ -1,0 +1,9 @@
+{
+  "baseline_median_ms": 11046.652,
+  "optimized_median_ms": 1704.035,
+  "reduction_percent": 84.57,
+  "sample_count_per_group": 3,
+  "query": "我要出国参加学术会议",
+  "all_matched_route_id": 103,
+  "scope": "Local sequential samples. After-direct first request is uncached, next two are cached; not production p95."
+}

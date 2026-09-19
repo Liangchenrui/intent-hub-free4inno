@@ -4,7 +4,7 @@ from collections import defaultdict
 from typing import Any
 from urllib.parse import quote
 
-import requests
+from intent_hub.utils import service_http as requests
 
 from intent_hub.config import Config
 from intent_hub.models import RouteConfig

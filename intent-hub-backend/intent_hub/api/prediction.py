@@ -1,6 +1,6 @@
 """预测相关API"""
 
-from flask import jsonify
+from flask import g, jsonify
 
 from intent_hub.auth import require_telestar_auth
 from intent_hub.core.components import get_component_manager
@@ -17,8 +17,8 @@ def predict(predict_req: PredictRequest):
 
     输入文本，返回所有相似度大于设定阈值的路由列表，按相似度降序排列
     """
+    g.route_input = predict_req.text
     component_manager = get_component_manager()
-    component_manager.ensure_ready()
 
     prediction_service = PredictionService(component_manager)
     results = prediction_service.predict(predict_req)

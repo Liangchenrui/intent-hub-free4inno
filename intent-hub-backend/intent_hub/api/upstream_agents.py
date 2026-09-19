@@ -11,9 +11,8 @@ from intent_hub.utils.error_handler import handle_errors
 
 @handle_errors
 def pull_agents():
-    result = UpstreamAgentService(get_component_manager()).pull()
-    result.pop("affected_route_ids", None)
-    return jsonify(result), 200
+    task = get_sync_task_service(get_component_manager()).enqueue_upstream_pull()
+    return jsonify(task), 202
 
 
 @handle_errors

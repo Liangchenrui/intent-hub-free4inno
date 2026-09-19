@@ -1,6 +1,9 @@
 """Qdrant客户端封装模块"""
 
 import uuid
+from time import monotonic
+from contextvars import ContextVar
+from intent_hub.utils.route_trace import remote_timing
 from urllib.parse import urlsplit
 from typing import Any, Dict, List, Optional
 
@@ -12,11 +15,26 @@ from qdrant_client.models import (
     PayloadSchemaType,
     PointStruct,
     VectorParams,
+    MatchValue,
 )
 
 from intent_hub.utils.logger import logger
 from intent_hub.models import RouteConfig
 from intent_hub.intent_description import description_hash
+
+
+_server_time = ContextVar('qdrant_server_time', default=None)
+
+
+def _capture_server_time(response):
+    # Qdrant REST envelopes report server processing time in seconds.
+    try:
+        response.read()
+        seconds = response.json().get('time')
+        if isinstance(seconds, (int, float)):
+            _server_time.set(seconds * 1000)
+    except (ValueError, TypeError, AttributeError):
+        pass
 
 
 class IntentHubQdrantClient:
@@ -43,6 +61,7 @@ class IntentHubQdrantClient:
         api_key: Optional[str] = None,
         timeout: int = 30,
         write_batch_size: int = 128,
+        trust_env: bool = True,
     ):
         """初始化Qdrant客户端
 
@@ -77,6 +96,8 @@ class IntentHubQdrantClient:
                 port=sdk_port,
                 api_key=api_key,
                 timeout=timeout,
+                event_hooks={"response": [_capture_server_time]},
+                trust_env=trust_env,
             )
             logger.info(f"Qdrant initialized (URL mode): {clean_url}")
         except Exception as e:
@@ -264,6 +285,7 @@ class IntentHubQdrantClient:
         route_hash: Optional[str] = None,
         model_name: Optional[str] = None,
         embedding: Optional[List[float]] = None,
+        sample_count: Optional[int] = None,
     ) -> None:
         """Store recovery data and an optional name/description retrieval vector.
 
@@ -285,6 +307,8 @@ class IntentHubQdrantClient:
             if len(embedding) != self.dimensions or not any(embedding):
                 raise ValueError("Invalid intent description embedding")
             payload[self.DESCRIPTION_HASH_KEY] = description_hash(route, model_name or "")
+        if sample_count is not None:
+            payload.update(sync_schema=1, sample_count=sample_count)
         self._upsert_points(
             [PointStruct(id=point_id, vector=embedding if embedding is not None else [0.0] * self.dimensions, payload=payload)]
         )
@@ -439,6 +463,8 @@ class IntentHubQdrantClient:
         query_filter: Filter,
     ) -> List[Dict[str, Any]]:
         """Return the best matching point for each route."""
+        _server_time.set(None)
+        started = monotonic()
         results = self.client.query_points_groups(
             collection_name=self.collection_name,
             query=query_vector,
@@ -449,6 +475,7 @@ class IntentHubQdrantClient:
             with_payload=True,
         )
 
+        remote_timing('qdrant', (monotonic() - started) * 1000, _server_time.get())
         search_results = []
         for group in results.groups:
             if not group.hits:
@@ -531,51 +558,78 @@ class IntentHubQdrantClient:
             logger.error(f"Failed to fetch existing route IDs: {e}", exc_info=True)
             raise
 
+    def get_route_metadata(self, route_ids: List[int]) -> Dict[int, dict]:
+        """Read commit records in batches without downloading their vectors."""
+        records = {}
+        for start in range(0, len(route_ids), 128):
+            ids = [str(uuid.uuid5(uuid.NAMESPACE_DNS, f"route-metadata:{rid}"))
+                   for rid in route_ids[start:start + 128]]
+            for point in self.client.retrieve(self.collection_name, ids=ids,
+                                              with_payload=True, with_vectors=False):
+                payload = point.payload or {}
+                records[payload[self.ROUTE_ID_KEY]] = payload
+        return records
+
+    def get_route_points(self, route_id: int):
+        points = []
+        offset = None
+        while True:
+            page, offset = self.client.scroll(
+                self.collection_name, limit=256, offset=offset,
+                scroll_filter=Filter(must=[FieldCondition(key=self.ROUTE_ID_KEY, match=MatchValue(value=route_id))]),
+                with_payload=True, with_vectors=True,
+            )
+            points.extend(page)
+            if offset is None:
+                return points
+
+    def patch_points(self, ids: list, payload: dict) -> None:
+        for start in range(0, len(ids), self.write_batch_size):
+            self.client.set_payload(self.collection_name, payload=payload,
+                                    points=ids[start:start + self.write_batch_size], wait=True)
+
+    def delete_points(self, ids: list) -> None:
+        for start in range(0, len(ids), self.write_batch_size):
+            self.client.delete(self.collection_name, points_selector=ids[start:start + self.write_batch_size], wait=True)
+
+    def fast_index_summary(self) -> Dict[str, Any]:
+        """Use committed manifests; scan legacy/incomplete collections safely."""
+        hashes, records, expected, offset = {}, {}, 0, None
+        valid = True
+        while True:
+            points, offset = self.client.scroll(
+                self.collection_name, limit=256, offset=offset, with_vectors=False,
+                with_payload=True,
+                scroll_filter=Filter(must=[FieldCondition(key=self.IS_ROUTE_METADATA_KEY, match=MatchValue(value=True))]),
+            )
+            for point in points:
+                payload = point.payload or {}
+                rid, digest = payload.get(self.ROUTE_ID_KEY), payload.get(self.ROUTE_HASH_KEY)
+                if isinstance(rid, int):
+                    records[rid] = payload
+                if (payload.get('sync_schema') != 1 or not isinstance(rid, int)
+                        or not digest or type(payload.get('sample_count')) is not int or rid in hashes):
+                    valid = False
+                else:
+                    hashes[rid] = digest
+                    expected += payload['sample_count'] + 1
+            if offset is None:
+                break
+        count = self.client.count(self.collection_name, exact=True).count
+        if valid and expected == count:
+            return {'points_count': count, 'route_ids': sorted(hashes), 'route_hashes': hashes,
+                    'metadata': records, 'manifests_valid': True}
+        return {**self.index_summary(), 'metadata': records, 'manifests_valid': False}
+
     def get_existing_route_hashes(self) -> Dict[int, str]:
-        """获取Qdrant中所有现有的路由ID及其对应的哈希值
-
-        Returns:
-            {route_id: hash} 字典
-        """
-        try:
-            route_hashes = {}
-            offset = None
-            batch_size = 100
-
-            while True:
-                result = self.client.scroll(
-                    collection_name=self.collection_name,
-                    limit=batch_size,
-                    offset=offset,
-                    with_payload=True,
-                    with_vectors=False,
-                )
-
-                points, next_offset = result
-                if not points:
-                    break
-
-                for point in points:
-                    payload = point.payload or {}
-                    route_id = payload.get(self.ROUTE_ID_KEY)
-                    route_hash = payload.get(self.ROUTE_HASH_KEY)
-                    if route_id is not None and route_hash is not None:
-                        # 如果同一个 ID 有多个点，哈希应该是一致的，这里直接覆盖
-                        route_hashes[route_id] = route_hash
-
-                offset = next_offset
-                if next_offset is None:
-                    break
-
-            return route_hashes
-        except Exception as e:
-            logger.error(f"Failed to fetch existing route hashes: {e}", exc_info=True)
-            return {}
+        # Read errors must fail the task, never masquerade as an empty index.
+        return self.fast_index_summary()['route_hashes']
 
     def index_summary(self) -> Dict[str, Any]:
         """Return counts and route hashes used to verify a completed sync."""
         route_ids: set[int] = set()
         route_hashes: Dict[int, str] = {}
+        metadata_hashes: Dict[int, str] = {}
         points_count = 0
         offset = None
         while True:
@@ -595,12 +649,14 @@ class IntentHubQdrantClient:
                     route_hash = payload.get(self.ROUTE_HASH_KEY)
                     if route_hash:
                         route_hashes[route_id] = route_hash
+                        if payload.get('is_route_metadata'):
+                            metadata_hashes[route_id] = route_hash
             if offset is None:
                 break
         return {
             "points_count": points_count,
             "route_ids": sorted(route_ids),
-            "route_hashes": route_hashes,
+            "route_hashes": {**route_hashes, **metadata_hashes},
         }
 
     def get_collection_model_name(self) -> Optional[str]:

@@ -15,7 +15,7 @@ def test_config_defaults():
     assert Config.BATCH_SIZE == 32
     assert Config.ROUTES_CONFIG_PATH.endswith("data\\routes.json") or Config.ROUTES_CONFIG_PATH.endswith("data/routes.json")
     assert Config.DEFAULT_USERNAME == "admin"
-    assert Config.DEFAULT_PASSWORD == "telestar"
+    assert Config.DEFAULT_PASSWORD == "123456"
 
 
 def test_management_login_uses_fixed_admin_telestar(monkeypatch):

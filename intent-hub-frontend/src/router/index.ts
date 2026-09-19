@@ -11,6 +11,7 @@ const routes = [
   { path: '/test', name: 'AgentTest', component: AgentTest },
   { path: '/diagnostics', name: 'Diagnostics', component: Diagnostics },
   { path: '/settings', name: 'Settings', component: Settings },
+  { path: '/logs', name: 'Logs', component: () => import('../views/Logs.vue') },
 ];
 
 const router = createRouter({ history: createWebHistory(), routes });

@@ -1,0 +1,886 @@
+{
+  "phase": "after-direct",
+  "measured_at": "2026-09-19T05:29:19.700403+00:00",
+  "note": "Same input and local service; three samples, not production p95.",
+  "records": [
+    {
+      "request_id": "345ccc45473642d5bea41ca4cd4f0967",
+      "http_status": 200,
+      "client_elapsed_ms": 2632.561,
+      "routing": {
+        "method": "POST",
+        "path": "/compat/master/predict",
+        "category": "routing",
+        "status_code": 200,
+        "elapsed_ms": 2591.463,
+        "input_text": "我要出国参加学术会议",
+        "status": "succeeded",
+        "result": [
+          {
+            "fallback_status": "matched",
+            "id": 103,
+            "match_source": "llm_fallback",
+            "name": "因公出国（赴港澳）任务申报",
+            "route_key": "因公出国（赴港澳）任务申报",
+            "score": null
+          }
+        ],
+        "events": [
+          {
+            "stage": "preparing",
+            "offset_ms": 0.82
+          },
+          {
+            "stage": "encoding",
+            "offset_ms": 1.822
+          },
+          {
+            "stage": "embedding_cache",
+            "offset_ms": 1.84,
+            "hit": false
+          },
+          {
+            "stage": "remote_call",
+            "offset_ms": 222.083,
+            "service": "embedding",
+            "elapsed_ms": 220.221
+          },
+          {
+            "stage": "negative_search",
+            "offset_ms": 222.789
+          },
+          {
+            "stage": "positive_search",
+            "offset_ms": 225.341
+          },
+          {
+            "stage": "remote_call",
+            "offset_ms": 521.799,
+            "service": "qdrant",
+            "elapsed_ms": 296.392,
+            "server_ms": 3.486
+          },
+          {
+            "stage": "remote_call",
+            "offset_ms": 522.085,
+            "service": "qdrant",
+            "elapsed_ms": 299.193,
+            "server_ms": 3.259
+          },
+          {
+            "stage": "negative_candidate",
+            "offset_ms": 522.686,
+            "route_id": 516,
+            "score": 0.48945358,
+            "threshold": 0.95,
+            "excluded": false
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 524.788,
+            "route_id": 103,
+            "route_name": "因公出国（赴港澳）任务申报",
+            "score": 0.64610094,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 526.247,
+            "route_id": 516,
+            "route_name": "天气查询智能体",
+            "score": 0.593446,
+            "threshold": 0.75,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 527.321,
+            "route_id": 104,
+            "route_name": "校外人员入校申请表",
+            "score": 0.57168543,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 528.671,
+            "route_id": 521,
+            "route_name": "文本校对智能体",
+            "score": 0.5663012,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 530.231,
+            "route_id": 520,
+            "route_name": "公众号爆文创作",
+            "score": 0.52696884,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 531.594,
+            "route_id": 121,
+            "route_name": "预借票据申请",
+            "score": 0.51620644,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 532.998,
+            "route_id": 118,
+            "route_name": "“一站式”学生社区场地预约",
+            "score": 0.5087143,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 534.603,
+            "route_id": 519,
+            "route_name": "基础法律问答助手",
+            "score": 0.46588236,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "fallback_entered",
+            "offset_ms": 534.644,
+            "enabled": true
+          },
+          {
+            "stage": "remote_call",
+            "offset_ms": 716.625,
+            "service": "qdrant",
+            "elapsed_ms": 180.573,
+            "server_ms": 2.624
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 716.71,
+            "route_id": 103,
+            "score": 0.6171897,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 716.739,
+            "route_id": 121,
+            "score": 0.4781253,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 716.759,
+            "route_id": 104,
+            "score": 0.46288142,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 716.776,
+            "route_id": 118,
+            "score": 0.4583516,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 716.797,
+            "route_id": 516,
+            "score": 0.4271239,
+            "decision": "eligible"
+          },
+          {
+            "stage": "llm_client",
+            "offset_ms": 717.07,
+            "reused": true
+          },
+          {
+            "stage": "llm_call_started",
+            "offset_ms": 717.079
+          },
+          {
+            "stage": "llm_decision",
+            "offset_ms": 2581.499,
+            "status": "matched",
+            "route_id": 103
+          },
+          {
+            "stage": "fallback_result",
+            "offset_ms": 2591.339,
+            "status": "matched",
+            "route_id": 103,
+            "match_source": "llm_fallback",
+            "elapsed_ms": 2056.679
+          }
+        ],
+        "timings": [
+          {
+            "stage": "preparing",
+            "offset_ms": 0.838,
+            "status": "succeeded",
+            "elapsed_ms": 0.967
+          },
+          {
+            "stage": "encoding",
+            "offset_ms": 1.831,
+            "status": "succeeded",
+            "elapsed_ms": 220.591
+          },
+          {
+            "stage": "negative_search",
+            "offset_ms": 222.804,
+            "status": "succeeded",
+            "elapsed_ms": 299.291
+          },
+          {
+            "stage": "positive_search",
+            "offset_ms": 225.351,
+            "status": "succeeded",
+            "elapsed_ms": 296.459
+          },
+          {
+            "stage": "negative_filter",
+            "offset_ms": 522.668,
+            "status": "succeeded",
+            "elapsed_ms": 0.022
+          },
+          {
+            "stage": "candidate_filter",
+            "offset_ms": 522.698,
+            "status": "succeeded",
+            "elapsed_ms": 11.931
+          },
+          {
+            "stage": "fallback_prepare",
+            "offset_ms": 534.665,
+            "status": "succeeded",
+            "elapsed_ms": 1.112
+          },
+          {
+            "stage": "description_search",
+            "offset_ms": 535.786,
+            "status": "succeeded",
+            "elapsed_ms": 180.849
+          },
+          {
+            "stage": "fallback_candidates",
+            "offset_ms": 716.639,
+            "status": "succeeded",
+            "elapsed_ms": 0.164
+          },
+          {
+            "stage": "llm_prompt",
+            "offset_ms": 716.808,
+            "status": "succeeded",
+            "elapsed_ms": 0.046
+          },
+          {
+            "stage": "llm_call",
+            "offset_ms": 717.083,
+            "status": "succeeded",
+            "elapsed_ms": 1864.28
+          },
+          {
+            "stage": "llm_parse",
+            "offset_ms": 2581.457,
+            "status": "succeeded",
+            "elapsed_ms": 0.032
+          },
+          {
+            "stage": "route_revalidate",
+            "offset_ms": 2581.504,
+            "status": "succeeded",
+            "elapsed_ms": 0.609
+          }
+        ]
+      }
+    },
+    {
+      "request_id": "2e99f205f53741e29ddd8e53eb0033d4",
+      "http_status": 200,
+      "client_elapsed_ms": 1728.473,
+      "routing": {
+        "method": "POST",
+        "path": "/compat/master/predict",
+        "category": "routing",
+        "status_code": 200,
+        "elapsed_ms": 1704.035,
+        "input_text": "我要出国参加学术会议",
+        "status": "succeeded",
+        "result": [
+          {
+            "fallback_status": "matched",
+            "id": 103,
+            "match_source": "llm_fallback",
+            "name": "因公出国（赴港澳）任务申报",
+            "route_key": "因公出国（赴港澳）任务申报",
+            "score": null
+          }
+        ],
+        "events": [
+          {
+            "stage": "preparing",
+            "offset_ms": 0.115
+          },
+          {
+            "stage": "encoding",
+            "offset_ms": 0.844
+          },
+          {
+            "stage": "embedding_cache",
+            "offset_ms": 0.859,
+            "hit": true
+          },
+          {
+            "stage": "negative_search",
+            "offset_ms": 1.211
+          },
+          {
+            "stage": "positive_search",
+            "offset_ms": 3.043
+          },
+          {
+            "stage": "remote_call",
+            "offset_ms": 143.032,
+            "service": "qdrant",
+            "elapsed_ms": 141.751,
+            "server_ms": 3.605
+          },
+          {
+            "stage": "remote_call",
+            "offset_ms": 196.131,
+            "service": "qdrant",
+            "elapsed_ms": 193.028,
+            "server_ms": 3.885
+          },
+          {
+            "stage": "negative_candidate",
+            "offset_ms": 196.59,
+            "route_id": 516,
+            "score": 0.48945358,
+            "threshold": 0.95,
+            "excluded": false
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 197.558,
+            "route_id": 103,
+            "route_name": "因公出国（赴港澳）任务申报",
+            "score": 0.64610094,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 198.459,
+            "route_id": 516,
+            "route_name": "天气查询智能体",
+            "score": 0.593446,
+            "threshold": 0.75,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 199.277,
+            "route_id": 104,
+            "route_name": "校外人员入校申请表",
+            "score": 0.57168543,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 200.214,
+            "route_id": 521,
+            "route_name": "文本校对智能体",
+            "score": 0.5663012,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 201.204,
+            "route_id": 520,
+            "route_name": "公众号爆文创作",
+            "score": 0.52696884,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 202.083,
+            "route_id": 121,
+            "route_name": "预借票据申请",
+            "score": 0.51620644,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 202.785,
+            "route_id": 118,
+            "route_name": "“一站式”学生社区场地预约",
+            "score": 0.5087143,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 203.671,
+            "route_id": 519,
+            "route_name": "基础法律问答助手",
+            "score": 0.46588236,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "fallback_entered",
+            "offset_ms": 203.695,
+            "enabled": true
+          },
+          {
+            "stage": "remote_call",
+            "offset_ms": 326.582,
+            "service": "qdrant",
+            "elapsed_ms": 121.978,
+            "server_ms": 2.347
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 326.654,
+            "route_id": 103,
+            "score": 0.6171897,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 326.676,
+            "route_id": 121,
+            "score": 0.4781253,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 326.693,
+            "route_id": 104,
+            "score": 0.46288142,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 326.721,
+            "route_id": 118,
+            "score": 0.4583516,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 326.745,
+            "route_id": 516,
+            "score": 0.4271239,
+            "decision": "eligible"
+          },
+          {
+            "stage": "llm_client",
+            "offset_ms": 326.969,
+            "reused": true
+          },
+          {
+            "stage": "llm_call_started",
+            "offset_ms": 326.976
+          },
+          {
+            "stage": "llm_decision",
+            "offset_ms": 1683.551,
+            "status": "matched",
+            "route_id": 103
+          },
+          {
+            "stage": "fallback_result",
+            "offset_ms": 1703.911,
+            "status": "matched",
+            "route_id": 103,
+            "match_source": "llm_fallback",
+            "elapsed_ms": 1500.194
+          }
+        ],
+        "timings": [
+          {
+            "stage": "preparing",
+            "offset_ms": 0.126,
+            "status": "succeeded",
+            "elapsed_ms": 0.706
+          },
+          {
+            "stage": "encoding",
+            "offset_ms": 0.851,
+            "status": "succeeded",
+            "elapsed_ms": 0.028
+          },
+          {
+            "stage": "negative_search",
+            "offset_ms": 1.218,
+            "status": "succeeded",
+            "elapsed_ms": 141.82
+          },
+          {
+            "stage": "positive_search",
+            "offset_ms": 3.052,
+            "status": "succeeded",
+            "elapsed_ms": 193.087
+          },
+          {
+            "stage": "negative_filter",
+            "offset_ms": 196.572,
+            "status": "succeeded",
+            "elapsed_ms": 0.021
+          },
+          {
+            "stage": "candidate_filter",
+            "offset_ms": 196.598,
+            "status": "succeeded",
+            "elapsed_ms": 7.089
+          },
+          {
+            "stage": "fallback_prepare",
+            "offset_ms": 203.708,
+            "status": "succeeded",
+            "elapsed_ms": 0.786
+          },
+          {
+            "stage": "description_search",
+            "offset_ms": 204.503,
+            "status": "succeeded",
+            "elapsed_ms": 122.089
+          },
+          {
+            "stage": "fallback_candidates",
+            "offset_ms": 326.595,
+            "status": "succeeded",
+            "elapsed_ms": 0.154
+          },
+          {
+            "stage": "llm_prompt",
+            "offset_ms": 326.753,
+            "status": "succeeded",
+            "elapsed_ms": 0.035
+          },
+          {
+            "stage": "llm_call",
+            "offset_ms": 326.98,
+            "status": "succeeded",
+            "elapsed_ms": 1356.406
+          },
+          {
+            "stage": "llm_parse",
+            "offset_ms": 1683.509,
+            "status": "succeeded",
+            "elapsed_ms": 0.033
+          },
+          {
+            "stage": "route_revalidate",
+            "offset_ms": 1683.555,
+            "status": "succeeded",
+            "elapsed_ms": 1.017
+          }
+        ]
+      }
+    },
+    {
+      "request_id": "f8c65cc4f89149cd98527f6ec28dbbd1",
+      "http_status": 200,
+      "client_elapsed_ms": 1599.457,
+      "routing": {
+        "method": "POST",
+        "path": "/compat/master/predict",
+        "category": "routing",
+        "status_code": 200,
+        "elapsed_ms": 1570.429,
+        "input_text": "我要出国参加学术会议",
+        "status": "succeeded",
+        "result": [
+          {
+            "fallback_status": "matched",
+            "id": 103,
+            "match_source": "llm_fallback",
+            "name": "因公出国（赴港澳）任务申报",
+            "route_key": "因公出国（赴港澳）任务申报",
+            "score": null
+          }
+        ],
+        "events": [
+          {
+            "stage": "preparing",
+            "offset_ms": 0.171
+          },
+          {
+            "stage": "encoding",
+            "offset_ms": 1.062
+          },
+          {
+            "stage": "embedding_cache",
+            "offset_ms": 1.075,
+            "hit": true
+          },
+          {
+            "stage": "negative_search",
+            "offset_ms": 1.469
+          },
+          {
+            "stage": "positive_search",
+            "offset_ms": 3.595
+          },
+          {
+            "stage": "remote_call",
+            "offset_ms": 144.943,
+            "service": "qdrant",
+            "elapsed_ms": 143.368,
+            "server_ms": 3.333
+          },
+          {
+            "stage": "remote_call",
+            "offset_ms": 162.604,
+            "service": "qdrant",
+            "elapsed_ms": 158.935,
+            "server_ms": 3.951
+          },
+          {
+            "stage": "negative_candidate",
+            "offset_ms": 163.807,
+            "route_id": 516,
+            "score": 0.48945358,
+            "threshold": 0.95,
+            "excluded": false
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 165.494,
+            "route_id": 103,
+            "route_name": "因公出国（赴港澳）任务申报",
+            "score": 0.64610094,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 167.094,
+            "route_id": 516,
+            "route_name": "天气查询智能体",
+            "score": 0.593446,
+            "threshold": 0.75,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 168.224,
+            "route_id": 104,
+            "route_name": "校外人员入校申请表",
+            "score": 0.57168543,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 169.393,
+            "route_id": 521,
+            "route_name": "文本校对智能体",
+            "score": 0.5663012,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 170.901,
+            "route_id": 520,
+            "route_name": "公众号爆文创作",
+            "score": 0.52696884,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 172.231,
+            "route_id": 121,
+            "route_name": "预借票据申请",
+            "score": 0.51620644,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 173.066,
+            "route_id": 118,
+            "route_name": "“一站式”学生社区场地预约",
+            "score": 0.5087143,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "candidate",
+            "offset_ms": 174.599,
+            "route_id": 519,
+            "route_name": "基础法律问答助手",
+            "score": 0.46588236,
+            "threshold": 0.8,
+            "decision": "below_threshold"
+          },
+          {
+            "stage": "fallback_entered",
+            "offset_ms": 174.634,
+            "enabled": true
+          },
+          {
+            "stage": "remote_call",
+            "offset_ms": 303.107,
+            "service": "qdrant",
+            "elapsed_ms": 127.033,
+            "server_ms": 2.601
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 303.177,
+            "route_id": 103,
+            "score": 0.6171897,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 303.198,
+            "route_id": 121,
+            "score": 0.4781253,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 303.215,
+            "route_id": 104,
+            "score": 0.46288142,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 303.231,
+            "route_id": 118,
+            "score": 0.4583516,
+            "decision": "eligible"
+          },
+          {
+            "stage": "fallback_candidate",
+            "offset_ms": 303.251,
+            "route_id": 516,
+            "score": 0.4271239,
+            "decision": "eligible"
+          },
+          {
+            "stage": "llm_client",
+            "offset_ms": 303.511,
+            "reused": true
+          },
+          {
+            "stage": "llm_call_started",
+            "offset_ms": 303.52
+          },
+          {
+            "stage": "llm_decision",
+            "offset_ms": 1549.523,
+            "status": "matched",
+            "route_id": 103
+          },
+          {
+            "stage": "fallback_result",
+            "offset_ms": 1570.318,
+            "status": "matched",
+            "route_id": 103,
+            "match_source": "llm_fallback",
+            "elapsed_ms": 1395.663
+          }
+        ],
+        "timings": [
+          {
+            "stage": "preparing",
+            "offset_ms": 0.193,
+            "status": "succeeded",
+            "elapsed_ms": 0.856
+          },
+          {
+            "stage": "encoding",
+            "offset_ms": 1.068,
+            "status": "succeeded",
+            "elapsed_ms": 0.025
+          },
+          {
+            "stage": "negative_search",
+            "offset_ms": 1.493,
+            "status": "succeeded",
+            "elapsed_ms": 143.473
+          },
+          {
+            "stage": "positive_search",
+            "offset_ms": 3.602,
+            "status": "succeeded",
+            "elapsed_ms": 159.019
+          },
+          {
+            "stage": "negative_filter",
+            "offset_ms": 163.784,
+            "status": "succeeded",
+            "elapsed_ms": 0.028
+          },
+          {
+            "stage": "candidate_filter",
+            "offset_ms": 163.822,
+            "status": "succeeded",
+            "elapsed_ms": 10.802
+          },
+          {
+            "stage": "fallback_prepare",
+            "offset_ms": 174.65,
+            "status": "succeeded",
+            "elapsed_ms": 1.318
+          },
+          {
+            "stage": "description_search",
+            "offset_ms": 175.979,
+            "status": "succeeded",
+            "elapsed_ms": 127.138
+          },
+          {
+            "stage": "fallback_candidates",
+            "offset_ms": 303.121,
+            "status": "succeeded",
+            "elapsed_ms": 0.134
+          },
+          {
+            "stage": "llm_prompt",
+            "offset_ms": 303.259,
+            "status": "succeeded",
+            "elapsed_ms": 0.033
+          },
+          {
+            "stage": "llm_call",
+            "offset_ms": 303.525,
+            "status": "succeeded",
+            "elapsed_ms": 1245.773
+          },
+          {
+            "stage": "llm_parse",
+            "offset_ms": 1549.476,
+            "status": "succeeded",
+            "elapsed_ms": 0.035
+          },
+          {
+            "stage": "route_revalidate",
+            "offset_ms": 1549.555,
+            "status": "succeeded",
+            "elapsed_ms": 1.13
+          }
+        ]
+      }
+    }
+  ]
+}

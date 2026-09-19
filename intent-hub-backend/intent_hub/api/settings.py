@@ -41,37 +41,37 @@ def _update_settings():
         return jsonify({"error": "请求体不能为空"}), 400
 
     try:
+        before = Config.to_dict()
         Config.save(data)
-        # 配置保存应立即返回；依赖组件在下次实际使用时按新配置懒加载。
+        after = Config.to_dict()
+        changed = {key for key in after if before.get(key) != after[key]}
+        # 配置保存立即返回；新组件在后台预热。
         from intent_hub.core.components import get_component_manager
 
         component_manager = get_component_manager()
-        component_manager.reset_components()
-        index_settings = {
+        component_settings = {
             "QDRANT_URL",
             "QDRANT_COLLECTION",
             "QDRANT_API_KEY",
             "EMBEDDING_SERVICE_URL",
             "EMBEDDING_MODEL_NAME",
             "EMBEDDING_API_FORMAT",
+            "BATCH_SIZE", "QDRANT_WRITE_BATCH_SIZE", "QDRANT_TIMEOUT_SECONDS", "SERVICE_HTTP_TRUST_ENV",
         }
-        if index_settings.intersection(data):
+        if changed & {"LLM_PROVIDER", "LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL",
+                      "LLM_FALLBACK_TIMEOUT_SECONDS", "LLM_FALLBACK_ENABLED"}:
+            from threading import Thread
+            from intent_hub.services.llm_runtime import warm_llm
+            Thread(target=warm_llm, name='llm-warmup', daemon=True).start()
+        if changed & component_settings:
+            component_manager.reset_components()
+        if changed & {"QDRANT_URL", "QDRANT_COLLECTION", "EMBEDDING_MODEL_NAME",
+                      "EMBEDDING_SERVICE_URL", "EMBEDDING_API_FORMAT"}:
             from intent_hub.services.sync_task_service import get_sync_task_service
 
-            route_ids = [route.id for route in component_manager.route_manager.get_all_routes()]
-            if route_ids:
-                for route_id in route_ids:
-                    route = component_manager.route_manager.get_route(route_id)
-                    current_version = route.sync.version if route and route.sync else 0
-                    component_manager.route_manager.update_sync_state(
-                        route_id,
-                        status="pending",
-                        version=current_version + 1,
-                        error=None,
-                    )
-                get_sync_task_service(component_manager).enqueue_routes(route_ids)
+            get_sync_task_service(component_manager).enqueue_incremental_reindex()
         return jsonify(
-            {"message": "配置更新成功，组件已重新加载", "settings": Config.to_dict()}
+            {"message": "配置更新成功" if changed else "配置未变化", "settings": after}
         ), 200
     except ValueError as e:
         return jsonify({"error": "配置参数错误", "detail": str(e)}), 400

@@ -145,8 +145,8 @@ class SyncService:
         logger.info("Running incremental reindex")
 
         # 3. 获取 Qdrant 中现有的路由 ID 和哈希
-        qdrant_route_hashes = qdrant_client.get_existing_route_hashes()
-        existing_route_ids = set(qdrant_route_hashes.keys())
+        initial = qdrant_client.fast_index_summary()
+        existing_route_ids = set(initial['route_ids'])
 
         # 4. 计算需要删除的路由（在 Qdrant 中存在但配置文件中不存在）
         routes_to_delete = existing_route_ids - config_route_ids
@@ -155,7 +155,6 @@ class SyncService:
         for route_id in routes_to_delete:
             logger.info(f"Deleting removed route: {route_id}")
             qdrant_client.delete_route(route_id)
-            qdrant_client.delete_route_negative_samples(route_id)
             deleted_count += 1
 
         # 5. 增量更新配置文件中的路由
@@ -164,57 +163,24 @@ class SyncService:
         new_count = 0
         total_points = 0
 
+        records = initial['metadata']
+        route_results = []
         for route in config_routes:
-            local_hash = route_manager.compute_route_hash(route)
-            qdrant_hash = qdrant_route_hashes.get(route.id)
-            
-            is_new_route = route.id not in existing_route_ids
-            needs_update = not is_new_route and local_hash != qdrant_hash
-
-            if is_new_route or needs_update:
-                if is_new_route:
-                    logger.info(f"New route: {route.name} (ID: {route.id})")
-                    new_count += 1
-                else:
-                    logger.info(f"Updating route (hash changed): {route.name} (ID: {route.id})")
-                    # 先删除旧的向量点（包括正例和负例）
-                    qdrant_client.delete_route(route.id)
-                    qdrant_client.delete_route_negative_samples(route.id)
-                    updated_count += 1
-
-                # 处理正例向量
-                embeddings = encoder.encode(route.utterances)
-                qdrant_client.upsert_route_utterances(
-                    route_id=route.id,
-                    route_name=route.name,
-                    utterances=route.utterances,
-                    embeddings=embeddings,
-                    score_threshold=route.score_threshold,
-                    route_hash=local_hash,
-                    model_name=Config.EMBEDDING_MODEL_NAME,
-                )
-                total_points += len(route.utterances)
-
-                # 处理负例向量
-                negative_samples = getattr(route, "negative_samples", [])
-                if negative_samples:
-                    negative_embeddings = encoder.encode(negative_samples)
-                    negative_threshold = getattr(route, "negative_threshold", 0.95)
-                    qdrant_client.upsert_route_negative_samples(
-                        route_id=route.id,
-                        route_name=route.name,
-                        negative_samples=negative_samples,
-                        embeddings=negative_embeddings,
-                        negative_threshold=negative_threshold,
-                    )
+            metadata = records.get(route.id, {})
+            if not initial['manifests_valid']:
+                metadata = {**metadata, 'sync_schema': 0} if metadata else {}
+            result = self._sync_delta(route, metadata)
+            route_results.append(result)
+            if route.id not in existing_route_ids:
+                new_count += 1
+            elif result["changed"]:
+                updated_count += 1
             else:
                 skipped_count += 1
+            total_points += result["total_points"]
 
-            # Always backfill the complete recovery record, including for unchanged
-            # legacy routes that predate metadata points.
-            self._sync_metadata(route)
-
-        self._validate_index(config_routes, qdrant_client, route_manager)
+        self._validate_index(config_routes, qdrant_client, route_manager, fast=True,
+                             actual=initial if not (new_count or updated_count or deleted_count) else None)
 
         # 处理被删除的路由缓存清理
         if routes_to_delete:
@@ -247,6 +213,8 @@ class SyncService:
             "deleted_routes": deleted_count,
             "skipped_routes": skipped_count,
             "total_points": total_points,
+            "encoded_texts": sum(r['encoded_texts'] for r in route_results),
+            "route_results": route_results,
         }
 
     @staticmethod
@@ -258,15 +226,16 @@ class SyncService:
             )
 
     @staticmethod
-    def _validate_index(config_routes: list, qdrant_client, route_manager) -> None:
+    def _validate_index(config_routes: list, qdrant_client, route_manager, fast=False, actual=None) -> None:
         expected_hashes = {
             route.id: route_manager.compute_route_hash(route) for route in config_routes
         }
         expected_points = sum(
-            len(route.utterances) + len(getattr(route, "negative_samples", [])) + 1
+            len(set(route.utterances)) + len(set(getattr(route, "negative_samples", []))) + 1
             for route in config_routes
         )
-        actual = qdrant_client.index_summary()
+        if actual is None:
+            actual = qdrant_client.fast_index_summary() if fast else qdrant_client.index_summary()
         if (
             actual["points_count"] != expected_points
             or actual["route_ids"] != sorted(expected_hashes)
@@ -305,57 +274,20 @@ class SyncService:
             raise ValueError(f"Route ID {route_id} not found")
         route = route.model_copy(deep=True)
 
-        logger.info(f"Syncing route: {route.name} (ID: {route_id})")
-
-        # 先删除旧的向量点（包括正例和负例）
-        qdrant_client.delete_route(route_id)
-        qdrant_client.delete_route_negative_samples(route_id)
-
         if route.lifecycle_status != "active":
+            qdrant_client.delete_route(route_id)
             self._mark_synced_if_current(route.id, route.sync.version if route.sync else 0)
-            return {"route_id": route.id, "total_points": 0, "total_negative_points": 0}
+            return {"route_id": route.id, "total_points": 0, "total_negative_points": 0,
+                    "changed": True, "metadata_committed": True}
+        return self._sync_delta(route)
 
-        # 重新编码并插入新的正例向量点
-        embeddings = encoder.encode(route.utterances)
-        qdrant_client.upsert_route_utterances(
-            route_id=route.id,
-            route_name=route.name,
-            utterances=route.utterances,
-            embeddings=embeddings,
-            score_threshold=route.score_threshold,
-            route_hash=route_manager.compute_route_hash(route),
-            model_name=Config.EMBEDDING_MODEL_NAME,
-        )
-        total_points = len(route.utterances)
+    def _sync_delta(self, route, metadata=None):
+        from intent_hub.services.delta_sync import sync_delta
 
-        # 处理负例向量
-        negative_samples = getattr(route, "negative_samples", [])
-        total_negative_points = 0
-        if negative_samples:
-            negative_embeddings = encoder.encode(negative_samples)
-            negative_threshold = getattr(route, "negative_threshold", 0.95)
-            qdrant_client.upsert_route_negative_samples(
-                route_id=route.id,
-                route_name=route.name,
-                negative_samples=negative_samples,
-                embeddings=negative_embeddings,
-                negative_threshold=negative_threshold,
-            )
-            total_negative_points = len(negative_samples)
-
-        self._sync_metadata(route)
-
-        logger.info(
-            f"Synced route {route.name} (ID: {route_id}): {total_points} positive, {total_negative_points} negative vectors"
-        )
-
-        return {
-            "message": f"Route {route.name} synced",
-            "route_id": route_id,
-            "route_name": route.name,
-            "total_points": total_points,
-            "total_negative_points": total_negative_points,
-        }
+        result = sync_delta(self, route, metadata)
+        logger.info("Route sync id=%s changed=%s encoded=%s timings_ms=%s",
+                    route.id, result["changed"], result["encoded_texts"], result["timings_ms"])
+        return result
 
     def _sync_metadata(self, route: RouteConfig) -> None:
         """Backfill legacy vectors and acknowledge sync only after the final write."""

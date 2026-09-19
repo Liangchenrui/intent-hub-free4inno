@@ -19,7 +19,7 @@ def test_dir():
 
 
 class DummyEncoder:
-    def __init__(self, service_url: str, batch_size: int, api_format: str):
+    def __init__(self, service_url: str, batch_size: int, api_format: str, trust_env=True):
         self.service_url = service_url
         self.batch_size = batch_size
         self.api_format = api_format
@@ -27,7 +27,7 @@ class DummyEncoder:
 
 
 class DummyQdrantClient:
-    def __init__(self, url: str, collection_name: str, dimensions: int, api_key=None, timeout=30, write_batch_size=128):
+    def __init__(self, url: str, collection_name: str, dimensions: int, api_key=None, timeout=30, write_batch_size=128, trust_env=True):
         self.url = url
         self.collection_name = collection_name
         self.dimensions = dimensions

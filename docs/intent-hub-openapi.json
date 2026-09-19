@@ -6,6 +6,127 @@
     "description": "Generated route inventory for master profile. Fixed compatibility namespaces are stable; root aliases follow API_COMPAT_PROFILE."
   },
   "paths": {
+    "/logs/{kind}": {
+      "get": {
+        "operationId": "logs_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          },
+          "400": {
+            "description": "Invalid filters or pagination"
+          },
+          "401": {
+            "description": "Management authentication required"
+          },
+          "404": {
+            "description": "Unknown log kind"
+          },
+          "503": {
+            "description": "Log storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "runtime",
+                "routing"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DEBUG",
+                "INFO",
+                "WARNING",
+                "ERROR",
+                "CRITICAL"
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "routing",
+                "sync",
+                "diagnostics",
+                "management",
+                "system"
+              ]
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "description": "Inclusive UTC Unix seconds"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "description": "Inclusive UTC Unix seconds"
+            }
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "operationId": "health_get",
@@ -15,6 +136,23 @@
         "responses": {
           "200": {
             "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": []
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "routing_readiness_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          },
+          "503": {
+            "description": "Routing components warming or unavailable; retry shortly."
           }
         },
         "security": []
@@ -81,6 +219,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Routing components warming or unavailable; retry shortly."
           }
         },
         "security": [
@@ -169,8 +310,8 @@
           "master"
         ],
         "responses": {
-          "200": {
-            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          "202": {
+            "description": "Durable upstream_pull task queued or reused; poll GET /sync-tasks. Result contains counts and optional sync_task_id for index completion."
           }
         },
         "security": [
@@ -833,6 +974,127 @@
         }
       }
     },
+    "/compat/master/logs/{kind}": {
+      "get": {
+        "operationId": "master_logs_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          },
+          "400": {
+            "description": "Invalid filters or pagination"
+          },
+          "401": {
+            "description": "Management authentication required"
+          },
+          "404": {
+            "description": "Unknown log kind"
+          },
+          "503": {
+            "description": "Log storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "runtime",
+                "routing"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DEBUG",
+                "INFO",
+                "WARNING",
+                "ERROR",
+                "CRITICAL"
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "routing",
+                "sync",
+                "diagnostics",
+                "management",
+                "system"
+              ]
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "description": "Inclusive UTC Unix seconds"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "description": "Inclusive UTC Unix seconds"
+            }
+          }
+        ]
+      }
+    },
     "/compat/master/health": {
       "get": {
         "operationId": "master_health_get",
@@ -842,6 +1104,23 @@
         "responses": {
           "200": {
             "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          }
+        },
+        "security": []
+      }
+    },
+    "/compat/master/health/ready": {
+      "get": {
+        "operationId": "master_routing_readiness_get",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          },
+          "503": {
+            "description": "Routing components warming or unavailable; retry shortly."
           }
         },
         "security": []
@@ -908,6 +1187,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Routing components warming or unavailable; retry shortly."
           }
         },
         "security": [
@@ -996,8 +1278,8 @@
           "master"
         ],
         "responses": {
-          "200": {
-            "description": "Completed response; see API.md for endpoint-specific statuses and errors."
+          "202": {
+            "description": "Durable upstream_pull task queued or reused; poll GET /sync-tasks. Result contains counts and optional sync_task_id for index completion."
           }
         },
         "security": [
@@ -1993,6 +2275,9 @@
         "responses": {
           "200": {
             "description": "BUPT success/data/error envelope; data.agents contains agent details and nullable score."
+          },
+          "503": {
+            "description": "Routing components warming or unavailable; retry shortly."
           }
         },
         "security": [
@@ -2527,6 +2812,9 @@
         "responses": {
           "200": {
             "description": "BUPT success/data/error envelope; data.agents contains agent details and nullable score."
+          },
+          "503": {
+            "description": "Routing components warming or unavailable; retry shortly."
           }
         },
         "security": [

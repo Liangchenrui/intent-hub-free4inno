@@ -1,5 +1,9 @@
 # Docs
 
+- [2026-09-28 收尾与后续工作](changes/2026-09-28-closeout.md)：当前功能、调用示例、验证和 Git 交付范围
+
+- [页面配置统一路由密钥](changes/route-api-key/README.md)：设置、持久化、鉴权范围和验证
+
 当前项目公共文档统一维护在根目录 `docs/`。
 
 - `API.md`：后端接口与鉴权说明
@@ -8,6 +12,7 @@
 - `bupt-routing-api.openapi.yaml`：BUPT 契约对外路由接口（`POST /compat/bupt/route`、`POST /route`）的 OpenAPI 3.1 契约，含鉴权方式、字段语义、错误与示例
 - `superpowers/`：过程性设计与计划文档
 - [大模型兜底需求与交付记录](changes/llm-fallback/README.md)：需求、设计取舍、实现入口、验收证据、本地运行与待验证项
+- [兜底自动积累语料](changes/fallback-learning/README.md)：成功兜底请求入库、来源记录、上游合并与后台索引验证
 - [master 与 BUPT 统一方案](changes/branch-unification/README.md)：需求、实现与兼容契约、迁移工具、验证证据及交付状态
 - [运行日志与路由记录](changes/logging/README.md)：已确定需求、建议设计及逐步实现状态
 - [路由时延优化](changes/routing-latency/README.md)：组件预热、客户端复用、并行检索与真实对照证据

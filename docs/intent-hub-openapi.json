@@ -2925,6 +2925,12 @@
             "minLength": 1,
             "title": "Text",
             "type": "string"
+          },
+          "learn_from_fallback": {
+            "default": true,
+            "description": "兜底成功后自动积累语料；测试界面传 false",
+            "title": "Learn From Fallback",
+            "type": "boolean"
           }
         },
         "required": [
@@ -3181,6 +3187,19 @@
             "title": "Id",
             "type": "integer"
           },
+          "display_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "当前列表中的展示顺序，从 1 开始",
+            "title": "Display Order"
+          },
           "name": {
             "description": "路由名称",
             "title": "Name",
@@ -3205,6 +3224,14 @@
             },
             "title": "Utterances",
             "type": "array"
+          },
+          "fallback_utterances": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "兜底自动添加的原文及 UTC 时间",
+            "title": "Fallback Utterances",
+            "type": "object"
           },
           "negative_samples": {
             "description": "负例语句列表，用于排除不应该匹配到该路由的查询",
@@ -3352,6 +3379,13 @@
             },
             "title": "Utterances",
             "type": "array"
+          },
+          "fallback_utterances": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Fallback Utterances",
+            "type": "object"
           },
           "negative_samples": {
             "items": {

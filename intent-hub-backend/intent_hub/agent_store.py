@@ -46,6 +46,7 @@ class AgentStore:
         return Agent(
             id=self.repo.legacy_id('bupt', Config.SOURCE_INSTANCE, route.id),
             title=route.name, text=route.description, utterances=route.utterances,
+            fallback_utterances=route.fallback_utterances,
             negative_samples=route.negative_samples, score_threshold=route.score_threshold,
             negative_threshold=route.negative_threshold, details=route.details,
             updated_at=route.updated_at,

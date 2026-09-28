@@ -44,6 +44,7 @@ class RouteConfig(BaseModel):
     route_key: str = Field(..., description="稳定的业务路由标识", min_length=1)
     description: str = Field(default="", description="路由描述")
     utterances: List[str] = Field(..., description="示例语句列表")
+    fallback_utterances: Dict[str, str] = Field(default_factory=dict, description="兜底自动添加的原文及 UTC 时间")
     negative_samples: List[str] = Field(
         default_factory=list,
         description="负例语句列表，用于排除不应该匹配到该路由的查询",
@@ -77,6 +78,7 @@ class PredictRequest(BaseModel):
     """预测请求模型"""
 
     text: str = Field(..., description="待匹配的文本", min_length=1)
+    learn_from_fallback: bool = Field(default=True, strict=True, description="兜底成功后自动积累语料；测试界面传 false")
 
 
 class PredictResponse(BaseModel):

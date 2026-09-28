@@ -13,8 +13,8 @@ info:
     - 两处是同一个视图函数，请求与响应契约完全一致。
 
     ## 鉴权
-    - 仅接受启动环境变量 `AUTH_CODE` 的值（Bearer 或 `X-API-Key`，`hmac.compare_digest` 精确比较）。
-    - `AUTH_CODE` 为空时该接口对所有请求返回 401；`AUTH_ENABLED` 开关不影响该接口。
+    - 路由接口优先接受页面保存的 `ROUTE_API_KEY`，未设置时接受启动环境变量 `AUTH_CODE` 的值（Bearer 或 `X-API-Key`，`hmac.compare_digest` 精确比较）。
+    - 两项密钥都为空时路由接口对所有请求返回 401；`AUTH_ENABLED` 开关不影响该接口。
     - master 的 `PREDICT_AUTH_KEY` 与管理台登录签发的 API Key 在此**不被接受**，两套凭据不能交叉使用。
 
     ## 命中与未命中语义
@@ -262,12 +262,12 @@ components:
     BearerAuth:
       type: http
       scheme: bearer
-      description: '`Authorization: Bearer <key>`，`<key>` 为启动环境变量 `AUTH_CODE` 的值。'
+      description: '`Authorization: Bearer <key>`，路由接口的 `<key>` 为已保存的 `ROUTE_API_KEY`，未设置则为环境变量 `AUTH_CODE`；管理接口仍使用 `AUTH_CODE`。'
     ApiKeyAuth:
       type: apiKey
       in: header
       name: X-API-Key
-      description: 与 `BearerAuth` 等价的备用传递方式，取值同为 `AUTH_CODE`。
+      description: 与 `BearerAuth` 等价的备用传递方式，取值规则同 BearerAuth。
 
   responses:
     BuptBadRequest:
@@ -286,7 +286,7 @@ components:
                   message: 请求参数错误
                   detail: query 不能为空
     BuptUnauthorized:
-      description: 认证失败（缺少或错误的 AUTH_CODE；AUTH_CODE 未配置时同样返回此响应）
+      description: 认证失败（缺少或错误的有效密钥；未配置有效密钥时同样返回此响应）
       content:
         application/json:
           schema:

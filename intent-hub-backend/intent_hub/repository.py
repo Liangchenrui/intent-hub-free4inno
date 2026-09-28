@@ -63,6 +63,11 @@ class Repository:
                 return self.save(route, connection, enqueue)
         row = db.execute('SELECT body FROM entities WHERE id=?', (route.id,)).fetchone()
         previous = RouteConfig.model_validate_json(row[0]) if row else None
+        # Preserve provenance for older clients, but remove it with deleted samples.
+        provenance = dict(previous.fallback_utterances) if previous else {}
+        provenance.update(route.fallback_utterances)
+        route.fallback_utterances = {text: at for text, at in provenance.items()
+                                     if text in route.utterances}
         if previous and previous.sync and route.sync and route.sync.version < previous.sync.version:
             raise ValueError('Entity changed concurrently; reload before saving')
         db.execute('INSERT INTO entities VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET route_key=excluded.route_key,body=excluded.body',

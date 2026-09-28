@@ -64,8 +64,9 @@
             <el-switch v-model="settings.SERVICE_HTTP_TRUST_ENV" />
             <div class="field-hint">{{ $t('settings.serviceHttpTrustEnvHint') }}</div>
           </el-form-item>
-          <el-form-item label="Route API Key">
-            <el-input v-model="settings.PREDICT_AUTH_KEY" type="password" show-password />
+          <el-form-item label="Route API Key（统一路由密钥）">
+            <el-input v-model="settings.ROUTE_API_KEY" type="password" show-password autocomplete="new-password" />
+            <div class="field-hint">保存后立即用于 /predict 和 /route，重启保留。留空恢复使用各接口原有环境变量密钥；不修改管理员登录密码。</div>
           </el-form-item>
 
           <el-divider content-position="left">{{ $t('settings.upstreamAgentTitle') }}</el-divider>
@@ -224,7 +225,7 @@ const creatingCollection = ref(false);
 const settings = ref<SystemSettings>({
   QDRANT_URL: 'http://app.qdrant.free4inno.com',
   SERVICE_HTTP_TRUST_ENV: true,
-  PREDICT_AUTH_KEY: null,
+  ROUTE_API_KEY: '',
   EMBEDDING_SERVICE_URL: 'http://embedding.free4inno.com/embed',
   AGENT_API_URL: 'https://yuanfang.bupt.edu.cn/ac/api',
   AGENT_API_LABEL_IDS: '87,88,89',
@@ -250,7 +251,7 @@ const normalizeSettings = (data: any): SystemSettings => ({
   QDRANT_URL: data.QDRANT_URL ?? '',
   SERVICE_HTTP_TRUST_ENV: data.SERVICE_HTTP_TRUST_ENV ?? true,
   QDRANT_COLLECTION: data.QDRANT_COLLECTION ?? '',
-  PREDICT_AUTH_KEY: data.PREDICT_AUTH_KEY ?? null,
+  ROUTE_API_KEY: data.ROUTE_API_KEY ?? '',
   EMBEDDING_SERVICE_URL: data.EMBEDDING_SERVICE_URL ?? '',
   AGENT_API_URL: data.AGENT_API_URL ?? 'https://yuanfang.bupt.edu.cn/ac/api',
   AGENT_API_LABEL_IDS: data.AGENT_API_LABEL_IDS ?? '87,88,89',
@@ -277,8 +278,8 @@ const fetchSettings = async (showResetMessage = false) => {
   try {
     const response = await getSettings();
     settings.value = normalizeSettings(response.data as any);
-    if (settings.value.PREDICT_AUTH_KEY) {
-      localStorage.setItem('predict_auth_key', settings.value.PREDICT_AUTH_KEY);
+    if (settings.value.ROUTE_API_KEY) {
+      localStorage.setItem('predict_auth_key', settings.value.ROUTE_API_KEY);
     } else {
       localStorage.removeItem('predict_auth_key');
     }
@@ -386,8 +387,8 @@ const handleSave = async () => {
     // 更新时只更新所有已知字段
     if (response.data.settings) {
       settings.value = normalizeSettings(response.data.settings as any);
-      if (settings.value.PREDICT_AUTH_KEY) {
-        localStorage.setItem('predict_auth_key', settings.value.PREDICT_AUTH_KEY);
+      if (settings.value.ROUTE_API_KEY) {
+        localStorage.setItem('predict_auth_key', settings.value.ROUTE_API_KEY);
       } else {
         localStorage.removeItem('predict_auth_key');
       }

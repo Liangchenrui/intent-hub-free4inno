@@ -325,7 +325,7 @@ const handleTest = async () => {
   loading.value = true;
   hasTested.value = true;
   try {
-    const response = await predict(queryText.value);
+    const response = await predict(queryText.value, false);
     results.value = response.data;
     feedbackState.value = {};
     feedbackPending.value = {};

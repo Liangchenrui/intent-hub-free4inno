@@ -146,6 +146,7 @@ class Config:
 
     # Telestar认证配置
     PREDICT_AUTH_KEY: Optional[str] = None
+    ROUTE_API_KEY: str = ""
 
     # 用户配置
     # The management UI intentionally has fixed local credentials. They are
@@ -193,6 +194,7 @@ class Config:
         # 1. 从 settings.json 加载 (最高优先级)
         path = cls.get_settings_path()
         path.parent.mkdir(parents=True, exist_ok=True)
+        cls.ROUTE_API_KEY = ""
 
         # 若 settings.json 不存在，则创建并写入默认配置（含默认提示词）
         if not path.exists():
@@ -286,6 +288,11 @@ class Config:
             raise ValueError("Unsupported settings: " + ", ".join(sorted(unknown)))
         cls.validate_fallback_settings(settings_dict)
         merged = {**cls.to_dict(), **settings_dict}
+        if not isinstance(merged['ROUTE_API_KEY'], str):
+            raise ValueError('ROUTE_API_KEY must be a string')
+        merged['ROUTE_API_KEY'] = merged['ROUTE_API_KEY'].strip()
+        if any(c.isspace() for c in merged['ROUTE_API_KEY']):
+            raise ValueError('ROUTE_API_KEY must not contain whitespace')
         if type(merged['SERVICE_HTTP_TRUST_ENV']) is not bool:
             raise ValueError('SERVICE_HTTP_TRUST_ENV must be a boolean')
         if type(merged['BATCH_SIZE']) is not int or merged['BATCH_SIZE'] <= 0:
@@ -371,6 +378,7 @@ class Config:
             "SKILL_ROUTE_IMPORT_PROMPT": cls.SKILL_ROUTE_IMPORT_PROMPT,
             # 认证配置
             "AUTH_ENABLED": cls.AUTH_ENABLED,
+            "ROUTE_API_KEY": cls.ROUTE_API_KEY,
             "NEGATIVE_SAMPLE_GENERATION_PROMPT": cls.NEGATIVE_SAMPLE_GENERATION_PROMPT,
             "DEFAULT_ROUTE_TEXT": cls.DEFAULT_ROUTE_TEXT,
             # 其他配置

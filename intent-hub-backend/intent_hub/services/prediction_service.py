@@ -79,7 +79,8 @@ class PredictionService:
 
         if not search_results:
             return [FallbackService(manager).predict(
-                request.text, query_vector, excluded_route_ids
+                request.text, query_vector, excluded_route_ids,
+                learn_from_fallback=request.learn_from_fallback,
             )]
 
         # 4. 按路由ID分组并进行阈值过滤（同时排除负例匹配的路由）
@@ -147,7 +148,8 @@ class PredictionService:
 
         if not sorted_results:
             return [FallbackService(manager).predict(
-                request.text, query_vector, excluded_route_ids
+                request.text, query_vector, excluded_route_ids,
+                learn_from_fallback=request.learn_from_fallback,
             )]
 
         logger.info(f"Matched route count: {len(sorted_results)}")

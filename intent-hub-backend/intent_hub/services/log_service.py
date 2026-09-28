@@ -96,7 +96,7 @@ def get_log_store():
 
 def redact_runtime(text):
     secrets = []
-    for name in Config.SECRET_KEYS:
+    for name in Config.SECRET_KEYS | {'ROUTE_API_KEY'}:
         value = getattr(Config, name, None)
         if isinstance(value, str) and value:
             secrets.append(value)

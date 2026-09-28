@@ -5,7 +5,7 @@ Intent Hub is a single-workspace intent-routing service with a Flask backend and
 ## Authentication
 
 - Administrators sign in with username and password at `POST /auth/login`. The returned short-lived API key protects management APIs.
-- `POST /predict` uses the independent `PREDICT_AUTH_KEY`, supplied as Bearer, raw `Authorization`, or `X-API-Key`.
+- Set the shared `ROUTE_API_KEY` in Settings for `/predict` and `/route` (including compatibility paths). Saving takes effect immediately in the local process and persists across restarts. If empty, each contract uses its legacy environment key (`PREDICT_AUTH_KEY` / `AUTH_CODE`). The shared routing key does not grant management access.
 
 ## Main APIs
 
@@ -25,6 +25,8 @@ cd intent-hub-frontend && npm install && npm run build
 
 ## Unified master / BUPT version
 
-Both contracts share one SQLite repository, routing core and sync queue. Set `API_COMPAT_PROFILE=master` (default) or `bupt` for root API aliases; `/compat/master/*` and `/compat/bupt/*` remain explicit. The administration UI uses the master namespace on either profile and fixed credentials `admin / telestar`; it does not use a `DEFAULT_PASSWORD` environment variable. Set `AUTH_CODE` for BUPT API access in the process environment. The LLM API key is configured in the Settings page and saved locally; other provider keys remain environment-only.
+Both contracts share one SQLite repository, routing core and sync queue. Set `API_COMPAT_PROFILE=master` (default) or `bupt` for root API aliases; `/compat/master/*` and `/compat/bupt/*` remain explicit. The administration UI uses the master namespace on either profile and current local credentials `admin / 123456`; it does not use a `DEFAULT_PASSWORD` environment variable. Configure the shared Route API Key in Settings for routing; BUPT management APIs still require environment `AUTH_CODE`. The LLM API key and shared routing key are configured in Settings and saved locally; other provider keys remain environment-only.
 
 For populated installations, use the [migration and compatibility guide](docs/changes/branch-unification/README.md). Do not reuse a BUPT index without rebuilding against migrated internal IDs. Deployment is deferred by user request.
+
+Successful LLM fallback adds the trimmed request to the selected Agent and queues vector synchronization. The test page disables automatic learning and uses explicit thumbs-up/down feedback. See [fallback learning](docs/changes/fallback-learning/README.md), [route API keys](docs/changes/route-api-key/README.md), and [delivery status and remaining work](docs/changes/2026-09-28-closeout.md).

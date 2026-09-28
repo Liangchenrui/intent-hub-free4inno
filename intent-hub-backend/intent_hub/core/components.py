@@ -119,6 +119,7 @@ class ComponentManager:
         if state.status != 'ready':
             self._prepare(state)
         return SimpleNamespace(encoder=state.encoder, qdrant_client=state.qdrant_client,
+                               owner=self,
                                route_manager=state.route_manager, ensure_ready=lambda: None,
                                embedding_model_name=state.config['EMBEDDING_MODEL_NAME'])
 

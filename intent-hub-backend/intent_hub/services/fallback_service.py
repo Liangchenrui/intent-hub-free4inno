@@ -54,7 +54,7 @@ class FallbackService:
     def __init__(self, component_manager):
         self.component_manager = component_manager
 
-    def predict(self, text: str, query_vector: list, excluded_route_ids: set) -> PredictResponse:
+    def predict(self, text: str, query_vector: list, excluded_route_ids: set, *, learn_from_fallback: bool = True) -> PredictResponse:
         trace_event("fallback_entered", enabled=bool(Config.LLM_FALLBACK_ENABLED))
         if not Config.LLM_FALLBACK_ENABLED:
             trace_event("fallback_result", status="disabled", match_source="default")
@@ -62,7 +62,7 @@ class FallbackService:
         started = monotonic()
         try:
             Config.validate_fallback_settings({})
-            result = self._predict(text, query_vector, excluded_route_ids)
+            result = self._predict(text, query_vector, excluded_route_ids, learn_from_fallback=learn_from_fallback)
         except Exception as exc:
             trace_event("fallback_error", error_type=type(exc).__name__)
             # Do not log provider exception bodies, which can contain request data.
@@ -77,7 +77,7 @@ class FallbackService:
                     elapsed_ms=round((monotonic() - started) * 1000, 3))
         return result
 
-    def _predict(self, text, query_vector, excluded_route_ids):
+    def _predict(self, text, query_vector, excluded_route_ids, *, learn_from_fallback=True):
         manager = self.component_manager
         with trace_stage("fallback_prepare"):
             routes = {
@@ -141,6 +141,9 @@ class FallbackService:
                 != manager.route_manager.compute_route_hash(selected)
             ):
                 return default_response("no_candidates")
+            from intent_hub.services.fallback_learning import learn_fallback
+            if learn_from_fallback:
+                learn_fallback(manager, current, text)
             return PredictResponse(
                 id=current.id, name=current.name, route_key=current.route_key, score=None,
                 match_source="llm_fallback", fallback_status="matched",

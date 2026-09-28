@@ -20,6 +20,8 @@ def isolate_runtime_logs(monkeypatch, tmp_path):
     from intent_hub.config import Config
     monkeypatch.setattr(Config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(Config, "LLM_API_KEY", "offline-test-key")
+    # A user's saved shared key must not override each test's explicit credentials.
+    monkeypatch.setattr(Config, "ROUTE_API_KEY", "")
 
 
 def pytest_sessionfinish(session, exitstatus):

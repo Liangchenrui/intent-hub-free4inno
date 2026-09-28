@@ -7,7 +7,7 @@ from flask_compress import Compress
 from pydantic import ValidationError
 
 from intent_hub.agent_compare import comparison_detail, comparison_summary
-from intent_hub.compat_auth import require_auth
+from intent_hub.compat_auth import require_auth, require_route_auth
 from intent_hub.config import Config
 from intent_hub import compat_config
 from intent_hub.core.components import get_component_manager, RoutingNotReady
@@ -197,7 +197,7 @@ def sync_status():
 
 
 @app.post("/route")
-@require_auth
+@require_route_auth
 @api_errors
 def route():
     payload = RouteRequest(**(request.get_json() or {}))

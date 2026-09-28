@@ -125,6 +125,8 @@ class UpstreamAgentService:
             if source_changed:
                 route.source.source_snapshot = snapshot
             for field, value in snapshot.items():
+                if field == "utterances":
+                    value = list(dict.fromkeys([*value, *route.fallback_utterances]))
                 if field not in overrides and not fields_equal(field, getattr(route, field), value):
                     setattr(route, field, value)
             details = item.get("details", route.details)
@@ -181,6 +183,8 @@ class UpstreamAgentService:
         for field in allowed:
             if field in route.source.source_snapshot:
                 setattr(route, field, route.source.source_snapshot[field])
+                if field == "utterances":
+                    route.utterances = list(dict.fromkeys([*route.utterances, *route.fallback_utterances]))
         route.sync = route.sync or RouteConfig.RouteSync()
         route.sync.manual_overrides = sorted(set(route.sync.manual_overrides) - allowed)
         RouteService._mark_changed(

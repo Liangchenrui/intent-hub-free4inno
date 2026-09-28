@@ -14,7 +14,7 @@ intent-hub-backend/
     └── diagnostics_cache.json
 ```
 
-One component manager creates the encoder, Qdrant client, and route manager. Qdrant and embedding endpoints are complete URLs passed without inferred ports. Management login keys and the external `PREDICT_AUTH_KEY` are separate.
+One component manager creates the encoder, Qdrant client, and route manager. Qdrant and embedding endpoints are complete URLs passed without inferred ports. Management login keys remain separate from routing keys. Administrator-saved `ROUTE_API_KEY` takes precedence for both routing contracts; when empty, master uses environment `PREDICT_AUTH_KEY` and BUPT uses environment `AUTH_CODE`. BUPT management still requires `AUTH_CODE`. Settings persist atomically and update the current process; multi-worker deployments require all workers to restart to share changes.
 
 The embedding client supports two explicit wire formats: `qwen` keeps the existing `/get_embeddings` request/response contract, while `tei` sends `{"inputs": [...]}` to the exact configured endpoint and accepts a plain embedding array. The default Free4inno service uses the TEI-compatible `http://embedding.free4inno.com/embed` endpoint. The protocol is never guessed at runtime.
 
@@ -58,3 +58,9 @@ Upstream pulls now use durable `upstream_pull` tasks and reused-connection seria
 Index equality excludes source snapshots, pull timestamps, raw details and override flags. SQLite remains authoritative for management state and raw details; Qdrant recovery metadata reflects the last index write and is not a current backup of upstream-only changes. Overall route hashes live on metadata points; sample payloads no longer receive a new route hash on description-only edits. Legacy sample hashes remain readable, with metadata hashes taking precedence. See [upstream pull delivery](changes/upstream-pull/README.md).
 
 Upstream matching uses route_key alone across all local source types. Explicit upstream route_key/routeKey takes priority; legacy title-only upstream data derives a normalized key from title. Source IDs are provenance, not entity identity. Duplicate keys in one pull reject the transaction; existing suffix/custom keys are not silently renamed or merged.
+
+## Fallback learning
+
+A successful fallback appends the trimmed request to `utterances` and records its UTC timestamp in `fallback_utterances`. A SQLite transaction revalidates the route, deduplicates text, increments its version and writes an outbox token. The existing background queue updates vectors; persistence or scheduling failures do not revoke the prediction result. Upstream pulls merge automatic examples with source examples without marking the entire field as a manual override. Deleting an example removes its provenance.
+
+`PredictRequest.learn_from_fallback` defaults to true. The test page explicitly sends false and keeps its existing manual feedback workflow. BUPT routing uses the default. Index visibility is asynchronous, and pending route hashes may temporarily exclude a route from fallback until synchronization completes. See [delivery status](changes/2026-09-28-closeout.md).

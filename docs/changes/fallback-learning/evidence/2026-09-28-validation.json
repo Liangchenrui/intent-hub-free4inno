@@ -1,0 +1,14 @@
+{
+  "date": "2026-09-28",
+  "environment": "Windows local Python; isolated test storage",
+  "command": "PYTHONPATH=intent-hub-backend python -m pytest intent-hub-backend/tests -q",
+  "tests": 209,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "elapsed_seconds": 95.706,
+  "frontend_build": "passed earlier in same session; unchanged since build",
+  "openapi_check": "passed",
+  "documentation_links": "passed",
+  "remote_deployment": false
+}

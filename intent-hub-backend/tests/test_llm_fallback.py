@@ -57,6 +57,9 @@ def system(tmp_path, monkeypatch):
     )
     route_manager.add_route(route)
     SyncService(manager).sync_route(1)
+    queue = SyncTaskService(manager, autostart=False, refresh_diagnostics=False)
+    monkeypatch.setattr('intent_hub.services.fallback_learning.get_sync_task_service', lambda *args: queue)
+    manager.learning_queue = queue
     yield manager
     client.client.close()
 
@@ -430,3 +433,126 @@ def test_consecutive_real_sdk_calls_work_across_request_event_loops(monkeypatch)
         server.shutdown()
         server.server_close()
         worker.join(timeout=2)
+
+
+def test_learning_sync_makes_next_request_semantic(system, monkeypatch):
+    query = '包裹实时位置'
+    set_model(monkeypatch, '{"status":"matched","route_id":1}')
+    result = PredictionService(system).predict(PredictRequest(text='  ' + query + '  '))[0]
+    assert result.match_source == 'llm_fallback'
+    route = system.route_manager.get_route(1)
+    assert route.utterances[-1] == query
+    assert query in route.fallback_utterances
+    assert route.sync.version == 2
+    assert not route.sync.manual_overrides
+    old_encode = system.encoder.encode
+    monkeypatch.setattr(system.encoder, 'encode', lambda texts: [
+        [1.0, 0.0] if t == query else old_encode([t])[0] for t in texts])
+    assert system.learning_queue.process_next()
+    second = PredictionService(system).predict(PredictRequest(text=query))[0]
+    assert second.match_source == 'semantic'
+    assert system.route_manager.get_route(1).utterances.count(query) == 1
+
+
+def test_learning_concurrent_duplicates(system):
+    from concurrent.futures import ThreadPoolExecutor
+    from intent_hub.services.fallback_learning import learn_fallback
+    selected = system.route_manager.get_route(1)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda _: learn_fallback(system, selected, '  new request  '), range(16)))
+    route = system.route_manager.get_route(1)
+    assert route.utterances.count('new request') == 1
+    assert route.sync.version == selected.sync.version + 1
+
+
+@pytest.mark.parametrize('status', ['no_match', 'ambiguous'])
+def test_abstention_does_not_learn(system, monkeypatch, status):
+    before = system.route_manager.get_route(1)
+    set_model(monkeypatch, json.dumps({'status': status, 'route_id': None}))
+    PredictionService(system).predict(PredictRequest(text='new request'))
+    assert system.route_manager.get_route(1) == before
+
+
+def test_learning_write_failure_keeps_match(system, monkeypatch):
+    set_model(monkeypatch, '{"status":"matched","route_id":1}')
+    def fail(*args, **kwargs):
+        raise OSError('private database error')
+    monkeypatch.setattr(system.route_manager.repository, 'save', fail)
+    result = PredictionService(system).predict(PredictRequest(text='new request'))[0]
+    assert result.match_source == 'llm_fallback'
+    assert 'new request' not in system.route_manager.get_route(1).utterances
+
+
+def test_learning_queue_failure_preserves_outbox(system, monkeypatch):
+    from intent_hub.services.fallback_learning import learn_fallback
+    def fail(*args, **kwargs):
+        raise RuntimeError('queue unavailable')
+    monkeypatch.setattr('intent_hub.services.fallback_learning.get_sync_task_service', fail)
+    learn_fallback(system, system.route_manager.get_route(1), 'new request')
+    assert 'new request' in system.route_manager.get_route(1).utterances
+    assert 1 in system.route_manager.repository.pending()
+    recovered = SyncTaskService(system, autostart=False, refresh_diagnostics=False)
+    assert recovered.process_next()
+    route = system.route_manager.get_route(1)
+    assert route.sync.synced_version == route.sync.version
+
+
+def test_learning_upstream_merge_restore_and_manual_delete(system):
+    from intent_hub.services.fallback_learning import learn_fallback
+    from intent_hub.services.upstream_agent_service import UpstreamAgentService
+    from intent_hub.services.route_service import RouteService
+    from intent_hub.agent_store import AgentStore
+    route = system.route_manager.get_route(1)
+    route.source = RouteConfig.RouteSource(type='upstream_agent', source_id='remote',
+        managed_fields=['name', 'description', 'utterances', 'negative_samples'])
+    system.route_manager.repository.save(route)
+    learn_fallback(system, route, 'local learned')
+    item = dict(source_id='remote', route_key=route.route_key, name=route.name,
+        description=route.description, utterances=['new upstream'], negative_samples=[])
+    source = SimpleNamespace(fetch_all=lambda: [item], complete=True)
+    service = UpstreamAgentService(system, source=source)
+    service.pull()
+    merged = system.route_manager.get_route(1)
+    assert merged.utterances == ['new upstream', 'local learned']
+    assert merged.source.source_snapshot['utterances'] == ['new upstream']
+    assert not merged.sync.manual_overrides
+    assert AgentStore(system).from_route(merged).fallback_utterances == merged.fallback_utterances
+    assert service.restore_fields(1, ['utterances']).utterances == ['new upstream', 'local learned']
+    version = system.route_manager.get_route(1).sync.version
+    service.pull()
+    assert system.route_manager.get_route(1).sync.version == version
+    # Old clients omit provenance when editing; retained samples keep it.
+    values = system.route_manager.get_route(1).model_dump(exclude={'fallback_utterances'})
+    edited = RouteConfig(**values)
+    RouteService(system).update_route(1, edited)
+    assert 'local learned' in system.route_manager.get_route(1).fallback_utterances
+    edited.utterances = ['new upstream']
+    RouteService(system).update_route(1, edited)
+    service.pull()
+    current = system.route_manager.get_route(1)
+    assert current.utterances == ['new upstream']
+    assert not current.fallback_utterances
+
+
+@pytest.mark.parametrize('empty_search', [False, True])
+@pytest.mark.parametrize('learn', [False, True, None])
+def test_http_test_mode_controls_learning(system, monkeypatch, empty_search, learn):
+    from intent_hub.app import app
+    monkeypatch.setattr(Config, 'PREDICT_AUTH_KEY', 'offline-route-key')
+    monkeypatch.setattr('intent_hub.api.prediction.get_component_manager', lambda: system)
+    set_model(monkeypatch, '{"status":"matched","route_id":1}')
+    if empty_search:
+        monkeypatch.setattr(system.qdrant_client, 'search', lambda *a, **kw: [])
+    before = system.route_manager.get_route(1)
+    payload = {'text': 'test mode request'}
+    if learn is not None:
+        payload['learn_from_fallback'] = learn
+    response = app.test_client().post('/compat/master/predict', json=payload,
+        headers={'Authorization': 'Bearer offline-route-key'})
+    assert response.status_code == 200
+    assert response.get_json()[0]['match_source'] == 'llm_fallback'
+    after = system.route_manager.get_route(1)
+    if learn is False:
+        assert after == before
+    else:
+        assert 'test mode request' in after.utterances

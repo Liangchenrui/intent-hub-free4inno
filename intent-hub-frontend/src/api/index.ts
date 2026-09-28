@@ -335,7 +335,8 @@ export function reindex(forceFull: boolean = false): Promise<AxiosResponse<Reind
   return api.post<ReindexResponse | SyncTask>('/reindex', { force_full: forceFull });
 }
 
-export const predict = (text: string) => api.post<PredictResult[]>('/predict', { text });
+export const predict = (text: string, learnFromFallback = true) =>
+  api.post<PredictResult[]>('/predict', { text, learn_from_fallback: learnFromFallback });
 export const submitPositiveRouteFeedback = (routeId: number, text: string) =>
   api.post<RouteFeedbackResponse>(`/routes/${routeId}/feedback/positive`, { text });
 export const submitNegativeRouteFeedback = (routeId: number, text: string) =>
@@ -390,7 +391,7 @@ export interface SystemSettings extends SharedLlmSettings {
   API_KEYS?: string | null;
   DEFAULT_USERNAME?: string;
   DEFAULT_PASSWORD?: string;
-  PREDICT_AUTH_KEY?: string | null;
+  ROUTE_API_KEY?: string;
   DEFAULT_ROUTE_ID?: number;
   DEFAULT_ROUTE_NAME?: string;
   DEFAULT_ROUTE_KEY?: string;

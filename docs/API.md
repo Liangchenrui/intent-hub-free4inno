@@ -1,6 +1,6 @@
 # API
 
-管理接口使用登录返回的 API key；`POST /auth/login` 免鉴权。`POST /predict` 使用独立 `PREDICT_AUTH_KEY`。
+管理接口使用登录返回的 API key；`POST /auth/login` 免鉴权。管理员可通过 `POST /compat/master/settings` 保存 `{"ROUTE_API_KEY":"你的密钥"}`；非空时统一用于 `/predict` 和 `/route`（含固定兼容路径），立即生效并持久化。留空则分别回退到 `PREDICT_AUTH_KEY` 与 `AUTH_CODE` 环境变量。统一路由密钥不授予管理权限。详见[密钥设置说明](changes/route-api-key/README.md)。
 
 对外路由接口的 BUPT 契约（`POST /compat/bupt/route`、`POST /route`）见 [bupt-routing-api.openapi.yaml](bupt-routing-api.openapi.yaml)；master 契约（`POST /predict`）见下文。
 
@@ -47,6 +47,8 @@
 | `fallback_status` | 未调用兜底为 `null`；其余为 `matched`、`no_match`、`ambiguous`、`no_candidates` 或 `unavailable` |
 | `score` | 保持原有例句相似度口径；模型选择与默认兜底均为 `null`，不返回模型自评置信度 |
 
+`/predict` 接受可选布尔字段 `learn_from_fallback`（默认 `true`）。测试界面固定传 `false`，仅使用点赞/点踩反馈；外部 API 默认自动积累。启用自动积累且兜底成功匹配后，请求原文去除首尾空白，自动追加到对应实体的 `utterances`，后台同步索引后参与普通检索。同一实体相同文本去重；入库或调度失败不会撤销路由结果。路由和 Agent 管理读取接口的 `fallback_utterances` 字典记录自动语料及 UTC 添加时间；删除对应语料会清除来源记录。上游更新及恢复上游语料字段时会合并保留自动语料。详见[兜底自动积累语料](changes/fallback-learning/README.md)。
+
 模型只能选择候选中的一个 ID。歧义、均不适用、缺少已同步候选、超时或无效输出均返回原有默认路由，通过 `fallback_status` 区分原因；`ambiguous` 供调用方提示用户澄清，不会自动发起多轮对话。被负例排除、非 active、已删除及内容 hash 过期的实体不能进入兜底结果。基础 Embedding/例句检索故障仍按现有接口错误机制处理；这里的降级只覆盖新增兜底阶段。
 
 `GET|POST /settings` 新增以下配置，旧设置文件缺省时无需迁移：
@@ -65,7 +67,7 @@
 所有 master 路径也可使用 `/compat/master` 前缀；BUPT 使用 `/compat/bupt` 前缀。`API_COMPAT_PROFILE=master|bupt` 仅决定无前缀别名，同名 `/settings` 与 `/diagnostics/*` 不按请求参数猜测版本。管理台固定调用 master 命名空间。
 
 - `POST /compat/bupt/route`：输入 `{"query":"查询文本"}`，返回 `{"success":true,"data":{"matched":true,"agents":[{"agent":{},"score":0.9}],"text":null,"match_source":"semantic","fallback_status":null},"error":null}`。`agent` 为原始 details；兜底命中的 score 为 null，未命中时 agents 为空数组、text 为默认文本。
-- BUPT 访问使用环境 `AUTH_CODE`，支持 Bearer 或 X-API-Key；不会接受 master 的预测专用密钥替代它。master 管理登录使用本地固定凭据：`admin / 123456`。
+- BUPT 路由优先使用页面保存的 `ROUTE_API_KEY`，未设置时回退到环境 `AUTH_CODE`，支持 Bearer 或 X-API-Key。BUPT 管理仍只接受 `AUTH_CODE`。master 管理登录使用本地固定凭据：`admin / 123456`。
 - BUPT `/agents`、签名整数 ID 的 CRUD/diff/restore-fields/recommendations/thresholds、`/agents/pull`、`/collections*`、`/diagnostics/*` 保留适配入口。不同来源 ID 使用持久映射，不直接作为向量主键。
 - BUPT `POST /vectors/sync` 与 `/sync` 使用 `mode=incremental|full`，等待共享任务完成返回 200。full 不允许同时指定局部 agent_ids，防止误删其余索引。任务失败或等待超时不会返回成功；可通过 master `/sync-tasks` 查看状态。该安全限制是明确的兼容修正。
 - `POST /compat/master/routes/{route_id}/recommendations`：`{"polarity":"positive|negative","count":5}`，返回 items，仅生成建议。

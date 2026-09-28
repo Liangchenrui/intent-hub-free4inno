@@ -275,7 +275,7 @@ def require_telestar_auth(f):
     """Telestar 认证装饰器 - 要求请求必须提供自定义的 Predict key
 
     支持以下优先级的认证方式：
-    1. 配置中的 PREDICT_AUTH_KEY（静态路由密钥，与 intentHub-BUPT 的 AUTH_CODE 模式一致）
+    1. 页面保存的 ROUTE_API_KEY，未设置则使用环境变量 PREDICT_AUTH_KEY
     2. 如果启用了普通认证，则支持有效的 API Key
     如果配置中 PREDICT_AUTH_KEY 为空且未启用普通认证，则跳过认证
     """
@@ -285,7 +285,7 @@ def require_telestar_auth(f):
         # 检查是否启用认证
         from intent_hub.config import Config
 
-        predict_key = Config.PREDICT_AUTH_KEY
+        predict_key = Config.ROUTE_API_KEY or Config.PREDICT_AUTH_KEY
         auth_enabled = Config.AUTH_ENABLED
 
         # 如果没有设置 Predict key 且没有启用普通认证，则直接允许

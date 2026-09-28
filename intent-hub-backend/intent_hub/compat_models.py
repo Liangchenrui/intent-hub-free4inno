@@ -10,6 +10,7 @@ class Agent(BaseModel):
     title: str
     text: str = ""
     utterances: list[str] = Field(default_factory=list)
+    fallback_utterances: dict[str, str] = Field(default_factory=dict)
     negative_samples: list[str] = Field(default_factory=list)
     score_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
     negative_threshold: float = Field(default=0.95, ge=0.0, le=1.0)

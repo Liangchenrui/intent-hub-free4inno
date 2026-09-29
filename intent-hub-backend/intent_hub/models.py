@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class RoutePayload(BaseModel):
@@ -74,11 +74,38 @@ class RouteResponse(BaseModel):
     name: str = Field(..., description="路由名称")
 
 
-class PredictRequest(BaseModel):
+class RoutingScope(BaseModel):
+    collection: Optional[str] = Field(default=None, min_length=1, max_length=255, description="本次检索的 Qdrant collection，默认使用服务配置")
+    upstream_id: Optional[str] = Field(default=None, min_length=1, description="上游稳定 ID，对应 source.instance；省略时不限来源")
+
+    @field_validator("collection", "upstream_id")
+    @classmethod
+    def validate_scope(cls, value):
+        if value is not None:
+            value = value.strip()
+            if not value:
+                raise ValueError("筛选参数不能为空白")
+        return value
+
+
+class PredictRequest(RoutingScope):
     """预测请求模型"""
 
     text: str = Field(..., description="待匹配的文本", min_length=1)
     learn_from_fallback: bool = Field(default=True, strict=True, description="兜底成功后自动积累语料；测试界面传 false")
+
+
+class RouteRequest(RoutingScope):
+    model_config = {"extra": "forbid"}
+    query: str = Field(..., min_length=1, description="用户需求")
+    learn_from_fallback: bool = Field(default=True, strict=True)
+
+    @field_validator("query")
+    @classmethod
+    def nonblank_query(cls, value):
+        if not value.strip():
+            raise ValueError("query 不能为空白")
+        return value
 
 
 class PredictResponse(BaseModel):

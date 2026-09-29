@@ -49,19 +49,18 @@ def components(tmp_path, monkeypatch):
     wrapper.client.close()
 
 
-def test_both_prediction_contracts_share_sqlite_and_vectors(components):
+def test_route_uses_sqlite_and_vectors(components):
     components.route_manager.add_route(make_route())
     SyncService(components).sync_route(1)
     client = app.test_client()
-    master = client.post('/compat/master/predict', json={'text': 'track'}, headers={'Authorization': 'Bearer master-test-code'})
-    bupt = client.post('/compat/bupt/route', json={'query': 'track'}, headers={'Authorization': 'Bearer bupt-test-code'})
-    assert master.status_code == bupt.status_code == 200
-    assert master.json[0]['route_key'] == 'orders'
-    assert bupt.json == {'success': True, 'error': None, 'data': {'matched': True, 'agents': [{'agent': {'id': 71, 'title': 'Orders'}, 'score': 1.0}], 'text': None, 'match_source': 'semantic', 'fallback_status': None}}
+    bupt = client.post('/route', json={'query': 'track'}, headers={'Authorization': 'Bearer bupt-test-code'})
+    assert bupt.status_code == 200
+    assert bupt.json['data']['agents'][0]['route_key'] == 'orders'
+    assert bupt.json == {'success': True, 'error': None, 'data': {'matched': True, 'agents': [{'id': 1, 'name': 'orders', 'route_key': 'orders', 'agent': {'id': 71, 'title': 'Orders'}, 'score': 1.0}], 'text': None, 'match_source': 'semantic', 'fallback_status': None}}
 
 
-@pytest.mark.parametrize('path,payload,wrong', [('/compat/master/predict', {'text': 'track'}, 'bupt-test-code'), ('/compat/bupt/route', {'query': 'track'}, 'master-test-code')])
-def test_auth_does_not_cross_contracts(components, path, payload, wrong):
+@pytest.mark.parametrize('path,payload,wrong', [('/route', {'query': 'track'}, 'master-test-code')])
+def test_route_rejects_legacy_predict_key(components, path, payload, wrong):
     client = app.test_client()
     assert client.post(path, json=payload).status_code == 401
     assert client.post(path, json=payload, headers={'Authorization': 'Bearer ' + wrong}).status_code == 401
@@ -79,7 +78,7 @@ def test_negative_local_id_is_editable_and_deleted_entity_is_not_routed(componen
     updated = client.patch(f'/compat/bupt/agents/{legacy_id}', json={'text': 'new description'}, headers=headers)
     assert updated.status_code == 200 and updated.json['text'] == 'new description'
     assert client.delete(f'/compat/bupt/agents/{legacy_id}', headers=headers).status_code == 200
-    routed = client.post('/compat/bupt/route', json={'query': 'track'}, headers=headers)
+    routed = client.post('/route', json={'query': 'track'}, headers=headers)
     assert routed.json['data']['matched'] is False
 
 
@@ -245,14 +244,14 @@ for n in [7,-7]:
 
 
 @pytest.mark.parametrize('decision,expected', [('matched', True), ('ambiguous', False), ('no_match', False)])
-def test_bupt_fallback_uses_shared_classifier_and_null_score(components, monkeypatch, decision, expected):
+def test_route_fallback_uses_shared_classifier_and_null_score(components, monkeypatch, decision, expected):
     from intent_hub.services.fallback_service import FallbackService, FallbackDecision
     components.route_manager.add_route(make_route())
     SyncService(components).sync_route(1)
     monkeypatch.setattr(Config, 'LLM_FALLBACK_ENABLED', True)
     monkeypatch.setattr(components.qdrant_client, 'search', lambda *a, **k: [])
     monkeypatch.setattr(FallbackService, '_classify', lambda *a: FallbackDecision(status=decision, route_id=1 if expected else None))
-    response = app.test_client().post('/compat/bupt/route', json={'query': 'track'}, headers={'Authorization': 'Bearer bupt-test-code'})
+    response = app.test_client().post('/route', json={'query': 'track'}, headers={'Authorization': 'Bearer bupt-test-code'})
     assert response.status_code == 200
     data = response.json['data']
     assert data['matched'] == expected and data['fallback_status'] == decision
@@ -262,7 +261,7 @@ def test_bupt_fallback_uses_shared_classifier_and_null_score(components, monkeyp
         assert data['agents'] == [] and data['text'] == Config.DEFAULT_ROUTE_TEXT
 
 
-def test_multimatch_and_negative_exclusion_on_both_contracts(components):
+def test_route_multimatch_and_negative_exclusion(components):
     for i in (1, 2, 3):
         route = make_route(i, f'orders{i}')
         if i == 3:
@@ -270,9 +269,8 @@ def test_multimatch_and_negative_exclusion_on_both_contracts(components):
         components.route_manager.add_route(route)
         SyncService(components).sync_route(i)
     client = app.test_client()
-    master = client.post('/compat/master/predict', json={'text': 'track'}, headers={'Authorization': 'Bearer master-test-code'})
-    bupt = client.post('/compat/bupt/route', json={'query': 'track'}, headers={'Authorization': 'Bearer bupt-test-code'})
-    assert {r['id'] for r in master.json} == {1, 2}
+    bupt = client.post('/route', json={'query': 'track'}, headers={'Authorization': 'Bearer bupt-test-code'})
+    assert {r['id'] for r in bupt.json['data']['agents']} == {1, 2}
     assert len(bupt.json['data']['agents']) == 2
 
 

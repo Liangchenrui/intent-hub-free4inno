@@ -20,6 +20,7 @@ desktop.ini
 **/.tmp/
 
 # Logs
+.runlogs/
 logs/
 *.log
 npm-debug.log*

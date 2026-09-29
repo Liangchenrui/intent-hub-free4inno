@@ -118,6 +118,7 @@ class Config:
     # without a credential.
     AGENT_API_URL: Optional[str] = "https://yuanfang.bupt.edu.cn/ac/api"
     AGENT_API_LABEL_IDS: str = "87,88,89"
+    UPSTREAMS = None  # None means an unmigrated single-upstream settings file.
 
     # 默认路由配置
     DEFAULT_ROUTE_ID: int = 0
@@ -195,6 +196,7 @@ class Config:
         path = cls.get_settings_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         cls.ROUTE_API_KEY = ""
+        cls.UPSTREAMS = None
 
         # 若 settings.json 不存在，则创建并写入默认配置（含默认提示词）
         if not path.exists():
@@ -309,6 +311,14 @@ class Config:
             raise ValueError("AGENT_API_LABEL_IDS must be a comma-separated list of numeric label IDs")
         merged['AGENT_API_URL'] = agent_api_url.rstrip('/')
         merged['AGENT_API_LABEL_IDS'] = ','.join(label_ids)
+        from intent_hub.upstreams import validate_upstreams
+        if 'UPSTREAMS' not in settings_dict and any(k in settings_dict for k in ('AGENT_API_URL', 'AGENT_API_LABEL_IDS')):
+            merged['UPSTREAMS'] = [dict(item, url=merged['AGENT_API_URL'], label_ids=merged['AGENT_API_LABEL_IDS'])
+                                   if item['id'] == cls.SOURCE_INSTANCE else item for item in merged['UPSTREAMS']]
+        merged['UPSTREAMS'] = validate_upstreams(merged['UPSTREAMS'])
+        default = next((s for s in merged['UPSTREAMS'] if s['id'] == cls.SOURCE_INSTANCE), None)
+        if default:
+            merged['AGENT_API_URL'], merged['AGENT_API_LABEL_IDS'] = default['url'], default['label_ids']
         changed = merged['QDRANT_COLLECTION'] != cls.QDRANT_COLLECTION
         path = cls.get_settings_path()
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -345,6 +355,14 @@ class Config:
             raise ValueError("LLM_FALLBACK_TIMEOUT_SECONDS must be between 1 and 60")
 
     @classmethod
+    def get_upstreams(cls):
+        from intent_hub.upstreams import validate_upstreams
+        if cls.UPSTREAMS is None:
+            return [{'id': cls.SOURCE_INSTANCE, 'name': 'default',
+                     'url': cls.AGENT_API_URL, 'label_ids': cls.AGENT_API_LABEL_IDS}]
+        return validate_upstreams(cls.UPSTREAMS)
+
+    @classmethod
     def to_dict(cls) -> Dict[str, Any]:
         """获取可供前端配置的项"""
         return {
@@ -358,6 +376,7 @@ class Config:
             "EMBEDDING_DEVICE": cls.EMBEDDING_DEVICE,
             "EMBEDDING_API_FORMAT": cls.EMBEDDING_API_FORMAT,
             "EMBEDDING_HEALTH_URL": cls.EMBEDDING_HEALTH_URL,
+            "UPSTREAMS": cls.get_upstreams(),
             "AGENT_API_URL": cls.AGENT_API_URL,
             "AGENT_API_LABEL_IDS": cls.AGENT_API_LABEL_IDS,
             # LLM配置（通用）

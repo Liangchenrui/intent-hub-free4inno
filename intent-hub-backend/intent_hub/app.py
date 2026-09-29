@@ -57,9 +57,9 @@ def login():
     return auth.login()
 
 
-@app.route("/predict", methods=["POST"])
+@app.route("/route", methods=["POST"])
 def predict():
-    """Route prediction (Telestar auth)."""
+    """Unified routing endpoint."""
     from intent_hub.api import prediction
 
     return prediction.predict()
@@ -386,7 +386,7 @@ def register_compatibility():
     import re
     original = list(app.url_map.iter_rules())
     for rule in original:
-        if rule.endpoint == 'static':
+        if rule.endpoint in {'static', 'predict'}:
             continue
         app.add_url_rule('/compat/master' + rule.rule, 'master_' + rule.endpoint,
                          app.view_functions[rule.endpoint], methods=rule.methods)

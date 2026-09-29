@@ -129,6 +129,8 @@ class RouteService:
         route.details = previous.details if "details" not in route.model_fields_set else route.details
         route.source = route.source or previous.source or RouteConfig.RouteSource(type="web_manual")
         if previous.source and previous.source.type == "upstream_agent":
+            if route.route_key != previous.route_key:
+                raise ValueError("上游路由标识由上游名称和原始 ID 生成，不能手动修改")
             route.source = previous.source.model_copy(deep=True)
             route.sync = route.sync or RouteConfig.RouteSync()
             previous_overrides = set(previous.sync.manual_overrides if previous.sync else [])

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Unified Intent Hub",
-    "version": "0.2.0",
+    "version": "0.4.0",
     "description": "Generated route inventory for master profile. Fixed compatibility namespaces are stable; root aliases follow API_COMPAT_PROFILE."
   },
   "paths": {
@@ -200,25 +200,15 @@
         }
       }
     },
-    "/predict": {
+    "/route": {
       "post": {
         "operationId": "predict_post",
         "tags": [
-          "master"
+          "routing"
         ],
         "responses": {
           "200": {
-            "description": "Completed response; see API.md for endpoint-specific statuses and errors.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PredictResponse"
-                  }
-                }
-              }
-            }
+            "description": "Routing result: success/data/error; data.agents contains id, name, route_key, agent details and nullable score."
           },
           "503": {
             "description": "Routing components warming or unavailable; retry shortly."
@@ -234,7 +224,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PredictRequest"
+                "$ref": "#/components/schemas/RouteRequest"
               }
             }
           }
@@ -1162,47 +1152,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LoginRequest"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/compat/master/predict": {
-      "post": {
-        "operationId": "master_predict_post",
-        "tags": [
-          "master"
-        ],
-        "responses": {
-          "200": {
-            "description": "Completed response; see API.md for endpoint-specific statuses and errors.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PredictResponse"
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Routing components warming or unavailable; retry shortly."
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PredictRequest"
               }
             }
           }
@@ -2266,37 +2215,6 @@
         ]
       }
     },
-    "/compat/bupt/route": {
-      "post": {
-        "operationId": "bupt_route_post",
-        "tags": [
-          "bupt"
-        ],
-        "responses": {
-          "200": {
-            "description": "BUPT success/data/error envelope; data.agents contains agent details and nullable score."
-          },
-          "503": {
-            "description": "Routing components warming or unavailable; retry shortly."
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RouteRequest"
-              }
-            }
-          }
-        }
-      }
-    },
     "/compat/bupt/settings": {
       "get": {
         "operationId": "bupt_settings_get",
@@ -2803,37 +2721,6 @@
         ]
       }
     },
-    "/route": {
-      "post": {
-        "operationId": "bupt_root_bupt_route_post",
-        "tags": [
-          "bupt"
-        ],
-        "responses": {
-          "200": {
-            "description": "BUPT success/data/error envelope; data.agents contains agent details and nullable score."
-          },
-          "503": {
-            "description": "Routing components warming or unavailable; retry shortly."
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RouteRequest"
-              }
-            }
-          }
-        }
-      }
-    },
     "/collections": {
       "get": {
         "operationId": "bupt_root_bupt_collections_get",
@@ -2917,26 +2804,54 @@
   },
   "components": {
     "schemas": {
-      "PredictRequest": {
-        "description": "预测请求模型",
+      "RouteRequest": {
+        "additionalProperties": false,
         "properties": {
-          "text": {
-            "description": "待匹配的文本",
+          "collection": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "本次检索的 Qdrant collection，默认使用服务配置",
+            "title": "Collection"
+          },
+          "upstream_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "上游稳定 ID，对应 source.instance；省略时不限来源",
+            "title": "Upstream Id"
+          },
+          "query": {
+            "description": "用户需求",
             "minLength": 1,
-            "title": "Text",
+            "title": "Query",
             "type": "string"
           },
           "learn_from_fallback": {
             "default": true,
-            "description": "兜底成功后自动积累语料；测试界面传 false",
             "title": "Learn From Fallback",
             "type": "boolean"
           }
         },
         "required": [
-          "text"
+          "query"
         ],
-        "title": "PredictRequest",
+        "title": "RouteRequest",
         "type": "object"
       },
       "PredictResponse": {
@@ -3342,20 +3257,6 @@
           "password"
         ],
         "title": "LoginRequest",
-        "type": "object"
-      },
-      "RouteRequest": {
-        "properties": {
-          "query": {
-            "minLength": 1,
-            "title": "Query",
-            "type": "string"
-          }
-        },
-        "required": [
-          "query"
-        ],
-        "title": "RouteRequest",
         "type": "object"
       },
       "Agent": {

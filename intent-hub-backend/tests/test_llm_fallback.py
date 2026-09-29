@@ -338,19 +338,21 @@ def test_background_task_preserves_description_vector(system, tmp_path):
 def test_http_predict_returns_fallback_contract_and_requires_auth(system, monkeypatch):
     from intent_hub.app import app
 
-    monkeypatch.setattr(Config, "PREDICT_AUTH_KEY", "offline-route-key")
+    monkeypatch.setattr(Config, "ROUTE_API_KEY", "offline-route-key")
     monkeypatch.setattr("intent_hub.api.prediction.get_component_manager", lambda: system)
     set_model(monkeypatch, '{"status":"matched","route_id":1}')
     client = app.test_client()
-    assert client.post("/predict", json={"text": "包裹现在到哪了"}).status_code == 401
+    assert client.post("/route", json={"query": "包裹现在到哪了"}).status_code == 401
     response = client.post(
-        "/predict", json={"text": "包裹现在到哪了"},
+        "/route", json={"query": "包裹现在到哪了"},
         headers={"Authorization": "Bearer offline-route-key"},
     )
     assert response.status_code == 200
-    assert response.get_json() == [{
-        "id": 1, "name": "查询订单", "route_key": "orders.track", "score": None,
-        "match_source": "llm_fallback", "fallback_status": "matched",
+    data = response.get_json()["data"]
+    assert data["match_source"] == "llm_fallback"
+    assert data["fallback_status"] == "matched"
+    assert data["agents"] == [{
+        "id": 1, "name": "查询订单", "route_key": "orders.track", "score": None, "agent": {},
     }]
 
 
@@ -362,8 +364,10 @@ def test_settings_api_saves_fallback_controls_and_rejects_bad_values(tmp_path, m
     for key in ("LLM_FALLBACK_ENABLED", "LLM_FALLBACK_TOP_K", "LLM_FALLBACK_TIMEOUT_SECONDS"):
         monkeypatch.setattr(Config, key, getattr(Config, key))
     resets = []
+    from intent_hub.route_manager import RouteManager
+    route_manager = RouteManager(str(tmp_path / "settings-routes.sqlite3"))
     monkeypatch.setattr("intent_hub.core.components.get_component_manager", lambda: SimpleNamespace(
-        reset_components=lambda: resets.append(True)
+        route_manager=route_manager, reset_components=lambda: resets.append(True)
     ))
     client = app.test_client()
     response = client.post("/settings", json={
@@ -538,19 +542,19 @@ def test_learning_upstream_merge_restore_and_manual_delete(system):
 @pytest.mark.parametrize('learn', [False, True, None])
 def test_http_test_mode_controls_learning(system, monkeypatch, empty_search, learn):
     from intent_hub.app import app
-    monkeypatch.setattr(Config, 'PREDICT_AUTH_KEY', 'offline-route-key')
+    monkeypatch.setattr(Config, 'ROUTE_API_KEY', 'offline-route-key')
     monkeypatch.setattr('intent_hub.api.prediction.get_component_manager', lambda: system)
     set_model(monkeypatch, '{"status":"matched","route_id":1}')
     if empty_search:
         monkeypatch.setattr(system.qdrant_client, 'search', lambda *a, **kw: [])
     before = system.route_manager.get_route(1)
-    payload = {'text': 'test mode request'}
+    payload = {'query': 'test mode request'}
     if learn is not None:
         payload['learn_from_fallback'] = learn
-    response = app.test_client().post('/compat/master/predict', json=payload,
+    response = app.test_client().post('/route', json=payload,
         headers={'Authorization': 'Bearer offline-route-key'})
     assert response.status_code == 200
-    assert response.get_json()[0]['match_source'] == 'llm_fallback'
+    assert response.get_json()['data']['match_source'] == 'llm_fallback'
     after = system.route_manager.get_route(1)
     if learn is False:
         assert after == before

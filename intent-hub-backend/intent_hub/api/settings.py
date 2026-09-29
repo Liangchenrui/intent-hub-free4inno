@@ -10,7 +10,10 @@ from intent_hub.services.collection_service import CollectionService
 @handle_errors
 def get_settings():
     """获取系统配置项"""
-    return jsonify(Config.to_dict()), 200
+    from intent_hub.core.components import get_component_manager
+    from intent_hub.upstreams import settings_view
+    with Config.LOCK:
+        return jsonify(settings_view(get_component_manager().route_manager.repository)), 200
 
 
 @handle_errors
@@ -41,6 +44,11 @@ def _update_settings():
         return jsonify({"error": "请求体不能为空"}), 400
 
     try:
+        from intent_hub.core.components import get_component_manager
+        from intent_hub.upstreams import validate_upstreams, validate_ownership
+        if "UPSTREAMS" in data:
+            data["UPSTREAMS"] = validate_upstreams(data["UPSTREAMS"])
+            validate_ownership(data["UPSTREAMS"], get_component_manager().route_manager.repository)
         before = Config.to_dict()
         Config.save(data)
         after = Config.to_dict()
@@ -70,6 +78,9 @@ def _update_settings():
             from intent_hub.services.sync_task_service import get_sync_task_service
 
             get_sync_task_service(component_manager).enqueue_incremental_reindex()
+        if "UPSTREAMS" in data:
+            from intent_hub.upstreams import settings_view
+            after = settings_view(component_manager.route_manager.repository)
         return jsonify(
             {"message": "配置更新成功" if changed else "配置未变化", "settings": after}
         ), 200

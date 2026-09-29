@@ -90,10 +90,6 @@ class MergeAgentsRequest(BaseModel):
     text: str = ""
 
 
-class RouteRequest(BaseModel):
-    query: str = Field(..., min_length=1)
-
-
 class ThresholdRequest(BaseModel):
     score_threshold: float = Field(..., ge=0.0, le=1.0)
     negative_threshold: float = Field(..., ge=0.0, le=1.0)

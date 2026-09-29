@@ -1,17 +1,6 @@
 <template>
-  <el-container class="layout-container">
-    <el-header class="header-wrapper">
-      <div class="header-content">
-        <div class="brand">
-          <img src="@/assets/logo.png" alt="Intent Hub" class="logo-img" />
-        </div>
-        <div class="user-info">
-          <ServiceHealthIndicators />
-          <LanguageSwitcher />
-          <el-button type="danger" @click="handleLogout">{{ $t('common.logout') }}</el-button>
-        </div>
-      </div>
-    </el-header>
+  <el-container class="layout-container" direction="vertical">
+    <AppHeader @logout="handleLogout" />
 
     <el-main class="main-wrapper" v-loading="fullPageLoading">
       <div class="page-header">
@@ -630,8 +619,7 @@ import {
   type RouteOverlap,
   type RepairSuggestion
 } from '../api';
-import LanguageSwitcher from '../components/LanguageSwitcher.vue';
-import ServiceHealthIndicators from '../components/ServiceHealthIndicators.vue';
+import AppHeader from '../components/AppHeader.vue';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -1797,27 +1785,6 @@ onMounted(() => {
   background-color: #f5f7fa;
 }
 
-.header-wrapper {
-  background-color: #fff;
-  border-bottom: 1px solid #e6e8eb;
-  padding: 0 40px;
-  height: 64px !important;
-  display: flex;
-  align-items: center;
-}
-
-.header-content {
-  width: 95%;
-  max-width: 1400px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logo-img {
-  height: 40px;
-}
 
 .main-wrapper {
   width: 95%;

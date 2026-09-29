@@ -1,0 +1,342 @@
+openapi: 3.1.0
+info:
+  title: Intent Hub 路由 API
+  version: 0.4.0
+  description: 输入用户需求，可按 collection 和 upstream_id 限定范围，返回匹配的 Agent。
+servers:
+- url: http://localhost:8000
+  description: 示例后端地址，请替换为实际部署地址；经前端代理时使用 /api 前缀。
+paths:
+  /route:
+    post:
+      tags:
+      - 路由
+      summary: 查找匹配的 Agent
+      operationId: route
+      description: collection 和 upstream_id 均可省略，同时传入取交集。筛选作用于正例、负例与 LLM 兜底；不会扩大查询范围。命中与未命中均返回
+        200。
+      security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteRequest'
+            examples:
+              basic:
+                summary: 常规请求
+                value:
+                  query: 帮我查一下订单物流
+              scoped:
+                summary: 同时指定 Collection 和上游源（示例值需替换）
+                value:
+                  query: 帮我查一下订单物流
+                  collection: intent_hub
+                  upstream_id: orders-platform
+      responses:
+        '200':
+          description: 统一信封响应；命中与否都返回 HTTP 200
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteEnvelope'
+              examples:
+                matched:
+                  summary: 命中一个 Agent
+                  value:
+                    success: true
+                    data:
+                      matched: true
+                      agents:
+                      - agent:
+                          id: 71
+                          title: 订单物流查询
+                        score: 0.93
+                        id: 1
+                        name: 订单物流查询
+                        route_key: orders.71
+                      text: null
+                      match_source: semantic
+                      fallback_status: null
+                    error: null
+                multiMatch:
+                  summary: 命中多条（按 score 降序）
+                  value:
+                    success: true
+                    data:
+                      matched: true
+                      agents:
+                      - agent:
+                          id: 71
+                          title: 订单物流查询
+                        score: 0.93
+                        id: 1
+                        name: 订单物流查询
+                        route_key: orders.71
+                      - agent:
+                          id: 76
+                          title: 退款进度查询
+                        score: 0.84
+                        id: 2
+                        name: 退款进度查询
+                        route_key: orders.76
+                      text: null
+                      match_source: semantic
+                      fallback_status: null
+                    error: null
+                noMatch:
+                  summary: 未命中且未启用兜底
+                  value:
+                    success: true
+                    data:
+                      matched: false
+                      agents: []
+                      text: 没有找到合适的 Agent
+                      match_source: default
+                      fallback_status: null
+                    error: null
+                fallbackMatched:
+                  summary: LLM 兜底命中（score 为 null）
+                  value:
+                    success: true
+                    data:
+                      matched: true
+                      agents:
+                      - agent:
+                          id: 74
+                          title: 电子发票申请补开
+                        score: null
+                        id: 1
+                        name: 电子发票申请补开
+                        route_key: orders.74
+                      text: null
+                      match_source: llm_fallback
+                      fallback_status: matched
+                    error: null
+                ambiguous:
+                  summary: 兜底判定为歧义，建议提示用户澄清
+                  value:
+                    success: true
+                    data:
+                      matched: false
+                      agents: []
+                      text: 没有找到合适的 Agent
+                      match_source: default
+                      fallback_status: ambiguous
+                    error: null
+        '400':
+          $ref: '#/components/responses/RouteBadRequest'
+        '401':
+          $ref: '#/components/responses/RouteUnauthorized'
+        '503':
+          $ref: '#/components/responses/RouteNotReady'
+        '500':
+          $ref: '#/components/responses/RouteInternalError'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: 使用 ROUTE_API_KEY，未配置时回退 AUTH_CODE。启用管理认证时也接受有效登录会话，供管理台测试使用。
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: 与 `BearerAuth` 等价的备用传递方式，取值规则同 BearerAuth。
+  responses:
+    RouteBadRequest:
+      description: 参数错误、未知字段、无效 JSON 或指定 Collection 不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RouteEnvelope'
+          examples:
+            emptyQuery:
+              value:
+                success: false
+                data: null
+                error:
+                  code: INVALID_REQUEST
+                  message: 请求参数错误
+                  detail: query 不能为空
+    RouteUnauthorized:
+      description: 认证失败（缺少或错误的有效密钥；未配置有效密钥时同样返回此响应）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RouteEnvelope'
+          examples:
+            unauthorized:
+              value:
+                success: false
+                data: null
+                error:
+                  code: UNAUTHORIZED
+                  message: Authentication failed
+                  detail: null
+    RouteNotReady:
+      description: 路由组件预热中或暂不可用，请稍后重试
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RouteEnvelope'
+          example:
+            success: false
+            data: null
+            error:
+              code: SERVICE_NOT_READY
+              message: 路由组件预热中或暂不可用，请稍后重试
+              detail: null
+    RouteInternalError:
+      description: 服务运行异常，详情不向外暴露
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RouteEnvelope'
+          examples:
+            internalError:
+              value:
+                success: false
+                data: null
+                error:
+                  code: INTERNAL_ERROR
+                  message: 服务异常
+                  detail: null
+  schemas:
+    RouteRequest:
+      type: object
+      description: query 必填且不能仅含空白；未知字段、错误类型或不存在的 Collection 返回 400。
+      required:
+      - query
+      properties:
+        query:
+          type: string
+          minLength: 1
+          description: 待匹配的用户文本
+          examples:
+          - 帮我查一下订单物流
+        collection:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 255
+          description: 本次检索的现有 Qdrant collection；省略或 null 使用服务默认配置，不存在返回 400。
+        upstream_id:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          description: 上游稳定 ID（source.instance），不是名称或 Agent 原始 ID；省略或 null 不限来源，无匹配来源返回未命中。
+        learn_from_fallback:
+          type: boolean
+          default: true
+          description: 兜底成功后自动积累语料；测试调用可设 false，查询非默认 Collection 时自动关闭。
+      additionalProperties: false
+    RouteEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      description: 统一响应；失败时 `data` 为 `null`
+      properties:
+        success:
+          type: boolean
+        data:
+          oneOf:
+          - $ref: '#/components/schemas/RouteData'
+          - type: 'null'
+        error:
+          oneOf:
+          - $ref: '#/components/schemas/ApiError'
+          - type: 'null'
+    RouteData:
+      type: object
+      required:
+      - matched
+      - agents
+      - text
+      - match_source
+      - fallback_status
+      properties:
+        matched:
+          type: boolean
+          description: 是否存在非 `default` 的命中结果；LLM 兜底命中同样为 `true`
+        agents:
+          type: array
+          description: 命中的 Agent 列表，按 `score` 降序；未命中时为空数组
+          items:
+            $ref: '#/components/schemas/RouteAgentMatch'
+        text:
+          type:
+          - string
+          - 'null'
+          description: 仅未命中时返回默认文本；命中时为 `null`
+        match_source:
+          type: string
+          enum:
+          - semantic
+          - llm_fallback
+          - default
+          description: 取值含义：`semantic` 例句匹配；`llm_fallback` LLM 兜底选中；`default` 默认结果
+        fallback_status:
+          type:
+          - string
+          - 'null'
+          enum:
+          - matched
+          - no_match
+          - ambiguous
+          - no_candidates
+          - unavailable
+          - null
+          description: 未触发兜底时为 `null`；`ambiguous` 建议调用方提示用户澄清（服务端不会自动发起多轮对话）
+    RouteAgentMatch:
+      type: object
+      required:
+      - id
+      - name
+      - route_key
+      - agent
+      - score
+      properties:
+        id:
+          type: integer
+          description: 本地路由 ID
+        name:
+          type: string
+          description: 路由名称
+        route_key:
+          type: string
+          description: 稳定业务路由标识
+        agent:
+          type: object
+          description: 原始 Agent `details` 载荷；字段由数据来源决定，可能为空对象，不作为稳定契约使用
+          additionalProperties: true
+        score:
+          type:
+          - number
+          - 'null'
+          description: 例句向量相似度；LLM 兜底命中为 `null`
+    ApiError:
+      type: object
+      required:
+      - code
+      - message
+      - detail
+      properties:
+        code:
+          type: string
+          enum:
+          - INVALID_REQUEST
+          - UNAUTHORIZED
+          - INTERNAL_ERROR
+        message:
+          type: string
+        detail:
+          type:
+          - string
+          - 'null'

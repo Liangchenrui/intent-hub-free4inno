@@ -1,15 +1,6 @@
 <template>
-  <el-container class="layout-container">
-    <el-header class="header-wrapper">
-      <div class="header-content">
-        <div class="brand"><img src="@/assets/logo.png" alt="Intent Hub" class="logo-img" /></div>
-        <div class="user-info">
-          <ServiceHealthIndicators />
-          <LanguageSwitcher />
-          <el-button type="danger" @click="logout">{{ t('common.logout') }}</el-button>
-        </div>
-      </div>
-    </el-header>
+  <el-container class="layout-container" direction="vertical">
+    <AppHeader @logout="logout" />
     <el-main class="main-wrapper">
       <div class="page-header">
         <el-tabs model-value="logs" class="nav-tabs" @tab-change="navigate">
@@ -91,8 +82,7 @@
 import { onMounted, onBeforeUnmount, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import LanguageSwitcher from '../components/LanguageSwitcher.vue';
-import ServiceHealthIndicators from '../components/ServiceHealthIndicators.vue';
+import AppHeader from '../components/AppHeader.vue';
 import { clearSession, getLogs, type LogKind, type LogRecord, type LogCategory } from '../api';
 
 const router = useRouter();
@@ -176,38 +166,6 @@ onBeforeUnmount(() => { generation++; });
   background-color: #f5f7fa;
 }
 
-.header-wrapper {
-  background-color: #fff;
-  border-bottom: 1px solid #e6e8eb;
-  padding: 0 40px;
-  height: 64px !important;
-  display: flex;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.header-content {
-  width: 95%;
-  max-width: 1400px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo-img {
-  height: 40px;
-  width: auto;
-}
-
 .main-wrapper {
   width: 95%;
   max-width: 1400px;
@@ -236,7 +194,6 @@ onBeforeUnmount(() => { generation++; });
   box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
 }
 
-.user-info { display: flex; align-items: center; gap: 16px; }
 .retention-note { float: right; margin-left: 16px; }
 .filters { display:flex; flex-wrap:wrap; gap:12px 16px; align-items:flex-end; margin:16px 0; }
 .filters .el-form-item { margin:0; flex:1 1 180px; } .filters .time-filter { flex:2 1 360px; } .time-filter :deep(.el-date-editor) { width:100%; }

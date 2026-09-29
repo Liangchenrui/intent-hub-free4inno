@@ -463,6 +463,13 @@ class IntentHubQdrantClient:
         query_filter: Filter,
     ) -> List[Dict[str, Any]]:
         """Return the best matching point for each route."""
+        route_ids = getattr(self, "search_route_ids", None)
+        if route_ids is not None:
+            if not route_ids:
+                return []
+            from qdrant_client.models import MatchAny
+            query_filter = Filter(must=[query_filter, FieldCondition(
+                key=self.ROUTE_ID_KEY, match=MatchAny(any=list(route_ids)))])
         _server_time.set(None)
         started = monotonic()
         results = self.client.query_points_groups(

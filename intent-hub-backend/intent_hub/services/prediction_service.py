@@ -1,6 +1,7 @@
 """预测服务 - 处理路由预测业务逻辑"""
 
 from typing import Dict, List
+from copy import copy
 
 from intent_hub.utils.logger import logger
 from intent_hub.utils.route_trace import trace_event, trace_stage, run_parallel_searches
@@ -43,6 +44,26 @@ class PredictionService:
             route_manager = manager.route_manager
             route_manager.reload()
             result_limit = max(1, len(route_manager.get_all_routes()))
+            scope_exclusions = set()
+            learn_from_fallback = request.learn_from_fallback
+            if request.collection is not None or request.upstream_id is not None:
+                # A request-local wrapper shares the transport, never its mutable scope.
+                qdrant_client = copy(qdrant_client)
+                if request.collection is not None:
+                    if not qdrant_client.client.collection_exists(request.collection):
+                        raise ValueError(f"collection '{request.collection}' 不存在")
+                    learn_from_fallback = (learn_from_fallback and
+                                           request.collection == qdrant_client.collection_name)
+                    qdrant_client.collection_name = request.collection
+                if request.upstream_id is not None:
+                    routes = route_manager.get_all_routes()
+                    eligible = {r.id for r in routes if r.source
+                                and r.source.type == "upstream_agent"
+                                and r.source.instance == request.upstream_id}
+                    qdrant_client.search_route_ids = eligible
+                    scope_exclusions = {r.id for r in routes} - eligible
+                manager = copy(manager)
+                manager.qdrant_client = qdrant_client
 
         # 1. 向量化
         trace_event("encoding")
@@ -51,7 +72,7 @@ class PredictionService:
             logger.debug(f"Query text: {request.text}, vector dim: {len(query_vector)}")
 
         # 2. 负例检查：先检查查询是否与任何负例向量过于接近
-        excluded_route_ids = set()
+        excluded_route_ids = set(scope_exclusions)
         negative_search_results, search_results = run_parallel_searches(
             lambda: qdrant_client.search_negative_samples(query_vector, top_k=result_limit),
             lambda: qdrant_client.search(query_vector, top_k=result_limit),
@@ -80,7 +101,7 @@ class PredictionService:
         if not search_results:
             return [FallbackService(manager).predict(
                 request.text, query_vector, excluded_route_ids,
-                learn_from_fallback=request.learn_from_fallback,
+                learn_from_fallback=learn_from_fallback,
             )]
 
         # 4. 按路由ID分组并进行阈值过滤（同时排除负例匹配的路由）
@@ -149,7 +170,7 @@ class PredictionService:
         if not sorted_results:
             return [FallbackService(manager).predict(
                 request.text, query_vector, excluded_route_ids,
-                learn_from_fallback=request.learn_from_fallback,
+                learn_from_fallback=learn_from_fallback,
             )]
 
         logger.info(f"Matched route count: {len(sorted_results)}")

@@ -1,0 +1,89 @@
+{
+  "environment": "isolated local fixtures; vector sync stubbed",
+  "routes": [
+    {
+      "id": 1,
+      "name": "同名 Agent",
+      "route_key": "default.123"
+    },
+    {
+      "id": 2,
+      "name": "同名 Agent",
+      "route_key": "partner.123"
+    }
+  ],
+  "upstreams": [
+    {
+      "name": "default",
+      "name_locked": true,
+      "last_result": {
+        "affected_route_ids": [],
+        "baseline_updated": 0,
+        "created": 0,
+        "detail_requests": 0,
+        "effective_updated": 0,
+        "failed": 0,
+        "failed_source_ids": [],
+        "last_pulled_at": "2026-09-28T12:39:39.059482+08:00",
+        "listed_source_ids": [
+          "123"
+        ],
+        "preserved_overrides": 0,
+        "routes_count": 1,
+        "scope": {
+          "labels": [
+            "87",
+            "88",
+            "89"
+          ],
+          "url": "http://127.0.0.1:5188/fixture/a"
+        },
+        "timings_ms": {
+          "compare_save": 13.881,
+          "fetch": 93.636
+        },
+        "unchanged": 1,
+        "updated": 0,
+        "upstream_missing": 0,
+        "upstream_requests": 3
+      }
+    },
+    {
+      "name": "partner",
+      "name_locked": true,
+      "last_result": {
+        "affected_route_ids": [
+          2
+        ],
+        "baseline_updated": 0,
+        "created": 1,
+        "detail_requests": 0,
+        "effective_updated": 0,
+        "failed": 0,
+        "failed_source_ids": [],
+        "last_pulled_at": "2026-09-28T12:37:48.019059+08:00",
+        "listed_source_ids": [
+          "123"
+        ],
+        "preserved_overrides": 0,
+        "routes_count": 1,
+        "scope": {
+          "labels": [
+            "87",
+            "88",
+            "89"
+          ],
+          "url": "http://127.0.0.1:5188/fixture/b"
+        },
+        "timings_ms": {
+          "compare_save": 18.799,
+          "fetch": 97.184
+        },
+        "unchanged": 0,
+        "updated": 0,
+        "upstream_missing": 0,
+        "upstream_requests": 3
+      }
+    }
+  ]
+}

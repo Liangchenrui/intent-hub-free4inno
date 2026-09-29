@@ -11,7 +11,13 @@ from intent_hub.utils.error_handler import handle_errors
 
 @handle_errors
 def pull_agents():
-    task = get_sync_task_service(get_component_manager()).enqueue_upstream_pull()
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        raise ValueError('请求体必须是对象')
+    upstream_id = data.get('upstream_id')
+    if upstream_id is not None and (not isinstance(upstream_id, str) or not upstream_id):
+        raise ValueError('upstream_id 必须是非空字符串')
+    task = get_sync_task_service(get_component_manager()).enqueue_upstream_pull(upstream_id)
     return jsonify(task), 202
 
 

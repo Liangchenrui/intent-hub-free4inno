@@ -33,8 +33,8 @@ def admin_headers(client):
 
 
 def assert_key(client, key, accepted):
-    for url in ['/predict', '/compat/master/predict', '/route', '/compat/bupt/route']:
-        response = client.post(url, headers={'Authorization': 'Bearer ' + key}, json={'text': '', 'query': ''})
+    for url in ['/route']:
+        response = client.post(url, headers={'Authorization': 'Bearer ' + key}, json={'query': '', 'query': ''})
         # Valid auth reaches input validation, without invoking a real model.
         assert response.status_code == (400 if accepted else 401), (url, response.get_json())
 
@@ -58,8 +58,8 @@ def test_save_rotate_reload_and_clear(client):
         assert client.get('/compat/master/settings', headers={'Authorization': 'Bearer ' + key}).status_code == 401
         assert client.get('/compat/bupt/settings', headers={'Authorization': 'Bearer ' + key}).status_code == 401
     assert client.post('/compat/master/settings', headers=headers, json={'ROUTE_API_KEY': ''}).status_code == 200
-    assert client.post('/predict', headers={'Authorization': 'Bearer legacy-master'}, json={'text': '', 'query': ''}).status_code == 400
-    assert client.post('/route', headers={'X-API-Key': 'legacy-bupt'}, json={'text': '', 'query': ''}).status_code == 400
+    assert client.post('/route', headers={'Authorization': 'Bearer legacy-master'}, json={'query': ''}).status_code == 401
+    assert client.post('/route', headers={'X-API-Key': 'legacy-bupt'}, json={'query': '', 'query': ''}).status_code == 400
     assert_key(client, 'shared-rotated', False)
 
 

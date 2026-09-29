@@ -78,10 +78,10 @@ class AgentSource:
                 self.complete = False
             for record in records:
                 resource_id = (record.get("resource") or {}).get("id")
-                if resource_id is not None:
+                if resource_id is not None and str(resource_id).strip():
                     records_by_id[str(resource_id)] = record
                 else:
-                    self.complete = False
+                    raise ValueError("上游列表存在缺少原始 ID 的记录，本次拉取未保存")
 
         self.listed_ids = set(records_by_id)
         def fetch_one(source_id):

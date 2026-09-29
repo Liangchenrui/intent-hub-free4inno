@@ -11,9 +11,11 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(Config, "API_COMPAT_PROFILE", "bupt")
     monkeypatch.setattr(Config, "AUTH_CODE", "test-management-key")
-    monkeypatch.setattr(Config, "PREDICT_AUTH_KEY", "test-route-key")
+    monkeypatch.setattr(Config, "ROUTE_API_KEY", "test-route-key")
     monkeypatch.setattr(Config, "AUTH_ENABLED", False)
+    from types import SimpleNamespace
     class Components:
+        route_manager = SimpleNamespace(get_route=lambda _: SimpleNamespace(details={}))
         def ensure_ready(self):
             pass
     monkeypatch.setattr("intent_hub.api.prediction.get_component_manager", Components)
@@ -24,7 +26,7 @@ def client(monkeypatch, tmp_path):
 
 def test_request_roundtrip_auth_and_persistence(client):
     text = "  完整输入\n第二行  "
-    response = client.post("/predict", json={"text": text},
+    response = client.post("/route", json={"query": text},
                            headers={"Authorization": "Bearer test-route-key"})
     assert response.status_code == 200
     rid = response.headers["X-Request-ID"]
@@ -45,12 +47,12 @@ def test_request_roundtrip_auth_and_persistence(client):
     assert client.get("/logs/routing?page=oops", headers=headers).status_code == 400
 
 
-@pytest.mark.parametrize("path", ["/route", "/compat/bupt/route"])
+@pytest.mark.parametrize("path", ["/route"])
 def test_bupt_full_input_and_one_record(client, monkeypatch, path):
     monkeypatch.setattr("intent_hub.compat_api.get_component_manager", lambda: None)
-    monkeypatch.setattr("intent_hub.compat_api.PredictionService.route", lambda *args: {"matched": False})
+    monkeypatch.setattr("intent_hub.api.prediction.PredictionService.predict", lambda *args: [PredictResponse(id=0, name="none", route_key="none", match_source="default")])
     response = client.post(path, json={"query": "  原文  "},
-                           headers={"X-API-Key": "test-management-key"})
+                           headers={"X-API-Key": "test-route-key"})
     assert response.status_code == 200
     data = get_log_store().query("routing", response.headers["X-Request-ID"])
     assert data["total"] == 1
@@ -61,10 +63,10 @@ def test_storage_failure_does_not_fail_prediction(client, monkeypatch):
     def unavailable(*args):
         raise OSError("disk unavailable")
     monkeypatch.setattr(LogStore, "connect", unavailable)
-    response = client.post("/predict", json={"text": "hello"},
+    response = client.post("/route", json={"query": "hello"},
                            headers={"X-API-Key": "test-route-key"})
     assert response.status_code == 200
-    assert response.get_json()[0]["id"] == 7
+    assert response.get_json()["data"]["agents"][0]["id"] == 7
     assert client.get("/logs/runtime", headers={"X-API-Key": "test-management-key"}).status_code == 503
 
 
@@ -85,9 +87,9 @@ def test_failed_route_record(client, monkeypatch):
         trace_event("encoding")
         raise RuntimeError("simulated")
     monkeypatch.setattr("intent_hub.compat_api.get_component_manager", lambda: None)
-    monkeypatch.setattr("intent_hub.compat_api.PredictionService.route", fail)
+    monkeypatch.setattr("intent_hub.api.prediction.PredictionService.predict", fail)
     response = client.post("/route", json={"query": "failure input"},
-                           headers={"X-API-Key": "test-management-key"})
+                           headers={"X-API-Key": "test-route-key"})
     assert response.status_code == 500
     rid = response.headers["X-Request-ID"]
     record = get_log_store().query("routing", rid)["items"][0]
@@ -171,8 +173,8 @@ def test_stage_durations_and_failure_persist(client, monkeypatch):
             raise RuntimeError('failure')
 
     monkeypatch.setattr('intent_hub.compat_api.get_component_manager', lambda: None)
-    monkeypatch.setattr('intent_hub.compat_api.PredictionService.route', fail)
-    response = client.post('/route', json={'query': 'timed'}, headers={'X-API-Key': 'test-management-key'})
+    monkeypatch.setattr('intent_hub.api.prediction.PredictionService.predict', fail)
+    response = client.post('/route', json={'query': 'timed'}, headers={'X-API-Key': 'test-route-key'})
     record = get_log_store().query('routing', response.headers['X-Request-ID'])['items'][0]
     assert record['category'] == 'routing'
     assert record['events'][0]['offset_ms'] == 25
@@ -190,7 +192,7 @@ def test_category_filter_before_pagination_and_legacy(client):
         ('runtime', now, 's1', {'category': 'sync', 'message': 'one'}),
         ('runtime', now + 1, 'r1', {'category': 'routing', 'message': 'two'}),
         ('runtime', now + 2, 's2', {'message': 'Route sync id=7'}),
-        ('runtime', now + 3, 'r2', {'path': '/compat/master/predict'}),
+        ('runtime', now + 3, 'r2', {'path': '/route'}),
         ('runtime', now + 4, 'unknown', {'message': 'old background event'}),
     ])
     headers = {'X-API-Key': 'test-management-key'}
@@ -223,5 +225,5 @@ def test_background_scope_isolated_from_requests(client):
     assert item['category'] == 'sync' and item['task_id'] == 'task-7'
     assert item['elapsed_ms'] == 12.5 and item['request_id'] == ''
     assert store.query('runtime', keyword='scope reset')['items'][0]['category'] == 'system'
-    response = client.post('/predict', json={'text': 'hello'}, headers={'X-API-Key': 'test-route-key'})
+    response = client.post('/route', json={'query': 'hello'}, headers={'X-API-Key': 'test-route-key'})
     assert store.query('runtime', response.headers['X-Request-ID'])['items'][0]['category'] == 'routing'

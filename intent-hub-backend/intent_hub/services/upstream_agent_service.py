@@ -7,6 +7,7 @@ from time import perf_counter
 
 from intent_hub.agent_source import AgentSource
 from intent_hub.config import Config
+from intent_hub.upstreams import route_key as make_route_key, lock_name, migrate_default
 from intent_hub.models import RouteConfig
 from intent_hub.route_compare import COMPARABLE_FIELDS, snapshots_equal, fields_equal
 from intent_hub.services.route_service import RouteService
@@ -17,9 +18,11 @@ def now_iso() -> str:
 
 
 class UpstreamAgentService:
-    def __init__(self, component_manager, source=None, default_threshold=0.75):
+    def __init__(self, component_manager, source=None, default_threshold=0.75, upstream_id=None):
         self.components = component_manager
-        self.source = source or AgentSource()
+        self.upstream_id = upstream_id
+        self.source = source
+        self._custom_source = source is not None
         self.default_threshold = default_threshold
 
     _pull_lock = threading.Lock()
@@ -28,20 +31,27 @@ class UpstreamAgentService:
         # Serialize compatibility and background pulls; do not hold a DB lock over HTTP.
         with self._pull_lock:
             started = perf_counter()
-            source_instance = Config.SOURCE_INSTANCE
-            expected_source = expected_source or self.source_config()
+            expected_source = expected_source or self.source_config(self.upstream_id)
+            source_instance = expected_source['SOURCE_INSTANCE']
+            if not self._custom_source:
+                self.source = AgentSource(base_url=expected_source['AGENT_API_URL'], label_ids=expected_source['AGENT_API_LABEL_IDS'])
+            repo = self.components.route_manager.repository
+            with Config.LOCK:
+                migrate_default(repo)
             scope = {
-                'url': getattr(self.source, 'base_url', None) or Config.AGENT_API_URL,
-                'labels': sorted(set(str(getattr(self.source, 'label_ids', None) or Config.AGENT_API_LABEL_IDS or '').split(','))),
+                'url': getattr(self.source, 'base_url', None) or expected_source['AGENT_API_URL'],
+                'labels': sorted(set(str(getattr(self.source, 'label_ids', None) or expected_source['AGENT_API_LABEL_IDS'] or '').split(','))),
             }
             incoming = self.source.fetch_all()
             fetched = perf_counter()
             if progress:
                 progress("comparing")
-            if expected_source is not None and expected_source != self.source_config():
+            if expected_source is not None and expected_source != self.source_config(source_instance):
                 raise ValueError("上游配置已变更，请重新拉取")
             repo = self.components.route_manager.repository
-            with repo.transaction() as db:
+            with Config.LOCK, repo.transaction() as db:
+                if expected_source != self.source_config(source_instance):
+                    raise ValueError("上游配置已变更，请重新拉取")
                 current = [RouteConfig.model_validate_json(row[0]) for row in
                            db.execute("SELECT body FROM entities ORDER BY id")]
                 previous = db.execute('SELECT value FROM metadata WHERE key=?',
@@ -49,7 +59,11 @@ class UpstreamAgentService:
                 previous = json.loads(previous[0]) if previous else None
                 candidates = None if previous is None else (
                     set(previous.get('listed_source_ids', [])) if previous.get('scope') == scope else set())
-                result = self._merge(incoming, current, repo, db, source_instance, candidates)
+                result = self._merge(incoming, current, repo, db, source_instance, candidates, expected_source["UPSTREAM_NAME"])
+                if incoming or (getattr(self.source, 'complete', True) and not getattr(self.source, 'failed_ids', [])):
+                    lock_name(db, source_instance, expected_source['UPSTREAM_NAME'])
+                if source_instance == Config.SOURCE_INSTANCE:
+                    db.execute("INSERT OR IGNORE INTO metadata VALUES ('upstream_identity_v2','1')")
                 result["timings_ms"] = {
                     "fetch": round((fetched - started) * 1000, 3),
                     "compare_save": round((perf_counter() - fetched) * 1000, 3),
@@ -57,7 +71,7 @@ class UpstreamAgentService:
                 result['upstream_requests'] = getattr(self.source, 'request_count', 0)
                 result['detail_requests'] = getattr(self.source, 'detail_request_count', 0)
                 # Preserve last complete membership across incomplete/empty fetches.
-                membership = sorted(set(getattr(self.source, 'listed_ids', set())) | {i['source_id'] for i in incoming})
+                membership = sorted(set(getattr(self.source, 'listed_ids', set())) | {str(i['source_id']) for i in incoming})
                 if not incoming or not getattr(self.source, 'complete', True):
                     membership = sorted(set(membership) | set(candidates or []))
                 db.execute("INSERT INTO metadata VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -65,17 +79,21 @@ class UpstreamAgentService:
             return result
 
     @staticmethod
-    def source_config():
-        return {key: getattr(Config, key) for key in
-                ("SOURCE_INSTANCE", "AGENT_API_URL", "AGENT_API_LABEL_IDS")}
+    def source_config(upstream_id=None):
+        upstream_id = Config.SOURCE_INSTANCE if upstream_id is None else upstream_id
+        upstream = next((s for s in Config.get_upstreams() if s['id'] == upstream_id), None)
+        if upstream is None:
+            raise ValueError('上游不存在或已被移除')
+        return {'SOURCE_INSTANCE': upstream['id'], 'UPSTREAM_NAME': upstream['name'],
+                'AGENT_API_URL': upstream['url'], 'AGENT_API_LABEL_IDS': upstream['label_ids']}
 
-    def _merge(self, incoming, current_routes, repo, db, source_instance, missing_candidates=None):
+    def _merge(self, incoming, current_routes, repo, db, source_instance, missing_candidates=None, source_name="default"):
         pulled_at = now_iso()
         result = dict(created=0, updated=0, effective_updated=0, baseline_updated=0,
                       unchanged=0, preserved_overrides=0, upstream_missing=0,
                       failed=len(getattr(self.source, "failed_ids", [])),
                       failed_source_ids=getattr(self.source, "failed_ids", []),
-                      routes_count=len(current_routes), affected_route_ids=[], last_pulled_at=pulled_at)
+                      routes_count=sum(bool(r.source and r.source.type == "upstream_agent" and r.source.instance == source_instance) for r in current_routes), affected_route_ids=[], last_pulled_at=pulled_at)
         if not incoming:
             result["warning"] = "上游未返回可用 Agent，本地数据保持不变"
             return result
@@ -86,16 +104,19 @@ class UpstreamAgentService:
         by_key = {r.route_key: r for r in current_routes}
         incoming_keys = {}
         for item in incoming:
-            key = self.components.route_manager.normalize_route_key(item.get('route_key') or item['name'])
+            key = make_route_key(source_name, item.get('source_id'))
             if not key:
                 raise ValueError('上游 Agent 缺少有效路由标识')
             if key in incoming_keys:
-                raise ValueError(f'上游路由标识重复：{key}；本次拉取未保存')
+                raise ValueError(f'上游原始 ID 重复：{key}；本次拉取未保存')
             incoming_keys[key] = item
         matched_ids = set()
         for route_key, item in incoming_keys.items():
             snapshot = {field: item[field] for field in COMPARABLE_FIELDS}
             current = by_key.get(route_key)
+            if current is not None and (not current.source or current.source.type != 'upstream_agent'
+                    or current.source.instance != source_instance or current.source.source_id != str(item['source_id'])):
+                raise ValueError(f'路由标识冲突：{route_key}；本次拉取未保存')
             if current is None:
                 route_id = repo.allocate(db)
                 route = RouteConfig(
@@ -103,7 +124,7 @@ class UpstreamAgentService:
                     score_threshold=self.default_threshold,
                     **snapshot,
                     source=RouteConfig.RouteSource(
-                        type="upstream_agent", instance=source_instance, source_id=item["source_id"],
+                        type="upstream_agent", instance=source_instance, source_id=str(item["source_id"]),
                         import_origin="agent_api", managed_fields=list(COMPARABLE_FIELDS),
                         source_snapshot=snapshot, upstream_present=True),
                     sync=RouteConfig.RouteSync(status="pending", version=1))
@@ -113,12 +134,8 @@ class UpstreamAgentService:
                 continue
             matched_ids.add(current.id)
             route = current.model_copy(deep=True)
-            if route.source is None or route.source.type != 'upstream_agent':
-                route.source = RouteConfig.RouteSource(type='upstream_agent', instance=source_instance,
-                    source_id=item['source_id'], import_origin='agent_api',
-                    managed_fields=list(COMPARABLE_FIELDS), source_snapshot={}, upstream_present=True)
             route.source.instance = source_instance
-            route.source.source_id = item['source_id']
+            route.source.source_id = str(item['source_id'])
             overrides = set(route.sync.manual_overrides if route.sync else [])
             result["preserved_overrides"] += len(overrides & set(COMPARABLE_FIELDS))
             source_changed = not snapshots_equal(route.source.source_snapshot or {}, snapshot)

@@ -2,9 +2,8 @@
 import time
 
 from intent_hub.config import Config
-from intent_hub.models import PredictRequest, RouteConfig
+from intent_hub.models import RouteConfig
 from intent_hub.services.route_service import RouteService
-from intent_hub.services.prediction_service import PredictionService as CorePrediction
 from intent_hub.services.sync_task_service import get_sync_task_service
 from intent_hub.services.sync_service import SyncService as CoreSync
 from intent_hub.services.diagnostic_service import DiagnosticService as CoreDiagnostic
@@ -13,29 +12,12 @@ from intent_hub.services.qdrant_import_service import QdrantImportService
 from intent_hub.services.upstream_agent_service import UpstreamAgentService
 
 
-class PredictionService:
-    def __init__(self, components):
-        self.components = components
-
-    def route(self, query):
-        components = self.components
-        if hasattr(components, 'ready_snapshot'):
-            components = components.ready_snapshot()
-        results = CorePrediction(components).predict(PredictRequest(text=query))
-        matched = [r for r in results if r.match_source != 'default']
-        return {'matched': bool(matched), 'agents': [
-            {'agent': components.route_manager.get_route(r.id).details, 'score': r.score}
-            for r in matched], 'text': None if matched else Config.DEFAULT_ROUTE_TEXT,
-            'match_source': results[0].match_source, 'fallback_status': results[0].fallback_status}
-
-
 class PullService:
     def __init__(self, components):
         self.components = components
 
     def pull(self):
-        from intent_hub.agent_source import AgentSource
-        result = UpstreamAgentService(self.components, source=AgentSource(label_ids=Config.AGENT_API_LABEL_IDS or "87,88,89"), default_threshold=0.8).pull()
+        result = UpstreamAgentService(self.components, default_threshold=0.8).pull()
         store = self.components.agent_store
         if result.get('last_pulled_at'):
             store.set_metadata('last_pull_at', result['last_pulled_at'])

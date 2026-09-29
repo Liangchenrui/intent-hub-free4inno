@@ -50,19 +50,18 @@ def document():
                 })
             request_type = None
             if method == 'POST':
-                request_type = {'/predict': 'PredictRequest', '/route': 'RouteRequest', '/auth/login': 'LoginRequest',
+                request_type = {'/route': 'RouteRequest', '/auth/login': 'LoginRequest',
                                 '/routes': 'RouteConfig', '/agents': 'AgentCreate', '/routes/merge': 'MergeAgentsRequest',
                                 '/diagnostics/merge': 'MergeAgentsRequest'}.get(base)
             if method == 'PATCH' and base == '/agents/{agent_id}':
                 request_type = 'AgentUpdate'
             if request_type:
                 operation['requestBody'] = {'required': True, 'content': {'application/json': {'schema': {'$ref': '#/components/schemas/' + request_type}}}}
-            if base in {'/predict', '/route'}:
-                operation['responses']['503'] = {'description': 'Routing components warming or unavailable; retry shortly.'}
-            if base == '/predict':
-                operation['responses']['200']['content'] = {'application/json': {'schema': {'type': 'array', 'items': {'$ref': '#/components/schemas/PredictResponse'}}}}
             if base == '/route':
-                operation['responses']['200']['description'] = 'BUPT success/data/error envelope; data.agents contains agent details and nullable score.'
+                operation['responses']['503'] = {'description': 'Routing components warming or unavailable; retry shortly.'}
+            if base == '/route':
+                operation['tags'] = ['routing']
+                operation['responses']['200']['description'] = 'Routing result: success/data/error; data.agents contains id, name, route_key, agent details and nullable score.'
             if base in {'/routes', '/agents', '/routes/merge', '/diagnostics/merge', '/collections', '/settings/qdrant-collections'} and method == 'POST':
                 operation['responses'] = {'201': {'description': 'Created'}}
             if base == '/reindex':
@@ -71,13 +70,13 @@ def document():
                 operation['responses'] = {'202': {'description': 'Durable upstream_pull task queued or reused; poll GET /sync-tasks. Result contains counts and optional sync_task_id for index completion.'}}
             paths.setdefault(path, {})[method.lower()] = operation
     schemas = {}
-    for module, names in [(models, ['PredictRequest', 'PredictResponse', 'RouteConfig', 'LoginRequest']),
-                          (compat_models, ['RouteRequest', 'Agent', 'AgentCreate', 'AgentUpdate', 'MergeAgentsRequest'])]:
+    for module, names in [(models, ['RouteRequest', 'PredictResponse', 'RouteConfig', 'LoginRequest']),
+                          (compat_models, ['Agent', 'AgentCreate', 'AgentUpdate', 'MergeAgentsRequest'])]:
         for name in names:
             schema = getattr(module, name).model_json_schema(ref_template='#/components/schemas/{model}')
             schemas.update(schema.pop('$defs', {}))
             schemas[name] = schema
-    return {'openapi': '3.1.0', 'info': {'title': 'Unified Intent Hub', 'version': '0.2.0',
+    return {'openapi': '3.1.0', 'info': {'title': 'Unified Intent Hub', 'version': '0.4.0',
             'description': 'Generated route inventory for master profile. Fixed compatibility namespaces are stable; root aliases follow API_COMPAT_PROFILE.'},
             'paths': paths, 'components': {'schemas': schemas, 'securitySchemes': {'BearerAuth': {'type': 'http', 'scheme': 'bearer'}}}}
 

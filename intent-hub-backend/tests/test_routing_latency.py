@@ -209,8 +209,8 @@ def test_prediction_contracts_return_503_during_warmup(monkeypatch):
     monkeypatch.setattr(Config, 'PREDICT_AUTH_KEY', '')
     monkeypatch.setattr(Config, 'AUTH_CODE', 'offline-test')
     client = app.test_client()
-    assert client.post('/compat/master/predict', json={'text': 'query'}).status_code == 503
-    result = client.post('/compat/bupt/route', json={'query': 'query'},
+    assert client.post('/route', json={'query': 'query'}, headers={'X-API-Key': 'offline-test'}).status_code == 503
+    result = client.post('/route', json={'query': 'query'},
                          headers={'Authorization': 'Bearer offline-test'})
     assert result.status_code == 503
     assert result.json['error']['code'] == 'SERVICE_NOT_READY'

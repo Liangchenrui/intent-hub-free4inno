@@ -1,17 +1,6 @@
 <template>
-  <el-container class="layout-container">
-    <el-header class="header-wrapper">
-      <div class="header-content">
-        <div class="brand">
-          <img src="@/assets/logo.png" alt="Intent Hub" class="logo-img" />
-        </div>
-        <div class="user-info">
-          <ServiceHealthIndicators />
-          <LanguageSwitcher />
-          <el-button type="danger" @click="handleLogout">{{ $t('common.logout') }}</el-button>
-        </div>
-      </div>
-    </el-header>
+  <el-container class="layout-container" direction="vertical">
+    <AppHeader @logout="handleLogout" />
 
     <el-main class="main-wrapper">
       <div class="page-header">
@@ -66,17 +55,10 @@
           </el-form-item>
           <el-form-item label="Route API Key（统一路由密钥）">
             <el-input v-model="settings.ROUTE_API_KEY" type="password" show-password autocomplete="new-password" />
-            <div class="field-hint">保存后立即用于 /predict 和 /route，重启保留。留空恢复使用各接口原有环境变量密钥；不修改管理员登录密码。</div>
+            <div class="field-hint">保存后立即用于 /route，重启保留。留空使用 AUTH_CODE 环境变量；不修改管理员登录密码。</div>
           </el-form-item>
 
-          <el-divider content-position="left">{{ $t('settings.upstreamAgentTitle') }}</el-divider>
-          <el-form-item :label="$t('settings.upstreamAgentUrl')">
-            <el-input v-model="settings.AGENT_API_URL" placeholder="https://yuanfang.bupt.edu.cn/ac/api" />
-          </el-form-item>
-          <el-form-item :label="$t('settings.upstreamAgentLabelIds')">
-            <el-input v-model="settings.AGENT_API_LABEL_IDS" placeholder="87,88,89" />
-            <div class="field-hint">{{ $t('settings.upstreamAgentHint') }}</div>
-          </el-form-item>
+          <UpstreamSettings />
 
           <el-divider :content-position="'left'">{{ $t('settings.llmTitle') }}</el-divider>
           <el-form-item :label="$t('settings.llmProvider')">
@@ -208,8 +190,8 @@ import {
   type SystemSettings,
   type CollectionOption,
 } from '../api';
-import LanguageSwitcher from '../components/LanguageSwitcher.vue';
-import ServiceHealthIndicators from '../components/ServiceHealthIndicators.vue';
+import UpstreamSettings from '../components/UpstreamSettings.vue';
+import AppHeader from '../components/AppHeader.vue';
 
 const { t } = useI18n();
 
@@ -360,7 +342,7 @@ const handleImportCollection = async () => {
 
 const prepareSettingsForSubmit = (data: SystemSettings): Partial<SystemSettings> => {
   const result: any = { ...data };
-  ['QDRANT_API_KEY', 'DEEPSEEK_API_KEY', 'API_KEYS', 'PREDICT_AUTH_KEY', 'DEFAULT_PASSWORD', 'AUTH_CODE', 'AUTH_ENABLED'].forEach(key => delete result[key]);
+  ['UPSTREAMS', 'AGENT_API_URL', 'AGENT_API_LABEL_IDS', 'QDRANT_API_KEY', 'DEEPSEEK_API_KEY', 'API_KEYS', 'PREDICT_AUTH_KEY', 'DEFAULT_PASSWORD', 'AUTH_CODE', 'AUTH_ENABLED'].forEach(key => delete result[key]);
   const nullableFields: (keyof SystemSettings)[] = [
     'LLM_BASE_URL',
     'LLM_MODEL'
@@ -463,38 +445,6 @@ onMounted(() => {
   margin-top: 10px;
   display: flex;
   gap: 8px;
-}
-
-.header-wrapper {
-  background-color: #fff;
-  border-bottom: 1px solid #e6e8eb;
-  padding: 0 40px;
-  height: 64px !important;
-  display: flex;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.header-content {
-  width: 95%;
-  max-width: 1400px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo-img {
-  height: 40px;
-  width: auto;
 }
 
 .main-wrapper {

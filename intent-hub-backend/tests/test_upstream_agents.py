@@ -432,7 +432,7 @@ def test_restarted_pull_reconnects_pending_index_work(tmp_path, monkeypatch):
     assert index['route_versions']['1'] == 2
 
 
-def test_route_key_matches_import_regardless_of_source_id(tmp_path):
+def test_upstream_key_cannot_take_over_an_import(tmp_path):
     from types import SimpleNamespace
     manager = RouteManager(str(tmp_path / 'identity.sqlite3'))
     route = RouteConfig(id=103, name='Original', route_key='shared.key', description='old', utterances=['old'],
@@ -441,27 +441,27 @@ def test_route_key_matches_import_regardless_of_source_id(tmp_path):
     manager.repository.save(route, enqueue=False)
     item = dict(source_id='new-source-id', route_key='shared.key', name='New name', description='new', utterances=['new'], negative_samples=[])
     service = UpstreamAgentService(SimpleNamespace(route_manager=manager), source=SimpleNamespace(fetch_all=lambda: [item]))
-    assert service.pull()['created'] == 0
-    assert len(manager.get_all_routes()) == 1
-    assert manager.get_route(103).description == 'new'
+    assert service.pull()['created'] == 1
+    assert len(manager.get_all_routes()) == 2
+    assert manager.get_route(103).description == 'old'
     assert manager.get_route(103).utterances == ['old']
     item['source_id'] = 'changed-again'
-    assert service.pull()['created'] == 0
+    assert service.pull()['created'] == 1
     assert service.pull()['unchanged'] == 1
 
 
-def test_different_route_keys_do_not_merge_even_with_same_source_id(tmp_path):
+def test_upstream_route_key_changes_do_not_change_identity(tmp_path):
     manager, source, service, item = delta_system(tmp_path)
     item['route_key'] = 'different.key'
-    assert service.pull()['created'] == 1
-    assert {r.route_key for r in manager.get_all_routes()} == {'a', 'different.key'}
+    assert service.pull()['created'] == 0
+    assert {r.route_key for r in manager.get_all_routes()} == {'default.a'}
 
 
-def test_duplicate_incoming_route_keys_abort_without_writes(tmp_path):
+def test_duplicate_incoming_source_ids_abort_without_writes(tmp_path):
     import pytest
     manager, source, service, item = delta_system(tmp_path)
-    source.fetch_all = lambda: [item, {**item, 'source_id': 'another'}]
-    with pytest.raises(ValueError, match='路由标识重复'):
+    source.fetch_all = lambda: [item, {**item, 'route_key': 'another'}]
+    with pytest.raises(ValueError, match='原始 ID 重复'):
         service.pull()
     assert len(manager.get_all_routes()) == 1
     assert manager.repository.pending() == []

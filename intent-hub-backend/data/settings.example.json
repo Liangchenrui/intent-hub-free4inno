@@ -1,4 +1,12 @@
 {
+  "UPSTREAMS": [
+    {
+      "id": "default",
+      "name": "default",
+      "url": "https://invalid.example/upstream",
+      "label_ids": "87,88,89"
+    }
+  ],
   "AGENT_REPAIR_PROMPT": "REPLACE_WITH_AGENT_REPAIR_PROMPT",
   "BATCH_SIZE": 32,
   "EMBEDDING_MODEL_NAME": "REPLACE_WITH_EMBEDDING_MODEL_NAME",

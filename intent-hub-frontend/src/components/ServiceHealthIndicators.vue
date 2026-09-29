@@ -1,77 +1,62 @@
 <template>
-  <div class="service-health">
-    <span
-      v-for="service in services"
-      :key="service.key"
-      class="service-health__item"
-      :class="`is-${service.state}`"
-      :title="service.detail"
-    >
-      <i />{{ service.label }}
-    </span>
+  <div class="service-health" role="group" :aria-label="t('health.label')">
+    <el-tooltip v-for="service in services" :key="service.key" :content="service.detail" placement="bottom" :show-after="200">
+      <span class="service-health__item" :class="`is-${service.state}`" tabindex="0" :aria-label="`${service.label}: ${service.detail}`">
+        <i class="service-health__dot" aria-hidden="true" />
+        <span class="service-health__name">{{ service.label }}</span>
+        <span class="service-health__state">{{ t(`health.${service.state}Label`) }}</span>
+      </span>
+    </el-tooltip>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { getServiceHealth } from '../api';
-
-type HealthState = 'checking' | 'healthy' | 'unhealthy';
-type ServiceKey = 'embedding' | 'qdrant';
-
-interface HeaderService {
-  key: ServiceKey;
-  label: string;
-  state: HealthState;
-  detail: string;
-}
+import { useServiceHealth } from '../composables/useServiceHealth';
 
 const { t } = useI18n();
-const services = ref<HeaderService[]>([
-  { key: 'embedding', label: 'Embedding', state: 'checking', detail: t('health.checking') },
-  { key: 'qdrant', label: 'Qdrant', state: 'checking', detail: t('health.checking') },
-]);
-let timer: number | undefined;
-
-const refresh = async () => {
-  try {
-    const { data } = await getServiceHealth();
-    services.value = services.value.map((service) => {
-      const result = data.services[service.key];
-      return {
-        ...service,
-        state: result.healthy ? 'healthy' : 'unhealthy',
-        detail: result.healthy
-          ? t('health.healthy', { latency: result.latency_ms })
-          : t('health.unhealthy', { message: result.message }),
-      };
-    });
-  } catch {
-    services.value = services.value.map((service) => ({
-      ...service,
-      state: 'unhealthy',
-      detail: t('health.unavailable'),
-    }));
-  }
-};
-
-onMounted(() => {
-  refresh();
-  timer = window.setInterval(refresh, 30_000);
-});
-
-onBeforeUnmount(() => {
-  if (timer !== undefined) window.clearInterval(timer);
-});
+const { health, unavailable } = useServiceHealth();
+const services = computed(() => (['embedding', 'qdrant'] as const).map((key) => {
+  const result = health.value?.services[key];
+  const state = unavailable.value ? 'unknown' : !result ? 'checking' : result.healthy ? 'healthy' : 'unhealthy';
+  const detail = state === 'unknown' ? t('health.unavailable')
+    : !result ? t('health.checking')
+    : result.healthy ? t('health.healthy', { latency: result.latency_ms })
+    : t('health.unhealthy', { message: result.message });
+  return { key, label: key === 'embedding' ? 'Embedding' : 'Qdrant', state, detail };
+}));
 </script>
 
 <style scoped>
-.service-health { display: flex; align-items: center; gap: 12px; }
-.service-health__item { display: inline-flex; align-items: center; gap: 6px; color: #606266; font-size: 12px; }
-.service-health__item i { width: 8px; height: 8px; border-radius: 50%; background: #909399; }
-.service-health__item.is-healthy i { background: #67c23a; box-shadow: 0 0 0 3px rgb(103 194 58 / 14%); }
-.service-health__item.is-unhealthy i { background: #f56c6c; box-shadow: 0 0 0 3px rgb(245 108 108 / 14%); }
-.service-health__item.is-checking i { background: #e6a23c; }
-@media (max-width: 720px) { .service-health__item { font-size: 0; } }
+.service-health { display: flex; align-items: center; gap: 8px; }
+.service-health__item {
+  --status-color: #64748b;
+  --status-background: #f8fafc;
+  --status-border: #e2e8f0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--status-border);
+  border-radius: 8px;
+  background: var(--status-background);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: default;
+}
+.service-health__item:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 3px; }
+.service-health__name { color: #334155; font-weight: 600; }
+.service-health__state { min-width: 3em; text-align: center; color: var(--status-color); }
+.service-health__dot { flex: 0 0 6px; height: 6px; border-radius: 50%; background: var(--status-color); }
+.is-healthy { --status-color: #18794e; --status-background: #f2faf5; --status-border: #d5eadd; }
+.is-unhealthy { --status-color: #b42318; --status-background: #fff5f4; --status-border: #f5d5d1; }
+.is-checking { --status-color: #946200; --status-background: #fffbef; --status-border: #efe3bc; }
+@media (max-width: 720px) {
+  .service-health__item { gap: 6px; padding: 0 8px; }
+  .service-health__state { display: none; }
+}
 </style>

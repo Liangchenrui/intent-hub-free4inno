@@ -22,12 +22,6 @@ const setBearer = (config: any, token?: string | null) => {
   }
 };
 
-const setRawAuthorization = (config: any, token?: string | null) => {
-  if (token) {
-    config.headers['Authorization'] = token;
-  }
-};
-
 api.interceptors.request.use((config) => {
   const url = config.url || '';
   if (url === '/auth/login') {
@@ -37,9 +31,9 @@ api.interceptors.request.use((config) => {
   const apiKey = localStorage.getItem(API_KEY);
   const predictKey = localStorage.getItem(PREDICT_AUTH_KEY);
 
-  if (url === '/predict') {
+  if (url === '/route') {
     if (predictKey) {
-      setRawAuthorization(config, predictKey);
+      setBearer(config, predictKey);
       return config;
     }
   }
@@ -91,6 +85,7 @@ export interface RouteSyncMeta {
 }
 
 export interface SyncTask {
+  source_config?: { SOURCE_INSTANCE: string; UPSTREAM_NAME?: string };
   id: string;
   kind: 'route_sync' | 'incremental_reindex' | 'full_reindex' | 'upstream_pull';
   route_ids: number[];
@@ -216,8 +211,8 @@ export const getServiceHealth = () =>
   api.get<ServiceHealthResponse>('/health/services', { timeout: 15000 });
 
 export const getRoutes = () => api.get<RouteConfig[]>('/routes');
-export const pullUpstreamAgents = () =>
-  api.post<SyncTask>('/routes/upstream-pull', {});
+export const pullUpstreamAgents = (upstreamId?: string) =>
+  api.post<SyncTask>('/routes/upstream-pull', upstreamId ? { upstream_id: upstreamId } : {});
 export const getUpstreamRouteDiff = (id: number) =>
   api.get<UpstreamRouteDiff>(`/routes/${id}/upstream-diff`);
 export const restoreUpstreamRouteFields = (id: number, fields: string[]) =>
@@ -335,8 +330,21 @@ export function reindex(forceFull: boolean = false): Promise<AxiosResponse<Reind
   return api.post<ReindexResponse | SyncTask>('/reindex', { force_full: forceFull });
 }
 
-export const predict = (text: string, learnFromFallback = true) =>
-  api.post<PredictResult[]>('/predict', { text, learn_from_fallback: learnFromFallback });
+export const predict = async (text: string, learnFromFallback = true) => {
+  const response = await api.post<{ data: {
+    matched: boolean;
+    agents: (PredictResult & { agent: Record<string, unknown> })[];
+    text: string | null;
+    match_source: PredictResult['match_source'];
+    fallback_status: PredictResult['fallback_status'];
+  } }>('/route', { query: text, learn_from_fallback: learnFromFallback }, { baseURL: '/api' });
+  const result = response.data.data;
+  const data: PredictResult[] = result.matched
+    ? result.agents.map(agent => ({ ...agent, match_source: result.match_source, fallback_status: result.fallback_status }))
+    : [{ id: 0, name: result.text || '', route_key: 'fallback.default', score: null,
+         match_source: 'default', fallback_status: result.fallback_status }];
+  return { ...response, data };
+};
 export const submitPositiveRouteFeedback = (routeId: number, text: string) =>
   api.post<RouteFeedbackResponse>(`/routes/${routeId}/feedback/positive`, { text });
 export const submitNegativeRouteFeedback = (routeId: number, text: string) =>
@@ -369,7 +377,17 @@ export interface SharedLlmSettings {
   INSTANCE_THRESHOLD_AMBIGUOUS?: number;
 }
 
+export interface UpstreamConfig {
+  id: string;
+  name: string;
+  url: string;
+  label_ids: string;
+  name_locked?: boolean;
+  last_result?: { last_pulled_at?: string; created?: number; updated?: number; unchanged?: number; upstream_missing?: number; failed?: number; warning?: string } | null;
+}
+
 export interface SystemSettings extends SharedLlmSettings {
+  UPSTREAMS?: UpstreamConfig[];
   LLM_FALLBACK_ENABLED: boolean;
   LLM_FALLBACK_TOP_K: number;
   LLM_FALLBACK_TIMEOUT_SECONDS: number;

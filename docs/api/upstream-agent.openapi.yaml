@@ -1,0 +1,273 @@
+openapi: 3.0.3
+info:
+  title: Intent Hub 上游 Agent 拉取协议
+  version: 1.0.0
+  description: |
+    上游服务需要实现的固定只读 API，调用方向为 Intent Hub → 上游。
+    servers.url 对应设置中的接口公共前缀，不是完整列表 URL。
+    本文件描述新上游的标准格式；运行时对旧语料字符串、缺省分页字段等的兼容不属于标准响应。
+    详细兼容与异常处理见同目录 upstream-agent-protocol.md。
+    当前不发送上游认证头，无协议版本协商；版本号不要求 URL 包含 /v1。
+    本文件不包含 Intent Hub 自己的设置、触发拉取和任务查询管理 API。
+servers:
+  - url: https://agents.example.com/ac/api
+    description: 示例地址；导入后替换为实际上游公共前缀
+security: []
+tags:
+  - name: UpstreamAgents
+    description: 固定协议的 Agent 资源列表与详情
+paths:
+  /resource/search:
+    get:
+      tags: [UpstreamAgents]
+      operationId: listUpstreamAgents
+      summary: 按单个标签分页查询 Agent
+      description: |
+        首次请求只传 labels；服务端默认返回第一页，并返回 total、pageNum、pageSize。
+        后续请求使用响应中的 pageSize，递增 pageNum。total 必须保持一致，各页 ID 不能重叠。
+        多个标签分别请求，结果按字符串化的原始 ID 去重；同 ID 内容应一致。
+        不支持游标分页。不要依赖 hasMore、has_more 或 next，当前适配器会将首页这些真值标记为列表不完整。
+        完整资源若包含 title、text、extent00、extent01、attachments、author、labelsByCategory、parameters、source，
+        则跳过详情请求；否则按 ID 请求详情。
+      parameters:
+        - name: labels
+          in: query
+          required: true
+          description: 单个数字标签 ID；不能传逗号分隔的多个 ID。
+          schema:
+            type: string
+            pattern: '^[0-9]+$'
+          example: '87'
+        - name: pageNum
+          in: query
+          required: false
+          description: 首次不传时默认第 1 页。
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 2
+        - name: pageSize
+          in: query
+          required: false
+          description: 首次不传，由服务端确定默认值并在响应中返回；后续沿用该值。
+          schema:
+            type: integer
+            minimum: 1
+          example: 2
+      responses:
+        '200':
+          description: 成功列表；HTTP 200 携带业务非 200 code 时仍视为失败。
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ListResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                firstPage:
+                  summary: 精简列表，需要继续分页和拉取详情
+                  value:
+                    code: 200
+                    msg: success
+                    data:
+                      records:
+                        - resource: {id: 123}
+                        - resource: {id: 124}
+                      total: 3
+                      pageNum: 1
+                      pageSize: 2
+                empty:
+                  summary: 有效空列表；Intent Hub 保留本地数据
+                  value:
+                    code: 200
+                    data:
+                      records: []
+                      total: 0
+                      pageNum: 1
+                      pageSize: 20
+                businessFailure:
+                  summary: HTTP 200 下的业务失败
+                  value: {code: 400, msg: invalid label, data: {}}
+        default:
+          $ref: '#/components/responses/HttpFailure'
+  /resource/{id}/detail:
+    get:
+      tags: [UpstreamAgents]
+      operationId: getUpstreamAgentDetail
+      summary: 获取单个 Agent 的详情
+      description: |
+        详情 id 字符串化后必须与列表及请求路径 ID 相同。
+        当前单请求超时参数为 30 秒；单条详情失败会记录失败 ID，其他条目可以继续处理。
+        失败 ID 不会被当作缺失而停用。
+        原始详情保存在 details；本地路由标识由上游名称与原始 ID 生成，
+        不采用上游 route_key、routeKey 或标题作为身份。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: |
+            列表原始 ID 的字符串形式。推荐整数或 ASCII 字母、数字、下划线、短横线，
+            以便直接用作单个路径段；当前适配器没有单独的路径 ID 编码步骤。
+          schema:
+            type: string
+            minLength: 1
+            pattern: '\S'
+          example: '123'
+      responses:
+        '200':
+          description: 成功详情；HTTP 200 携带业务非 200 code 时仍视为失败。
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/DetailResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                agent:
+                  summary: 标准资源详情
+                  value:
+                    code: 200
+                    msg: success
+                    data:
+                      id: 123
+                      title: 天气查询
+                      text: 查询指定城市的天气和未来预报。
+                      extent00: [北京今天天气怎么样, 明天上海会下雨吗]
+                      extent01: [帮我订机票]
+                      attachments: []
+                      author: {}
+                      labelsByCategory: {}
+                      parameters: []
+                      source: {}
+                businessFailure:
+                  value: {code: 404, msg: resource not found, data: {}}
+        default:
+          $ref: '#/components/responses/HttpFailure'
+components:
+  responses:
+    HttpFailure:
+      description: |
+        HTTP 错误使请求失败。下面定义约定的 JSON 错误格式；网络代理等返回的非 JSON 错误同样视为失败。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {code: 500, msg: upstream unavailable, data: {}}
+  schemas:
+    ResourceId:
+      description: |
+        同一上游内稳定且唯一，不能复用于另一实体。
+        数字 123 与字符串 "123" 视为相同 ID，"00123" 不同。
+        本地 route_key 为上游名称加点号加编码后的原始 ID，例如 bupt.123。
+        普通数字原样保留；非小写 ASCII 字母、数字、下划线、短横线按 UTF-8 字节编码为小写 %xx。
+      oneOf:
+        - type: integer
+        - type: string
+          minLength: 1
+          pattern: '\S'
+      example: 123
+    Corpus:
+      type: array
+      description: 标准格式为字符串数组；去除首尾空白、空项和重复项。无语料使用空数组。
+      items:
+        type: string
+      example: [查询天气]
+    Resource:
+      type: object
+      required: [id]
+      description: |
+        列表至少提供 id，也可以直接返回完整详情字段。
+        后五个扩展字段保留原始 JSON，没有施加示例类型以外的虚构约束。
+      properties:
+        id:
+          $ref: '#/components/schemas/ResourceId'
+        title:
+          type: string
+          description: Agent 名称，映射到 name；建议非空。
+        text:
+          type: string
+          description: 功能描述，映射到 description。
+        extent00:
+          $ref: '#/components/schemas/Corpus'
+        extent01:
+          $ref: '#/components/schemas/Corpus'
+        attachments:
+          description: 附件原始信息，保存在 details；内部结构不作约束。
+          example: []
+        author:
+          description: 作者原始信息，保存在 details；内部结构不作约束。
+          example: {}
+        labelsByCategory:
+          description: 分类标签原始信息，保存在 details；内部结构不作约束。
+          example: {}
+        parameters:
+          description: 参数原始信息，保存在 details；内部结构不作约束。
+          example: []
+        source:
+          description: 上游自身来源信息，不是 Intent Hub 路由来源标识；内部结构不作约束。
+          example: {}
+      additionalProperties: true
+    AgentDetail:
+      allOf:
+        - $ref: '#/components/schemas/Resource'
+        - type: object
+          required: [id, title, text, extent00, extent01]
+      description: 标准详情必需五个业务字段；其他扩展字段按原样保存。
+    ResourcePage:
+      type: object
+      required: [records, total, pageNum, pageSize]
+      properties:
+        records:
+          type: array
+          items:
+            type: object
+            required: [resource]
+            properties:
+              resource:
+                $ref: '#/components/schemas/Resource'
+        total:
+          type: integer
+          minimum: 0
+          description: 当前标签结果的总记录数，分页期间保持一致。
+        pageNum:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+    ListResponse:
+      type: object
+      required: [code, data]
+      properties:
+        code:
+          type: integer
+          enum: [200]
+        msg:
+          type: string
+        data:
+          $ref: '#/components/schemas/ResourcePage'
+    DetailResponse:
+      type: object
+      required: [code, data]
+      properties:
+        code:
+          type: integer
+          enum: [200]
+        msg:
+          type: string
+        data:
+          $ref: '#/components/schemas/AgentDetail'
+    ErrorResponse:
+      type: object
+      required: [code, data]
+      properties:
+        code:
+          type: integer
+          not:
+            enum: [200]
+        msg:
+          type: string
+        data:
+          type: object
+          additionalProperties: true

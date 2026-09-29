@@ -139,9 +139,9 @@ class SyncTaskService:
     def enqueue_incremental_reindex(self) -> dict[str, Any]:
         return self.enqueue_reindex(False)
 
-    def enqueue_upstream_pull(self) -> dict[str, Any]:
+    def enqueue_upstream_pull(self, upstream_id=None) -> dict[str, Any]:
         from intent_hub.services.upstream_agent_service import UpstreamAgentService
-        source = UpstreamAgentService.source_config()
+        source = UpstreamAgentService.source_config(upstream_id)
         if not source['AGENT_API_URL'] or not source['AGENT_API_LABEL_IDS']:
             raise ValueError('请先配置上游地址和标签')
         with self._condition:
@@ -298,7 +298,11 @@ class SyncTaskService:
             from intent_hub.agent_source import AgentSource
             from intent_hub.services.upstream_agent_service import UpstreamAgentService
             source = task['source_config']
-            if source != UpstreamAgentService.source_config():
+            try:
+                current_source = UpstreamAgentService.source_config(source['SOURCE_INSTANCE'])
+            except ValueError:
+                current_source = None
+            if source != current_source:
                 task['status'] = 'superseded'
                 return
             def progress(phase):
@@ -308,7 +312,7 @@ class SyncTaskService:
             progress('fetching')
             result = UpstreamAgentService(self.component_manager, source=AgentSource(
                 label_ids=source['AGENT_API_LABEL_IDS'], base_url=source['AGENT_API_URL']
-            )).pull(progress=progress, expected_source=source)
+            ), upstream_id=source['SOURCE_INSTANCE']).pull(progress=progress, expected_source=source)
             task['result'] = result
             # Also reconnect durable pending work after a crash between local commit
             # and linking the index task, including an unchanged retry of the pull.

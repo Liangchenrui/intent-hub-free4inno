@@ -33,6 +33,9 @@ class RouteManager:
                     self.repository.save(route, db, enqueue=False)
                 db.execute("INSERT INTO metadata VALUES ('legacy_imported','1')")
 
+        from intent_hub.upstreams import migrate_default
+        migrate_default(self.repository)
+
     def get_route(self, route_id):
         return self.repository.get(route_id)
 

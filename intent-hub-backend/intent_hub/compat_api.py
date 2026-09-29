@@ -7,20 +7,19 @@ from flask_compress import Compress
 from pydantic import ValidationError
 
 from intent_hub.agent_compare import comparison_detail, comparison_summary
-from intent_hub.compat_auth import require_auth, require_route_auth
+from intent_hub.compat_auth import require_auth
 from intent_hub.config import Config
 from intent_hub import compat_config
 from intent_hub.core.components import get_component_manager, RoutingNotReady
 from intent_hub.compat_models import (
     AgentCreate, AgentUpdate, ApplyRepairRequest, MergeAgentsRequest,
-    CollectionRequest, RecommendationRequest, RepairRequest, RouteRequest,
+    CollectionRequest, RecommendationRequest, RepairRequest,
     ThresholdRequest,
 )
 from intent_hub.compat_services import CollectionService
 from intent_hub.compat_services import DiagnosticService
 from intent_hub.services.health_service import check_external_services
 from intent_hub.services.llm_service import LLMService
-from intent_hub.compat_services import PredictionService
 from intent_hub.compat_services import PullService
 from intent_hub.compat_services import SyncService
 from intent_hub.utils.logger import logger
@@ -194,22 +193,6 @@ def sync():
 @api_errors
 def sync_status():
     return jsonify(SyncService(get_component_manager()).status())
-
-
-@app.post("/route")
-@require_route_auth
-@api_errors
-def route():
-    payload = RouteRequest(**(request.get_json() or {}))
-    query = payload.query.strip()
-    if not query:
-        raise ValueError("query 不能为空")
-    g.route_input = payload.query
-    return jsonify({
-        "success": True,
-        "data": PredictionService(get_component_manager()).route(query),
-        "error": None,
-    })
 
 
 @app.get("/settings")

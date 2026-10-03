@@ -46,6 +46,7 @@ def test_list_qdrant_collections_uses_configured_url(monkeypatch):
 
 @pytest.mark.parametrize('change,reset,queued', [
     ({}, False, False),
+    ({'NEGATIVE_UTTERANCE_GENERATION_PROMPT': 'Custom {name} {format_instructions}'}, False, False),
     ({'LLM_FALLBACK_TOP_K': 3}, False, False),
     ({'BATCH_SIZE': 17}, True, False),
     ({'SERVICE_HTTP_TRUST_ENV': False}, True, False),

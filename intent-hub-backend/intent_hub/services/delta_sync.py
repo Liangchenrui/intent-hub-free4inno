@@ -14,7 +14,7 @@ SYNC_SCHEMA = 1
 
 
 def business_snapshot(route):
-    body = route.model_dump(exclude={'sync', 'updated_at', 'source', 'details'})
+    body = route.model_dump(exclude={'sync', 'updated_at', 'source', 'details', 'review'})
     body['utterances'] = sorted(set(route.utterances))
     body['negative_samples'] = sorted(set(route.negative_samples))
     return body

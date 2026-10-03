@@ -7,7 +7,7 @@ import json
 from typing import Any
 
 
-COMPARABLE_FIELDS = ("title", "text", "utterances", "negative_samples")
+COMPARABLE_FIELDS = ("title", "text")
 CORPUS_FIELDS = {"utterances", "negative_samples"}
 
 

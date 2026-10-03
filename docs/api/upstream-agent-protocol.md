@@ -2,7 +2,7 @@
 
 机器可读导出：[OpenAPI 3.0.3 YAML](upstream-agent.openapi.yaml)，可导入支持 OpenAPI 的接口工具。`servers.url` 是示例地址，接入时替换为实际公共前缀。
 
-本文是 Intent Hub 上游接入的固定协议说明，依据 2026-09-29 的 [AgentSource](../../intent-hub-backend/intent_hub/agent_source.py) 与 [合并服务](../../intent-hub-backend/intent_hub/services/upstream_agent_service.py) 整理。新上游应按本文的标准格式提供接口。文档版本 `v1` 不表示 URL 中需要加入 `/v1`，当前没有协议版本协商机制。
+本文是 Intent Hub 上游接入的固定协议说明，依据 2026-09-30 的 [AgentSource](../../intent-hub-backend/intent_hub/agent_source.py) 与 [合并服务](../../intent-hub-backend/intent_hub/services/upstream_agent_service.py) 更新。新上游应按本文的标准格式提供接口。文档版本 `v1` 不表示 URL 中需要加入 `/v1`，当前没有协议版本协商机制。正、负例句由 Intent Hub 本地维护，上游语料字段不再解析或导入。
 
 所有上游使用同一套路径、参数、响应包裹和字段映射。设置页仅配置名称、接口公共前缀和标签 ID，不支持自定义接口路径、字段映射或鉴权适配器。
 
@@ -147,8 +147,8 @@ GET {base_url}/resource/123/detail
 | `id` | integer 或非空 string | 是 | 原始 ID，字符串化后必须与列表 ID 相同 |
 | `title` | string | 是 | 映射到路由 `name` |
 | `text` | string | 是 | 映射到路由 `description` |
-| `extent00` | array of string | 是 | 正向语料，映射到 `utterances`；没有语料用 `[]` |
-| `extent01` | array of string | 是 | 负向语料，映射到 `negative_samples`；没有负例用 `[]` |
+| `extent00` | 建议 array of string | 否 | 可选原始正例，仅保留在 `details`，不导入 `utterances` |
+| `extent01` | 建议 array of string | 否 | 可选原始负例，仅保留在 `details`，不导入 `negative_samples` |
 | `attachments` | 示例为 array | 否 | 附件原始信息，保存在 `details` |
 | `author` | 示例为 object | 否 | 作者原始信息，保存在 `details` |
 | `labelsByCategory` | 示例为 object | 否 | 分类标签原始信息，保存在 `details` |
@@ -157,13 +157,13 @@ GET {base_url}/resource/123/detail
 
 后五个字段的内部结构当前没有固定解析约束，表中类型为接入示例，不是当前代码已实施的类型校验。完整资源对象及扩展字段会保存在路由 `details` 中。
 
-`title`、`text` 会去除首尾空白。语料会去除首尾空白、空项并按原顺序去重。建议提供非空名称和有效正向语料；字段存在不等于路由质量合格。
+`title`、`text` 会去除首尾空白。建议提供非空名称和清晰的能力描述；字段存在不等于路由质量合格。新建实体的本地正、负例句为空，描述仍可参与同步后的 Top-K 兜底检索。
 
-兼容旧上游时，`extent00` / `extent01` 也可接受 JSON 数组字符串（如 `"[\"查询天气\"]"`），代码还兼容 Python 列表字面量字符串；空值会被当作空列表。**新上游统一返回真正的 JSON 字符串数组**，不要依赖这些兼容解析。详情缺少 `id` 时当前代码会沿用请求 ID，但标准响应仍应显式返回 `id`。
+`extent00` / `extent01` 缺失、为空或格式异常均不影响信息拉取；不执行语料解析，也不以语料变化触发提醒。原始详情字段沿用兼容返回，不表示已进入本地路由语料。详情缺少 `id` 时当前代码会沿用请求 ID，但标准响应仍应显式返回 `id`。
 
 ### 省略详情请求的条件
 
-列表中的 `resource` 如果同时包含 `title`、`text`、`extent00`、`extent01`、`attachments`、`author`、`labelsByCategory`、`parameters`、`source` 这九个字段，Intent Hub 会直接使用该对象，不再请求详情。仅包含前四个业务字段仍会触发详情请求。上游应提供详情接口，以支持精简列表响应；不能假设每次同步都会访问详情接口。
+列表中的 `resource` 如果同时包含 `title`、`text`、`attachments`、`author`、`labelsByCategory`、`parameters`、`source` 这七个字段，Intent Hub 会直接使用该对象，不再请求详情。仅包含名称、描述仍会触发详情请求。上游应提供详情接口，以支持精简列表响应；不能假设每次同步都会访问详情接口。
 
 ## 5. 原始 ID 与路由身份
 
@@ -185,7 +185,7 @@ GET {base_url}/resource/123/detail
 | 情况 | 当前处理 |
 | --- | --- |
 | 列表 HTTP/业务失败、缺少 `records` 数组，或列表记录缺少有效 ID | 本轮拉取失败，不进入合并阶段 |
-| 单条详情失败、详情 ID 不匹配、必要业务字段缺失、非空语料格式无法解析 | 记录到 `failed_source_ids`，继续处理其他条目；失败 ID 不按缺失处理 |
+| 单条详情失败、详情 ID 不匹配、必要业务字段缺失 | 记录到 `failed_source_ids`，继续处理其他条目；失败 ID 不按缺失处理 |
 | 列表不完整 | 合并可用条目，不据此停用缺失记录 |
 | 没有可用条目，包括有效空列表 | 保留本地数据并返回 warning；不会批量停用 |
 | 完整且非空的拉取 | 更新本上游记录；在可比较的历史拉取范围内标记缺失并停用，不影响其他上游 |
@@ -194,7 +194,7 @@ GET {base_url}/resource/123/detail
 | 合并阶段收到重复原始 ID，或生成标识与其他来源冲突 | 合并事务整批回滚，不接管其他来源数据 |
 | 拉取过程中当前上游配置被修改或移除 | 不提交旧配置对应的拉取结果 |
 
-已有人工覆盖继续保留，来源快照会更新；拉取不等于立即完成向量同步。有效内容变更会进入后续索引任务，应分别查看拉取与索引状态。缺失判断的具体范围保护见 [多上游功能说明](../changes/multiple-upstreams/README.md)。
+已有人工覆盖继续保留，来源快照会更新；现有本地语料及自动学习记录保持不变。恢复上游字段只支持名称、描述。新增或业务信息变化会产生管理员待处理提醒，人工覆盖不会挡住提醒；无变化拉取不重复提醒。拉取不等于立即完成向量同步。有效内容变更会进入后续索引任务，应分别查看拉取与索引状态。缺失判断的具体范围保护见 [多上游功能说明](../changes/multiple-upstreams/README.md)。
 
 ## 7. 与 Intent Hub 管理接口的区别
 
@@ -212,13 +212,13 @@ Authorization: Bearer <管理员登录所得 API Key>
 
 ## 8. 接入验证与依据
 
-接入方应检查：首页不传分页参数时返回第 1 页；多页总数与排序稳定；多标签重复 ID 内容一致；详情 ID 与列表一致；两类语料均为数组；空列表和错误响应符合约定。再在 Intent Hub 中保存配置，单独拉取并检查任务结果、本地 `名称.ID` 标识及重复拉取是否无新增。
+接入方应检查：首页不传分页参数时返回第 1 页；多页总数与排序稳定；多标签重复 ID 内容一致；详情 ID 与列表一致；名称和描述字段齐全；空列表和错误响应符合约定。再在 Intent Hub 中保存配置，单独拉取并检查任务结果、本地 `名称.ID` 标识及重复拉取是否无新增。
 
 实现与既有回归入口：
 
-- [上游 HTTP 适配器](../../intent-hub-backend/intent_hub/agent_source.py)：请求、分页、详情、语料解析。
+- [上游 HTTP 适配器](../../intent-hub-backend/intent_hub/agent_source.py)：请求、分页、详情；忽略上游语料。
 - [身份编码与配置校验](../../intent-hub-backend/intent_hub/upstreams.py)：名称规则、原始 ID 编码。
 - [拉取合并](../../intent-hub-backend/intent_hub/services/upstream_agent_service.py)：来源隔离、人工覆盖、缺失保护。
 - [适配器与拉取测试](../../intent-hub-backend/tests/test_upstream_agents.py)、[多上游测试](../../intent-hub-backend/tests/test_multiple_upstreams.py)。
 
-本次文档按当前代码核对，并检查 JSON 示例和相对链接；没有改动运行协议，也没有据此声称所有新上游都已联调通过。标准格式中比当前兼容解析更严格的约定已在文中明确区分。
+本次调整将上游语料改为可选且不导入，保留原始详情响应；未据此声称所有上游都已联调通过。标准格式中比当前兼容行为更严格的约定已在文中明确区分。

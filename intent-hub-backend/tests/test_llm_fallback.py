@@ -517,11 +517,12 @@ def test_learning_upstream_merge_restore_and_manual_delete(system):
     service = UpstreamAgentService(system, source=source)
     service.pull()
     merged = system.route_manager.get_route(1)
-    assert merged.utterances == ['new upstream', 'local learned']
-    assert merged.source.source_snapshot['utterances'] == ['new upstream']
+    assert merged.utterances == [*route.utterances, 'local learned']
+    assert 'utterances' not in merged.source.source_snapshot
     assert not merged.sync.manual_overrides
     assert AgentStore(system).from_route(merged).fallback_utterances == merged.fallback_utterances
-    assert service.restore_fields(1, ['utterances']).utterances == ['new upstream', 'local learned']
+    with pytest.raises(ValueError, match='本地维护'):
+        service.restore_fields(1, ['utterances'])
     version = system.route_manager.get_route(1).sync.version
     service.pull()
     assert system.route_manager.get_route(1).sync.version == version

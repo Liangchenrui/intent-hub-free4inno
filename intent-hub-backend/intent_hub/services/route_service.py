@@ -189,7 +189,7 @@ class RouteService:
         self.component_manager.ensure_ready()
         route_manager = self.component_manager.route_manager
 
-        example_utterances = req.utterances if req.utterances is not None else []
+        example_utterances = (req.negative_samples or []) if req.polarity == "negative" else (req.utterances or [])
         new_utterances = self._generate_utterances_with_llm(req, example_utterances)
         final_utterances = example_utterances + new_utterances
 
@@ -207,8 +207,8 @@ class RouteService:
                 description=req.description
                 if req.description
                 else existing_route.description,
-                utterances=final_utterances,
-                negative_samples=getattr(existing_route, 'negative_samples', []),
+                utterances=(req.utterances or []) if req.polarity == "negative" else final_utterances,
+                negative_samples=final_utterances if req.polarity == "negative" else getattr(existing_route, 'negative_samples', []),
                 score_threshold=existing_route.score_threshold,
                 negative_threshold=getattr(existing_route, 'negative_threshold', 0.95),
             )
@@ -218,8 +218,8 @@ class RouteService:
                 name=req.name,
                 route_key=req.route_key,
                 description=req.description,
-                utterances=final_utterances,
-                negative_samples=[],
+                utterances=(req.utterances or []) if req.polarity == "negative" else final_utterances,
+                negative_samples=final_utterances if req.polarity == "negative" else [],
                 score_threshold=0.75,  # 默认阈值
                 negative_threshold=0.95,  # 默认负例阈值
             )
@@ -308,8 +308,11 @@ class RouteService:
             reference_utterances_text = f"\n参考示例（请参照这些示例的风格和范围，生成新的句子，但绝对不能重复这些示例）:\n{utterances_list}\n"
 
         from intent_hub.config import Config
+        template = Config.UTTERANCE_GENERATION_PROMPT
+        if req.polarity == "negative":
+            template = Config.NEGATIVE_UTTERANCE_GENERATION_PROMPT
         prompt = PromptTemplate(
-            template=Config.UTTERANCE_GENERATION_PROMPT,
+            template=template,
             input_variables=["name", "description", "count", "reference_utterances"],
             partial_variables={"format_instructions": parser.get_format_instructions()},
         )
@@ -321,17 +324,22 @@ class RouteService:
             "reference_utterances": reference_utterances_text,
         }
 
+        if req.polarity == "negative":
+            prompt_variables["positive_examples"] = "\n".join(req.utterances or [])
         chain = prompt | llm | parser
 
         try:
             result = chain.invoke(prompt_variables)
             generated_utterances = result.utterances
 
-            reference_set = set(example_utterances) if example_utterances else set()
+            reference_set = {item.strip() for item in example_utterances}
+            reference_set.update(item.strip() for item in (req.utterances or []) if req.polarity == "negative")
             new_utterances = []
             for utt in generated_utterances:
-                if utt not in reference_set:
+                utt = utt.strip()
+                if utt and utt not in reference_set:
                     new_utterances.append(utt)
+                    reference_set.add(utt)
 
             if len(new_utterances) > req.count:
                 new_utterances = new_utterances[: req.count]

@@ -8,8 +8,8 @@ from time import perf_counter
 from intent_hub.agent_source import AgentSource
 from intent_hub.config import Config
 from intent_hub.upstreams import route_key as make_route_key, lock_name, migrate_default
-from intent_hub.models import RouteConfig
-from intent_hub.route_compare import COMPARABLE_FIELDS, snapshots_equal, fields_equal
+from intent_hub.models import RouteConfig, RouteReview
+from intent_hub.route_compare import UPSTREAM_FIELDS, REVIEW_DETAIL_FIELDS, snapshots_equal, fields_equal
 from intent_hub.services.route_service import RouteService
 
 
@@ -112,7 +112,7 @@ class UpstreamAgentService:
             incoming_keys[key] = item
         matched_ids = set()
         for route_key, item in incoming_keys.items():
-            snapshot = {field: item[field] for field in COMPARABLE_FIELDS}
+            snapshot = {field: item[field] for field in UPSTREAM_FIELDS}
             current = by_key.get(route_key)
             if current is not None and (not current.source or current.source.type != 'upstream_agent'
                     or current.source.instance != source_instance or current.source.source_id != str(item['source_id'])):
@@ -122,13 +122,16 @@ class UpstreamAgentService:
                 route = RouteConfig(
                     id=route_id, route_key=route_key, details=item.get("details", {}),
                     score_threshold=self.default_threshold,
+                    utterances=[], negative_samples=[],
+                    review=RouteReview(needs_review=True, version=1, changed_at=pulled_at,
+                                       reason="created", changed_fields=list(UPSTREAM_FIELDS)),
                     **snapshot,
                     source=RouteConfig.RouteSource(
                         type="upstream_agent", instance=source_instance, source_id=str(item["source_id"]),
-                        import_origin="agent_api", managed_fields=list(COMPARABLE_FIELDS),
+                        import_origin="agent_api", managed_fields=list(UPSTREAM_FIELDS),
                         source_snapshot=snapshot, upstream_present=True),
                     sync=RouteConfig.RouteSync(status="pending", version=1))
-                repo.save(route, db)
+                repo.save(route, db, update_review=True)
                 result["created"] += 1
                 result["affected_route_ids"].append(route.id)
                 continue
@@ -137,13 +140,13 @@ class UpstreamAgentService:
             route.source.instance = source_instance
             route.source.source_id = str(item['source_id'])
             overrides = set(route.sync.manual_overrides if route.sync else [])
-            result["preserved_overrides"] += len(overrides & set(COMPARABLE_FIELDS))
+            result["preserved_overrides"] += len(overrides & set(UPSTREAM_FIELDS))
             source_changed = not snapshots_equal(route.source.source_snapshot or {}, snapshot)
+            changed_fields = [field for field in UPSTREAM_FIELDS
+                              if not fields_equal(field, (route.source.source_snapshot or {}).get(field), snapshot[field])]
             if source_changed:
                 route.source.source_snapshot = snapshot
             for field, value in snapshot.items():
-                if field == "utterances":
-                    value = list(dict.fromkeys([*value, *route.fallback_utterances]))
                 if field not in overrides and not fields_equal(field, getattr(route, field), value):
                     setattr(route, field, value)
             details = item.get("details", route.details)
@@ -151,6 +154,13 @@ class UpstreamAgentService:
             managed_keys = {'title', 'text', 'extent00', 'extent01'}
             details_changed = ({k: v for k, v in details.items() if k not in managed_keys}
                                != {k: v for k, v in route.details.items() if k not in managed_keys})
+            changed_fields.extend(f"details.{field}" for field in REVIEW_DETAIL_FIELDS
+                                  if details.get(field) != route.details.get(field))
+            if changed_fields:
+                prior_fields = route.review.changed_fields if route.review.needs_review else []
+                route.review = RouteReview(needs_review=True, version=route.review.version + 1,
+                                           changed_at=pulled_at, reason="updated",
+                                           changed_fields=sorted(set(prior_fields + changed_fields)))
             if source_changed or details_changed:
                 route.details = details
             route.source.upstream_present = True
@@ -163,7 +173,7 @@ class UpstreamAgentService:
                 result["effective_updated"] += 1
             changed = route != current
             if changed:
-                repo.save(route, db, enqueue=effective_changed)
+                repo.save(route, db, enqueue=effective_changed, update_review=True)
                 if not effective_changed:
                     result["baseline_updated"] += 1
             else:
@@ -193,15 +203,15 @@ class UpstreamAgentService:
         current = manager.get_route(route_id)
         if not current or not current.source or current.source.type != "upstream_agent":
             raise ValueError("只能恢复上游 Agent 字段")
-        allowed = set(fields) & set(COMPARABLE_FIELDS)
+        if set(fields) - set(UPSTREAM_FIELDS):
+            raise ValueError("仅名称和描述可恢复为上游值；正、负例句由本地维护")
+        allowed = set(fields) & set(UPSTREAM_FIELDS)
         if not allowed:
             raise ValueError("没有可恢复的字段")
         route = current.model_copy(deep=True)
         for field in allowed:
             if field in route.source.source_snapshot:
                 setattr(route, field, route.source.source_snapshot[field])
-                if field == "utterances":
-                    route.utterances = list(dict.fromkeys([*route.utterances, *route.fallback_utterances]))
         route.sync = route.sync or RouteConfig.RouteSync()
         route.sync.manual_overrides = sorted(set(route.sync.manual_overrides) - allowed)
         RouteService._mark_changed(

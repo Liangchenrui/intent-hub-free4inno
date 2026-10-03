@@ -89,12 +89,12 @@ class AgentSource:
                 details = records_by_id[source_id]["resource"]
                 # A routing-complete list is not necessarily a complete raw Agent.
                 # BUPT returns raw details, including fields absent from live lists.
-                if not all(key in details for key in ("title", "text", "extent00", "extent01",
+                if not all(key in details for key in ("title", "text",
                                                      "attachments", "author", "labelsByCategory", "parameters", "source")):
                     details = self._get(base_url, f"/resource/{source_id}/detail")
                 if str(details.get("id", source_id)) != source_id:
                     raise ValueError("上游详情 ID 不匹配")
-                if not all(key in details for key in ("title", "text", "extent00", "extent01")):
+                if not all(key in details for key in ("title", "text")):
                     raise ValueError("上游详情缺少必要字段")
                 return {
                     "source_id": source_id,
@@ -102,8 +102,9 @@ class AgentSource:
                     "details": details,
                     "name": str(details.get("title") or "").strip(),
                     "description": str(details.get("text") or "").strip(),
-                    "utterances": self._parse_corpus(details.get("extent00")),
-                    "negative_samples": self._parse_corpus(details.get("extent01")),
+                    # Raw details remain compatible, but routing corpora are local.
+                    "utterances": [],
+                    "negative_samples": [],
                 }, None
             except Exception:
                 return None, source_id

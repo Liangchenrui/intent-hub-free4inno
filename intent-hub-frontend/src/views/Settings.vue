@@ -14,10 +14,12 @@
       </div>
 
       <el-card shadow="never" class="settings-card" v-loading="loading">
-        <el-form :model="settings" label-position="top" class="settings-form">
-          <el-divider content-position="left">Infrastructure</el-divider>
-          <el-form-item label="Qdrant URL">
-            <el-input v-model="settings.QDRANT_URL" placeholder="http://app.qdrant.free4inno.com" />
+        <el-form :model="settings" label-position="top" class="settings-form" :disabled="saving">
+          <section class="settings-section" :aria-label="$t('settings.connectionTab')">
+            <h2>{{ $t('settings.connectionTab') }}</h2>
+
+          <el-form-item :label="$t('settings.qdrantUrl')">
+            <el-input v-model="settings.QDRANT_URL" placeholder="http://localhost:6333" />
           </el-form-item>
           <el-form-item :label="$t('settings.qdrantCollection')">
             <el-select
@@ -46,21 +48,27 @@
               </el-button>
             </div>
           </el-form-item>
-          <el-form-item label="Embedding Service URL">
-            <el-input v-model="settings.EMBEDDING_SERVICE_URL" placeholder="http://embedding.free4inno.com/embed" />
+          <el-form-item :label="$t('settings.embeddingServiceUrl')">
+            <el-input v-model="settings.EMBEDDING_SERVICE_URL" placeholder="http://localhost:8000/embed" />
           </el-form-item>
-          <el-form-item :label="$t('settings.serviceHttpTrustEnv')">
-            <el-switch v-model="settings.SERVICE_HTTP_TRUST_ENV" />
-            <div class="field-hint">{{ $t('settings.serviceHttpTrustEnvHint') }}</div>
-          </el-form-item>
-          <el-form-item label="Route API Key（统一路由密钥）">
+          <el-form-item :label="$t('settings.routeKeyLabel')">
             <el-input v-model="settings.ROUTE_API_KEY" type="password" show-password autocomplete="new-password" />
-            <div class="field-hint">保存后立即用于 /route，重启保留。留空使用 AUTH_CODE 环境变量；不修改管理员登录密码。</div>
+            <div class="field-hint">{{ $t('settings.routeKeyHint') }}</div>
           </el-form-item>
 
-          <UpstreamSettings />
+          <el-collapse class="advanced-settings">
+            <el-collapse-item :title="$t('settings.networkTitle')" name="network">
+          <el-form-item :label="$t('settings.serviceHttpTrustEnv')">
+            <el-switch v-model="settings.SERVICE_HTTP_TRUST_ENV" :aria-label="$t('settings.serviceHttpTrustEnv')" />
+            <div class="field-hint">{{ $t('settings.serviceHttpTrustEnvHint') }}</div>
+            <div class="field-hint">{{ $t('settings.networkDetails') }}</div>
+          </el-form-item>
+            </el-collapse-item>
+          </el-collapse>
+          </section>
+          <section class="settings-section" :aria-label="$t('settings.llmTitle')">
+            <h2>{{ $t('settings.llmTitle') }}</h2>
 
-          <el-divider :content-position="'left'">{{ $t('settings.llmTitle') }}</el-divider>
           <el-form-item :label="$t('settings.llmProvider')">
             <el-select v-model="settings.LLM_PROVIDER" style="width: 100%">
               <el-option label="DeepSeek" value="deepseek" />
@@ -69,7 +77,7 @@
               <el-option label="通义千问 (Qwen)" value="qwen" />
               <el-option label="Gemini" value="gemini" />
             </el-select>
-            <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+            <div class="field-hint">
               {{ $t('settings.providerHint') }}
             </div>
           </el-form-item>
@@ -84,7 +92,7 @@
                   v-model="settings.LLM_MODEL" 
                   :placeholder="getModelPlaceholder()"
                 />
-                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                <div class="field-hint">
                   {{ $t('settings.modelHint') }}
                 </div>
               </el-form-item>
@@ -95,46 +103,60 @@
               v-model="settings.LLM_BASE_URL" 
               :placeholder="getBaseUrlPlaceholder()"
             />
-            <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+            <div class="field-hint">
               {{ $t('settings.baseUrlHint') }}
             </div>
           </el-form-item>
           <el-form-item :label="$t('settings.temperature')">
             <el-slider v-model="settings.LLM_TEMPERATURE" :min="0" :max="2" :step="0.1" show-input />
-            <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+            <div class="field-hint">
               {{ $t('settings.temperatureHint') }}
             </div>
           </el-form-item>
           <el-divider content-position="left">{{ $t('settings.fallbackTitle') }}</el-divider>
           <el-form-item :label="$t('settings.fallbackEnabled')">
-            <el-switch v-model="settings.LLM_FALLBACK_ENABLED" />
+            <el-switch v-model="settings.LLM_FALLBACK_ENABLED" :aria-label="$t('settings.fallbackEnabled')" />
             <div class="field-hint">{{ $t('settings.fallbackHint') }}</div>
           </el-form-item>
           <el-row :gutter="20">
-            <el-col :span="12">
+            <el-col :xs="24" :sm="12">
               <el-form-item :label="$t('settings.fallbackTopK')">
                 <el-input-number v-model="settings.LLM_FALLBACK_TOP_K" :min="1" :max="20" :step="1" :precision="0" :disabled="!settings.LLM_FALLBACK_ENABLED" />
               </el-form-item>
             </el-col>
-            <el-col :span="12">
+            <el-col :xs="24" :sm="12">
               <el-form-item :label="$t('settings.fallbackTimeout')">
                 <el-input-number v-model="settings.LLM_FALLBACK_TIMEOUT_SECONDS" :min="1" :max="60" :step="1" :disabled="!settings.LLM_FALLBACK_ENABLED" />
               </el-form-item>
             </el-col>
           </el-row>
+          </section>
+          <section class="settings-section" :aria-label="$t('settings.promptsTab')">
+            <el-collapse>
+              <el-collapse-item :title="$t('settings.promptsTab')" name="prompts">
+            <p class="section-hint">{{ $t('settings.promptsHint') }}</p>
           <el-form-item :label="$t('settings.prompt')">
-            <el-input v-model="settings.UTTERANCE_GENERATION_PROMPT" type="textarea" :rows="4" />
+            <el-input v-model="settings.UTTERANCE_GENERATION_PROMPT" type="textarea" :rows="7" />
+          </el-form-item>
+          <el-form-item :label="$t('settings.negativePrompt')">
+            <el-input v-model="settings.NEGATIVE_UTTERANCE_GENERATION_PROMPT" type="textarea" :rows="7" />
+            <div class="field-hint">{{ $t('settings.negativePromptHint') }}</div>
           </el-form-item>
           <el-form-item :label="$t('settings.skillImportPrompt')">
-            <el-input v-model="settings.SKILL_ROUTE_IMPORT_PROMPT" type="textarea" :rows="6" />
+            <el-input v-model="settings.SKILL_ROUTE_IMPORT_PROMPT" type="textarea" :rows="7" />
           </el-form-item>
           <el-form-item :label="$t('settings.repairPrompt')">
-            <el-input v-model="settings.AGENT_REPAIR_PROMPT" type="textarea" :rows="4" />
+            <el-input v-model="settings.AGENT_REPAIR_PROMPT" type="textarea" :rows="7" />
           </el-form-item>
 
-          <el-divider :content-position="'left'">{{ $t('settings.diagnosticTitle') }}</el-divider>
+              </el-collapse-item>
+            </el-collapse>
+          </section>
+          <section class="settings-section" :aria-label="$t('settings.diagnosticTitle')">
+            <h2>{{ $t('settings.diagnosticTitle') }}</h2>
+
           <el-row :gutter="20">
-            <el-col :span="12">
+            <el-col :xs="24" :sm="12">
               <el-form-item :label="$t('settings.regionThreshold')">
                 <el-slider 
                   v-model="settings.REGION_THRESHOLD_SIGNIFICANT" 
@@ -144,12 +166,12 @@
                   show-input 
                   :format-tooltip="(val: number) => (val * 100).toFixed(1) + '%'"
                 />
-                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                <div class="field-hint">
                   {{ $t('settings.regionThresholdHint') }}
                 </div>
               </el-form-item>
             </el-col>
-            <el-col :span="12">
+            <el-col :xs="24" :sm="12">
               <el-form-item :label="$t('settings.instanceThreshold')">
                 <el-slider 
                   v-model="settings.INSTANCE_THRESHOLD_AMBIGUOUS" 
@@ -159,18 +181,25 @@
                   show-input 
                   :format-tooltip="(val: number) => (val * 100).toFixed(1) + '%'"
                 />
-                <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                <div class="field-hint">
                   {{ $t('settings.instanceThresholdHint') }}
                 </div>
               </el-form-item>
             </el-col>
           </el-row>
 
+          </section>
           <div class="form-actions">
-            <el-button type="primary" :loading="saving" @click="handleSave">{{ $t('settings.save') }}</el-button>
-            <el-button @click="fetchSettings(true)">{{ $t('settings.reset') }}</el-button>
+            <span class="field-hint">{{ $t('settings.saveScope') }}</span>
+            <div class="action-buttons">
+              <el-button :disabled="saving || loading" @click="fetchSettings(true)">{{ $t('settings.reset') }}</el-button>
+              <el-button type="primary" :loading="saving" :disabled="loading" @click="handleSave">{{ $t('settings.save') }}</el-button>
+            </div>
           </div>
         </el-form>
+      </el-card>
+      <el-card shadow="never" class="settings-card upstream-settings-card">
+        <el-form label-position="top" class="settings-form"><UpstreamSettings /></el-form>
       </el-card>
     </el-main>
   </el-container>
@@ -220,6 +249,7 @@ const settings = ref<SystemSettings>({
   LLM_FALLBACK_TOP_K: 5,
   LLM_FALLBACK_TIMEOUT_SECONDS: 8,
   UTTERANCE_GENERATION_PROMPT: '',
+  NEGATIVE_UTTERANCE_GENERATION_PROMPT: '',
   SKILL_ROUTE_IMPORT_PROMPT: '',
   AGENT_REPAIR_PROMPT: '',
   BATCH_SIZE: 32,
@@ -246,6 +276,7 @@ const normalizeSettings = (data: any): SystemSettings => ({
   LLM_FALLBACK_TOP_K: data.LLM_FALLBACK_TOP_K ?? 5,
   LLM_FALLBACK_TIMEOUT_SECONDS: data.LLM_FALLBACK_TIMEOUT_SECONDS ?? 8,
   UTTERANCE_GENERATION_PROMPT: data.UTTERANCE_GENERATION_PROMPT ?? '',
+  NEGATIVE_UTTERANCE_GENERATION_PROMPT: data.NEGATIVE_UTTERANCE_GENERATION_PROMPT ?? '',
   SKILL_ROUTE_IMPORT_PROMPT: data.SKILL_ROUTE_IMPORT_PROMPT ?? '',
   AGENT_REPAIR_PROMPT: data.AGENT_REPAIR_PROMPT ?? '',
   BATCH_SIZE: data.BATCH_SIZE ?? 32,
@@ -437,7 +468,9 @@ onMounted(() => {
 
 .field-hint {
   margin-top: 4px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
+  line-height: 1.6;
+  width: 100%;
   font-size: 12px;
 }
 
@@ -445,6 +478,7 @@ onMounted(() => {
   margin-top: 10px;
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .main-wrapper {
@@ -473,19 +507,40 @@ onMounted(() => {
   border: none;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
-  padding: 20px;
+  padding: 8px 16px;
 }
 
 .settings-form {
-  max-width: 1000px;
+  max-width: 960px;
   margin: 0 auto;
 }
 
 .form-actions {
-  margin-top: 40px;
-  display: flex;
-  justify-content: center;
-  gap: 20px;
+  position: sticky; bottom: 0; z-index: 5;
+  margin-top: 24px; padding: 16px 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  background: var(--el-bg-color); border-top: 1px solid var(--el-border-color-light);
+}
+.form-actions > .field-hint { width: auto; margin: 0; }
+.action-buttons { display: flex; gap: 8px; flex-shrink: 0; }
+.action-buttons .el-button { margin-left: 0; }
+.settings-section + .settings-section { border-top: 1px solid var(--el-border-color-light); margin-top: 32px; padding-top: 24px; }
+.settings-section h2 { font-size: 16px; font-weight: 600; margin: 0 0 24px; }
+.settings-section :deep(.el-collapse-item__header) { font-size: 16px; font-weight: 600; }
+.settings-section :deep(.el-collapse) { border: none; }
+.section-hint { font-size: 13px; color: var(--el-text-color-secondary); line-height: 1.6; margin: 0 0 20px; }
+.upstream-settings-card { margin-top: 24px; }
+:deep(.el-form-item) { margin-bottom: 24px; }
+:deep(.el-form-item__label) { font-weight: 500; }
+:deep(.el-slider) { margin: 0 8px; }
+.advanced-settings { margin: 8px 0 24px; }
+:deep(.advanced-settings .el-collapse-item__header) { font-size: 14px; font-weight: 500; }
+@media (max-width: 600px) {
+  .settings-card { padding: 0; }
+  :deep(.settings-card > .el-card__body) { padding: 16px; }
+  .form-actions { align-items: stretch; flex-direction: column; gap: 8px; }
+  .action-buttons { justify-content: flex-end; }
+  :deep(.el-slider__input) { width: 110px; }
 }
 
 .skill-actions {

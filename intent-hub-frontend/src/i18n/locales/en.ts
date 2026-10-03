@@ -120,6 +120,16 @@ export default {
     requestError: 'Request failed. Please try again.',
   },
   agent: {
+    editor: { basic: 'Basic information', examples: 'Matching examples', onePerLine: 'One per line', saveFirst: 'Save your changes before marking this item as reviewed.', pendingHint: 'Save to keep editing; mark reviewed to close.' },
+    review: {
+      title: 'Maintenance status', pending: 'Needs review', done: 'Reviewed', onlyPending: 'Needs review only',
+      count: '{count} need review in the current search results', markDone: 'Mark reviewed', markPending: 'Mark for review',
+      fields: 'Changed fields', hint: 'Save example edits before marking reviewed. Opening or saving does not clear alerts. This status is shared by administrators.',
+      saved: 'Review status updated', conflict: 'Agent information or review status changed. Reload the details before confirming.',
+      reload: 'Reload details', reloadConfirm: 'Reloading discards unsaved form edits. Continue?', missing: 'Agent no longer exists. Refresh the list.',
+      reasons: { created: 'Added upstream', updated: 'Updated upstream (manual overrides kept)', manual: 'Marked by administrator' },
+      fieldNames: { name: 'Name', description: 'Description', attachments: 'Attachments', author: 'Author', labelsByCategory: 'Categories', parameters: 'Parameters', source: 'Source information' },
+    },
     inactiveState: 'Inactive',
     mergeAction: 'Merge',
     mergeTarget: 'Enter target entity ID',
@@ -268,7 +278,18 @@ export default {
     reindexErrorDetail: 'Sync failed: {detail}',
   },
   settings: {
-    serviceHttpTrustEnv: 'Use HTTP environment for internal services',
+    negativePrompt: 'Negative example generation prompt',
+    negativePromptHint: "Variables: {'{'}name{'}'}, {'{'}description{'}'}, {'{'}count{'}'}, {'{'}positive_examples{'}'}, {'{'}reference_utterances{'}'}, {'{'}format_instructions{'}'}. Keep the output format variable. Empty restores the default.",
+
+    pageHint: 'Manage service connections, models and routing behavior.',
+    connectionTab: 'Connections', promptsTab: 'Prompts', upstreamsTab: 'Upstream sources',
+    promptsHint: 'Keep template variables when editing. Both positive and negative example prompts can be configured.',
+    saveScope: 'Save system settings. Upstream sources are saved separately.',
+    networkTitle: 'Advanced network settings',
+    networkDetails: 'Reads HTTP_PROXY, HTTPS_PROXY, NO_PROXY and certificate environment variables from the backend process, not browser or OS proxy preferences. HTTPS verification remains enabled when off.',
+    routeKeyLabel: 'Routing API key', routeKeyHint: 'Used by /route, separate from administrator login. Empty uses the AUTH_CODE environment variable.',
+
+    serviceHttpTrustEnv: 'Use proxy and certificate environment variables',
     serviceHttpTrustEnvHint: 'Embedding and Qdrant only. Disable for direct connections with HTTPS verification still enabled. LLM settings are unchanged.',
     upstreamAgentTitle: 'Upstream Agent',
     upstreamAgentUrl: 'Upstream Agent API URL',

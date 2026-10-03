@@ -86,6 +86,10 @@
           style="display: none"
           @change="handleImportFileChange"
         />
+        <div class="review-filter">
+          <el-checkbox v-model="onlyNeedsReview">{{ $t('agent.review.onlyPending') }}</el-checkbox>
+          <span>{{ $t('agent.review.count', { count: pendingReviewCount }) }}</span>
+        </div>
         <input
           ref="skillFileInput"
           type="file"
@@ -112,6 +116,9 @@
                 <div class="agent-name">{{ row.name }}
                     <el-tag v-if="row.lifecycle_status && row.lifecycle_status !== 'active'" type="info" size="small">{{ $t('agent.inactiveState') }}</el-tag></div>
                 <div class="agent-route-key">{{ row.route_key }}</div>
+                <el-tag :type="row.review?.needs_review ? 'warning' : 'info'" size="small">
+                  {{ $t(row.review?.needs_review ? 'agent.review.pending' : 'agent.review.done') }}
+                </el-tag>
                 <CollapsibleDescription :key="row.id" :text="row.description || $t('agent.noDescription')" />
                 <el-tag
                   v-if="row.source?.type === 'upstream_agent'"
@@ -253,31 +260,48 @@
       v-model="showModal"
       :title="isEdit ? $t('agent.editTitle') : $t('agent.addTitle')"
       width="90%"
-      style="max-width: 650px"
+      style="max-width: 760px"
+      top="5vh"
+      :close-on-click-modal="false"
+      :close-on-press-escape="!saving && !reviewSaving"
+      :show-close="!saving && !reviewSaving"
       destroy-on-close
       class="custom-dialog"
     >
-        <el-form :model="editForm" label-position="top">
-        <div class="skill-import-bar">
-          <div class="skill-import-copy">
-            <div class="skill-import-title">{{ $t('agent.skillImportTitle') }}</div>
-            <div class="skill-import-desc">{{ $t('agent.skillImportDesc') }}</div>
+        <el-form :model="editForm" label-position="top" :disabled="saving || reviewSaving">
+        <section v-if="isEdit" class="review-detail" :aria-label="$t('agent.review.title')">
+          <div class="review-actions">
+            <strong>{{ $t('agent.review.title') }}</strong>
+            <el-tag :type="editForm.review?.needs_review ? 'warning' : 'info'">
+              {{ $t(editForm.review?.needs_review ? 'agent.review.pending' : 'agent.review.done') }}
+            </el-tag>
+
           </div>
-          <el-button
-            type="primary"
-            plain
-            :loading="importingSkill"
-            @click="triggerSkillImport"
-          >
+          <p v-if="editForm.review?.reason">
+            {{ $t(`agent.review.reasons.${editForm.review.reason}`) }}
+            <span v-if="editForm.review.changed_at"> · {{ new Date(editForm.review.changed_at).toLocaleString() }}</span>
+          </p>
+          <p v-if="editForm.review?.changed_fields?.length">
+            {{ $t('agent.review.fields') }}：{{ editForm.review.changed_fields.map(reviewFieldLabel).join('、') }}
+          </p>
+
+          <el-alert v-if="reviewConflict" :title="$t('agent.review.conflict')" type="warning" :closable="false" />
+          <el-button v-if="reviewConflict" link type="primary" @click="reloadReviewDetail">{{ $t('agent.review.reload') }}</el-button>
+        </section>
+        <div class="editor-section-heading">
+          <h3>{{ $t('agent.editor.basic') }}</h3>
+          <el-button link type="primary" :loading="importingSkill" @click="triggerSkillImport">
             {{ $t('agent.skillImportAction') }}
           </el-button>
         </div>
+        <div class="identity-fields">
         <el-form-item :label="$t('agent.nameLabel')" required>
           <el-input v-model="editForm.name" :placeholder="$t('agent.namePlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('agent.routeKeyLabel')" required>
           <el-input :disabled="editForm.source?.type === 'upstream_agent'" v-model="editForm.route_key" :placeholder="$t('agent.routeKeyPlaceholder')" />
         </el-form-item>
+        </div>
         <el-form-item :label="$t('agent.descLabel')">
           <el-input 
             v-model="editForm.description" 
@@ -286,6 +310,7 @@
             :rows="3" 
           />
         </el-form-item>
+        <div class="editor-section-heading"><h3>{{ $t('agent.editor.examples') }}</h3><span>{{ $t('agent.editor.onePerLine') }}</span></div>
         <el-form-item :label="$t('agent.thresholdLabel')">
           <div class="threshold-container">
             <el-slider 
@@ -320,10 +345,12 @@
                   class="gen-count-input"
                 />
                 <el-button 
-                  type="success" 
+                  type="primary"
+                  plain
                   size="small" 
                   :loading="generating"
-                  @click="handleGenerateAI"
+                  @click="handleGenerateAI('positive')"
+                  :disabled="generatingNegative"
                   :icon="MagicStick"
                 >
                   {{ $t('agent.aiGen') }}
@@ -335,7 +362,7 @@
             v-model="utterancesText" 
             type="textarea" 
             :placeholder="$t('agent.utterancePlaceholder')" 
-            :rows="10" 
+            :rows="5"
           />
         </el-form-item>
         <el-form-item :label="$t('agent.negativeThresholdLabel')">
@@ -357,22 +384,40 @@
             />
           </div>
         </el-form-item>
-        <el-form-item :label="$t('agent.negativeSamplesLabel')">
-          <el-button v-if="isEdit" size="small" :loading="generatingNegative" @click="handleRecommendNegative">{{ $t('agent.recommendNegative') }}</el-button>
+        <el-form-item>
+          <template #label>
+            <div class="label-row">
+              <span>{{ $t('agent.negativeSamplesLabel') }}</span>
+              <div class="ai-gen-options">
+                <span class="gen-label">{{ $t('agent.genCount') }}:</span>
+                <el-input-number v-model="negativeGenCount" :min="1" :max="20" size="small" controls-position="right" class="gen-count-input" />
+                <el-button type="primary" plain size="small" :loading="generatingNegative" :disabled="generating" @click="handleGenerateAI('negative')" :icon="MagicStick">
+                  {{ $t('agent.aiGen') }}
+                </el-button>
+              </div>
+            </div>
+          </template>
           <el-input 
             v-model="negativeSamplesText" 
             type="textarea" 
             :placeholder="$t('agent.negativeSamplesPlaceholder')" 
-            :rows="6" 
+            :rows="5"
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="closeModal">{{ $t('common.cancel') }}</el-button>
-          <el-button type="primary" :loading="saving" @click="handleSave">
-            {{ $t('common.save') }}
-          </el-button>
+        <div class="editor-footer">
+          <span class="editor-footer-hint" role="status">{{ reviewConflict ? $t('agent.review.conflict') : isEdit && formDirty ? $t('agent.editor.saveFirst') : isEdit && editForm.review?.needs_review ? $t('agent.editor.pendingHint') : '' }}</span>
+          <div class="editor-footer-actions">
+            <el-button :disabled="saving || reviewSaving" @click="closeModal">{{ $t('common.cancel') }}</el-button>
+            <el-button v-if="isEdit && !editForm.review?.needs_review" :loading="reviewSaving" :disabled="reviewConflict || saving || formDirty" @click="handleReviewChange">{{ $t('agent.review.markPending') }}</el-button>
+            <el-button :type="isEdit && editForm.review?.needs_review ? 'default' : 'primary'" :loading="saving" :disabled="reviewSaving || generating || generatingNegative || importingSkill" @click="handleSave">
+              {{ $t('common.save') }}
+            </el-button>
+            <el-button v-if="isEdit && editForm.review?.needs_review" type="primary" :loading="reviewSaving" :disabled="reviewConflict || saving || formDirty || generating || generatingNegative || importingSkill" @click="handleReviewChange">
+              {{ $t('agent.review.markDone') }}
+            </el-button>
+          </div>
         </div>
       </template>
     </el-dialog>
@@ -419,9 +464,9 @@ import {
   searchRoutes,
   deleteRoute,
   updateRoute,
+  updateRouteReview,
   createRoute,
   generateUtterances,
-  recommendNegativeSamples,
   reindex,
   importRoutes,
   importRouteFromSkill,
@@ -460,7 +505,11 @@ const diffLoading = ref(false);
 const upstreamDiff = ref<UpstreamRouteDiff>();
 const diffRouteId = ref<number>();
 const genCount = ref(5);
+const negativeGenCount = ref(5);
 const searchQuery = ref('');
+const onlyNeedsReview = ref(false);
+const reviewSaving = ref(false);
+const reviewConflict = ref(false);
 const activeTab = ref('list');
 const importFileInput = ref<HTMLInputElement | null>(null);
 const skillFileInput = ref<HTMLInputElement | null>(null);
@@ -469,10 +518,17 @@ const selectedRouteIds = ref<number[]>([]);
 const currentPage = ref(1);
 const pageSize = 10;
 
-const totalAgents = computed(() => agents.value.length);
+const pendingReviewCount = computed(() => agents.value.filter(agent => agent.review?.needs_review).length);
+const filteredAgents = computed(() => onlyNeedsReview.value
+  ? agents.value.filter(agent => agent.review?.needs_review) : agents.value);
+const totalAgents = computed(() => filteredAgents.value.length);
 const paginatedAgents = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
-  return agents.value.slice(start, start + pageSize);
+  return filteredAgents.value.slice(start, start + pageSize);
+});
+watch(onlyNeedsReview, () => { currentPage.value = 1; selectedRouteIds.value = []; });
+watch(totalAgents, (count) => {
+  currentPage.value = Math.min(currentPage.value, Math.max(1, Math.ceil(count / pageSize)));
 });
 
 const displayIndex = (index: number) => (currentPage.value - 1) * pageSize + index + 1;
@@ -741,17 +797,18 @@ const editForm = ref<Partial<RouteConfig>>({
 });
 const utterancesText = ref('');
 const generatingNegative = ref(false);
-const handleRecommendNegative = async () => {
-  generatingNegative.value = true;
-  try {
-    const { data } = await recommendNegativeSamples(editForm.value.id!, genCount.value);
-    negativeSamplesText.value = [...new Set([...negativeSamplesText.value.split('\n').filter(Boolean), ...data.items])].join('\n');
-  } catch (error: any) { ElMessage.error(error.response?.data?.detail || t('common.error')); }
-  finally { generatingNegative.value = false; }
-};
 const negativeSamplesText = ref('');
+const savedFormSnapshot = ref('');
+const formSnapshot = () => JSON.stringify({
+  name: editForm.value.name, route_key: editForm.value.route_key,
+  description: editForm.value.description, score_threshold: editForm.value.score_threshold,
+  negative_threshold: editForm.value.negative_threshold,
+  utterances: utterancesText.value, negative_samples: negativeSamplesText.value,
+});
+const formDirty = computed(() => formSnapshot() !== savedFormSnapshot.value);
 
 const openModal = (agent?: RouteConfig) => {
+  reviewConflict.value = false;
   if (agent) {
     isEdit.value = true;
     originalRouteKey.value = agent.route_key;
@@ -774,6 +831,7 @@ const openModal = (agent?: RouteConfig) => {
     utterancesText.value = '';
     negativeSamplesText.value = '';
   }
+  savedFormSnapshot.value = formSnapshot();
   showModal.value = true;
 };
 
@@ -783,6 +841,40 @@ const closeModal = () => {
 
 const handleAdd = () => openModal();
 const handleEdit = (agent: RouteConfig) => openModal(agent);
+
+const reviewFieldLabel = (field: string) => t(`agent.review.fieldNames.${field.replace('details.', '')}`);
+
+const handleReviewChange = async () => {
+  if (!editForm.value.id || reviewConflict.value || saving.value || reviewSaving.value || formDirty.value) return;
+  reviewSaving.value = true;
+  try {
+    const { data } = await updateRouteReview(editForm.value.id,
+      !editForm.value.review?.needs_review, editForm.value.review?.version || 0);
+    // Review changes only after all form edits have been saved.
+    editForm.value.review = data.review;
+    if (!data.review?.needs_review) closeModal();
+    await fetchAgents(searchQuery.value, true);
+    ElMessage.success(t('agent.review.saved'));
+  } catch (e: any) {
+    if (e?.response?.status === 409) reviewConflict.value = true;
+    ElMessage.error(e?.response?.status === 409 ? t('agent.review.conflict')
+      : e?.response?.data?.detail || t('common.error'));
+  } finally {
+    reviewSaving.value = false;
+  }
+};
+
+const reloadReviewDetail = async () => {
+  try {
+    await ElMessageBox.confirm(t('agent.review.reloadConfirm'), t('agent.review.title'));
+    const { data } = await getRoutes();
+    const current = data.find(agent => agent.id === editForm.value.id);
+    if (!current) { ElMessage.error(t('agent.review.missing')); return; }
+    openModal(current);
+  } catch (e: any) {
+    if (e !== 'cancel' && e !== 'close') ElMessage.error(t('common.error'));
+  }
+};
 
 const handleReindex = async () => {
   try {
@@ -865,7 +957,7 @@ const handleImportFileChange = async (evt: Event) => {
       if (!('route_key' in item) || typeof item.route_key !== 'string' || !item.route_key.trim()) {
         return ElMessage.error(t('agent.importInvalidFormat'));
       }
-      if (!('utterances' in item) || !Array.isArray(item.utterances) || item.utterances.length === 0) {
+      if (!('utterances' in item) || !Array.isArray(item.utterances)) {
         return ElMessage.error(t('agent.importInvalidFormat'));
       }
     }
@@ -916,17 +1008,21 @@ const handleSkillFileChange = async (evt: Event) => {
   }
 };
 
-const handleGenerateAI = async () => {
+const handleGenerateAI = async (polarity: 'positive' | 'negative') => {
+  if (generating.value || generatingNegative.value) return;
+  const pending = polarity === 'negative' ? generatingNegative : generating;
   if (!editForm.value.name) return ElMessage.warning(t('agent.inputNameWarning'));
   if (!editForm.value.route_key?.trim()) return ElMessage.warning(t('agent.routeKeyRequired'));
-  generating.value = true;
+  pending.value = true;
   try {
     const current = utterancesText.value.split('\n').filter(s => s.trim());
     const requestData: GenerateUtterancesRequest = {
       id: editForm.value.id || 0,
       name: editForm.value.name,
       route_key: editForm.value.route_key.trim(),
-      count: genCount.value,
+      count: polarity === 'negative' ? negativeGenCount.value : genCount.value,
+      polarity,
+      negative_samples: negativeSamplesText.value.split('\n').filter(s => s.trim()),
       utterances: current
     };
     
@@ -935,14 +1031,16 @@ const handleGenerateAI = async () => {
     }
     
     const response = await generateUtterances(requestData);
-    if (response.data.utterances && response.data.utterances.length > 0) {
-      utterancesText.value = response.data.utterances.join('\n');
+    const result = polarity === 'negative' ? response.data.negative_samples : response.data.utterances;
+    if (result?.length) {
+      (polarity === 'negative' ? negativeSamplesText : utterancesText).value = result.join('\n');
     }
     ElMessage.success(t('agent.aiGenSuccess'));
-  } catch (e) { ElMessage.error(t('agent.aiGenError')); } finally { generating.value = false; }
+  } catch (e) { ElMessage.error(t('agent.aiGenError')); } finally { pending.value = false; }
 };
 
 const handleSave = async () => {
+  if (saving.value || reviewSaving.value) return;
   if (!editForm.value.name) return ElMessage.warning(t('agent.nameRequired'));
   if (!editForm.value.route_key?.trim()) return ElMessage.warning(t('agent.routeKeyRequired'));
   saving.value = true;
@@ -963,12 +1061,19 @@ const handleSave = async () => {
       negative_samples: negativeSamplesText.value.split('\n').filter(s => s.trim()),
       negative_threshold: editForm.value.negative_threshold || 0.95
     } as RouteConfig;
-    isEdit.value ? await updateRoute(data.id, data) : await createRoute(data);
+    const response = isEdit.value ? await updateRoute(data.id, data) : await createRoute(data);
+    // A save must not silently acknowledge an upstream update received while editing.
+    const latestReview = response.data.review;
+    if ((latestReview?.version || 0) !== (editForm.value.review?.version || 0)) reviewConflict.value = true;
+    editForm.value.review = latestReview;
+    originalRouteKey.value = trimmedRouteKey;
+    savedFormSnapshot.value = formSnapshot();
     ElMessage.success(t('agent.saveQueued'));
-    closeModal();
+    if (!isEdit.value || (!latestReview?.needs_review && !reviewConflict.value)) closeModal();
     currentPage.value = 1;
     fetchAgents(searchQuery.value);
   } catch (e: any) {
+    if (e === 'cancel' || e === 'close') return;
     const detail = e?.response?.data?.detail;
     ElMessage.error(detail || t('agent.saveError'));
   } finally { saving.value = false; }
@@ -1030,6 +1135,11 @@ const handleBatchDelete = async () => {
 </script>
 
 <style scoped>
+.review-filter, .review-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.review-filter { margin: 12px 0; color: var(--el-text-color-secondary); font-size: 13px; }
+.review-detail { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--el-border-color-light); }
+.review-detail p { margin: 10px 0; font-size: 13px; line-height: 1.6; }
+
 .comparison-tag { margin-left: 8px; cursor: pointer; }
 .diff-values { display: grid; gap: 6px; white-space: pre-wrap; }
 .layout-container {
@@ -1162,38 +1272,8 @@ const handleBatchDelete = async () => {
 .threshold-container {
   display: flex;
   align-items: center;
-  background: #f8f9fb;
-  padding: 8px 16px;
-  border-radius: 8px;
-}
-
-.skill-import-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-  padding: 14px 16px;
-  background: #f8f9fb;
-  border: 1px dashed #d7deea;
-  border-radius: 12px;
-}
-
-.skill-import-copy {
-  min-width: 0;
-}
-
-.skill-import-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.skill-import-desc {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #606266;
-  line-height: 1.5;
+  width: 100%;
+  gap: 8px;
 }
 
 .label-row {
@@ -1230,8 +1310,24 @@ const handleBatchDelete = async () => {
   font-weight: 700;
 }
 
-:deep(.custom-dialog) {
-  border-radius: 16px;
+/* The dialog is teleported; scope its surface explicitly. */
+:global(.custom-dialog) { border-radius: 12px; padding: 24px; display: flex; flex-direction: column; max-height: 90dvh; }
+:global(.custom-dialog .el-dialog__body) { overflow-y: auto; padding: 20px 4px 0; }
+:global(.custom-dialog .el-dialog__footer) { border-top: 1px solid var(--el-border-color-light); padding-top: 16px; }
+.editor-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.editor-section-heading h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.editor-section-heading span, .editor-footer-hint { color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.5; }
+.identity-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.editor-footer { display: flex; flex-direction: column; gap: 12px; }
+.editor-footer-hint:empty { display: none; }
+.editor-footer-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.editor-footer-actions .el-button { margin-left: 0; }
+:deep(.el-form-item__label) { width: 100%; }
+.label-row { gap: 8px; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  :global(.custom-dialog) { padding: 16px; width: 96%; }
+  .identity-fields { grid-template-columns: 1fr; gap: 0; }
+  .ai-gen-options { gap: 8px; }
 }
 
 :deep(.el-dialog__header) {

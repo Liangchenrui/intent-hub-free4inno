@@ -5,7 +5,7 @@ info:
   description: |
     上游服务需要实现的固定只读 API，调用方向为 Intent Hub → 上游。
     servers.url 对应设置中的接口公共前缀，不是完整列表 URL。
-    本文件描述新上游的标准格式；运行时对旧语料字符串、缺省分页字段等的兼容不属于标准响应。
+    本文件描述新上游的标准格式；上游语料字段仅保留在原始详情中，不导入本地正负例。缺省分页字段不属于标准响应。
     详细兼容与异常处理见同目录 upstream-agent-protocol.md。
     当前不发送上游认证头，无协议版本协商；版本号不要求 URL 包含 /v1。
     本文件不包含 Intent Hub 自己的设置、触发拉取和任务查询管理 API。
@@ -27,7 +27,7 @@ paths:
         后续请求使用响应中的 pageSize，递增 pageNum。total 必须保持一致，各页 ID 不能重叠。
         多个标签分别请求，结果按字符串化的原始 ID 去重；同 ID 内容应一致。
         不支持游标分页。不要依赖 hasMore、has_more 或 next，当前适配器会将首页这些真值标记为列表不完整。
-        完整资源若包含 title、text、extent00、extent01、attachments、author、labelsByCategory、parameters、source，
+        完整资源若包含 title、text、attachments、author、labelsByCategory、parameters、source，
         则跳过详情请求；否则按 ID 请求详情。
       parameters:
         - name: labels
@@ -169,7 +169,7 @@ components:
       example: 123
     Corpus:
       type: array
-      description: 标准格式为字符串数组；去除首尾空白、空项和重复项。无语料使用空数组。
+      description: 可选的上游原始语料，建议字符串数组；Intent Hub 不解析、不导入，也不用于更新提醒。
       items:
         type: string
       example: [查询天气]
@@ -212,8 +212,8 @@ components:
       allOf:
         - $ref: '#/components/schemas/Resource'
         - type: object
-          required: [id, title, text, extent00, extent01]
-      description: 标准详情必需五个业务字段；其他扩展字段按原样保存。
+          required: [id, title, text]
+      description: 标准详情必需 id、title、text；其他扩展字段按原样保存，语料字段不参与本地路由。
     ResourcePage:
       type: object
       required: [records, total, pageNum, pageSize]

@@ -8,6 +8,10 @@ from typing import Any
 
 
 COMPARABLE_FIELDS = ("name", "description", "utterances", "negative_samples")
+UPSTREAM_FIELDS = ("name", "description")
+# Detail fields defined by the application-center contract. Volatile counters,
+# timestamps, raw corpora and unknown extensions do not trigger review alerts.
+REVIEW_DETAIL_FIELDS = ("attachments", "author", "labelsByCategory", "parameters", "source")
 CORPUS_FIELDS = {"utterances", "negative_samples"}
 
 
@@ -33,21 +37,21 @@ def fields_equal(field: str, left: Any, right: Any) -> bool:
 
 
 def snapshots_equal(left: dict[str, Any], right: dict[str, Any]) -> bool:
-    return all(fields_equal(field, left.get(field), right.get(field)) for field in COMPARABLE_FIELDS)
+    return all(fields_equal(field, left.get(field), right.get(field)) for field in UPSTREAM_FIELDS)
 
 
 def comparison_summary(route) -> dict[str, Any]:
     source = route.source
     if source is None or source.type != "upstream_agent":
         return {"status": "local_only", "diff_fields": [], "diff_count": 0, "override_fields": []}
-    overrides = sorted(set(route.sync.manual_overrides if route.sync else []))
+    overrides = sorted(set(route.sync.manual_overrides if route.sync else []) & set(UPSTREAM_FIELDS))
     snapshot = source.source_snapshot or {}
     if source.upstream_present is False:
         status, diff_fields = "upstream_missing", []
-    elif not all(field in snapshot for field in COMPARABLE_FIELDS):
+    elif not all(field in snapshot for field in UPSTREAM_FIELDS):
         status, diff_fields = "snapshot_unknown", []
     else:
-        diff_fields = [field for field in COMPARABLE_FIELDS if not fields_equal(field, getattr(route, field), snapshot.get(field))]
+        diff_fields = [field for field in UPSTREAM_FIELDS if not fields_equal(field, getattr(route, field), snapshot.get(field))]
         locked_equal = bool(set(overrides) - set(diff_fields))
         status = "local_modified" if diff_fields else ("locked_equal" if locked_equal else "same")
     return {
@@ -62,7 +66,7 @@ def comparison_detail(route) -> dict[str, Any]:
     summary = comparison_summary(route)
     snapshot = route.source.source_snapshot if route.source else {}
     fields = {}
-    for field in COMPARABLE_FIELDS:
+    for field in UPSTREAM_FIELDS:
         local_value = getattr(route, field)
         upstream_value = snapshot.get(field)
         common = {"changed": field in summary["diff_fields"], "overridden": field in summary["override_fields"]}

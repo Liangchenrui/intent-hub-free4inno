@@ -135,6 +135,13 @@ def delete_route(route_id: int):
     return routes.delete_route(route_id)
 
 
+@app.patch("/routes/<int:route_id>/review")
+@require_auth
+def update_route_review(route_id: int):
+    from intent_hub.api import routes
+    return routes.update_review(route_id)
+
+
 @app.route("/routes/generate-utterances", methods=["POST"])
 @require_auth
 def generate_utterances():

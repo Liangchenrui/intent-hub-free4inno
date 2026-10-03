@@ -50,11 +50,20 @@ def document():
                 })
             request_type = None
             if method == 'POST':
-                request_type = {'/route': 'RouteRequest', '/auth/login': 'LoginRequest',
+                request_type = {'/routes/generate-utterances': 'GenerateUtterancesRequest', '/route': 'RouteRequest', '/auth/login': 'LoginRequest',
                                 '/routes': 'RouteConfig', '/agents': 'AgentCreate', '/routes/merge': 'MergeAgentsRequest',
                                 '/diagnostics/merge': 'MergeAgentsRequest'}.get(base)
             if method == 'PATCH' and base == '/agents/{agent_id}':
                 request_type = 'AgentUpdate'
+            if method == 'PATCH' and base == '/routes/{route_id}/review':
+                request_type = 'ReviewRequest'
+                operation['responses'].update({
+                    '200': {'description': 'RouteConfig with current shared review state; no indexing is queued.'},
+                    '400': {'description': 'Invalid review state or expected_version'},
+                    '401': {'description': 'Management authentication required'},
+                    '404': {'description': 'Route does not exist'},
+                    '409': {'description': 'Review version changed; reload details before acknowledging'},
+                })
             if request_type:
                 operation['requestBody'] = {'required': True, 'content': {'application/json': {'schema': {'$ref': '#/components/schemas/' + request_type}}}}
             if base == '/route':
@@ -70,7 +79,7 @@ def document():
                 operation['responses'] = {'202': {'description': 'Durable upstream_pull task queued or reused; poll GET /sync-tasks. Result contains counts and optional sync_task_id for index completion.'}}
             paths.setdefault(path, {})[method.lower()] = operation
     schemas = {}
-    for module, names in [(models, ['RouteRequest', 'PredictResponse', 'RouteConfig', 'LoginRequest']),
+    for module, names in [(models, ['RouteRequest', 'PredictResponse', 'RouteConfig', 'ReviewRequest', 'LoginRequest', 'GenerateUtterancesRequest']),
                           (compat_models, ['Agent', 'AgentCreate', 'AgentUpdate', 'MergeAgentsRequest'])]:
         for name in names:
             schema = getattr(module, name).model_json_schema(ref_template='#/components/schemas/{model}')

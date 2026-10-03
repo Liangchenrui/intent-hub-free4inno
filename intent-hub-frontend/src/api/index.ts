@@ -126,7 +126,19 @@ export interface RouteConfig {
   sync?: RouteSyncMeta;
   lifecycle_status?: string;
   comparison?: RouteComparison;
+  review?: RouteReview;
 }
+
+export interface RouteReview {
+  needs_review: boolean;
+  version: number;
+  changed_at: string | null;
+  reason: 'created' | 'updated' | 'manual' | null;
+  changed_fields: string[];
+}
+
+export const updateRouteReview = (id: number, needsReview: boolean, expectedVersion: number) =>
+  api.patch<RouteConfig>(`/routes/${id}/review`, { needs_review: needsReview, expected_version: expectedVersion });
 
 export interface UpstreamDiffField {
   kind: 'scalar' | 'corpus';
@@ -166,6 +178,8 @@ export interface GenerateUtterancesRequest {
   description?: string;
   count?: number;
   utterances?: string[];
+  polarity?: 'positive' | 'negative';
+  negative_samples?: string[];
 }
 
 export interface ImportSkillRouteRequest {
@@ -370,6 +384,7 @@ export interface SharedLlmSettings {
   LLM_TEMPERATURE: number;
 
   UTTERANCE_GENERATION_PROMPT: string;
+  NEGATIVE_UTTERANCE_GENERATION_PROMPT: string;
   AGENT_REPAIR_PROMPT: string;
   SKILL_ROUTE_IMPORT_PROMPT: string;
 

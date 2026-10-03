@@ -10,6 +10,7 @@ from intent_hub.models import (
     ErrorResponse,
     GenerateUtterancesRequest,
     RouteConfig,
+    ReviewRequest,
     SkillRouteImportRequest,
 )
 from intent_hub.services.route_service import RouteService
@@ -51,6 +52,30 @@ def search_routes():
     routes = route_service.search_routes(query)
 
     return jsonify([_route_payload(route, index) for index, route in enumerate(routes, start=1)]), 200
+
+
+@handle_errors
+def update_review(route_id: int):
+    data = ReviewRequest.model_validate(request.get_json(silent=True))
+    repo = get_component_manager().route_manager.repository
+    with repo.transaction() as db:
+        row = db.execute('SELECT body FROM entities WHERE id=?', (route_id,)).fetchone()
+        if row is None:
+            return jsonify(error="路由不存在", detail="请刷新列表"), 404
+        route = RouteConfig.model_validate_json(row[0])
+        if route.review.version != data.expected_version:
+            return jsonify(error="review_conflict", detail="智能体信息或处理状态已变化，请重新加载详情后确认",
+                           review=route.review.model_dump()), 409
+        if route.review.needs_review != data.needs_review:
+            route.review.needs_review = data.needs_review
+            route.review.version += 1
+            if data.needs_review:
+                from datetime import datetime, timezone
+                route.review.changed_at = datetime.now(timezone.utc).isoformat()
+                route.review.reason = "manual"
+                route.review.changed_fields = []
+            repo.save(route, db, enqueue=False, update_review=True)
+    return jsonify(_route_payload(route)), 200
 
 
 @handle_errors

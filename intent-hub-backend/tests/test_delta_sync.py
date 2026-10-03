@@ -267,6 +267,18 @@ def test_source_baseline_and_details_changes_do_not_touch_index(system, monkeypa
     manager.encoder.encode.assert_not_called()
 
 
+def test_review_change_is_noop_even_when_explicitly_reindexed(system, monkeypatch):
+    from intent_hub.models import RouteReview
+    manager, service = system
+    route = manager.route_manager.get_route(1)
+    route.review = RouteReview(needs_review=True, version=1, reason='manual')
+    manager.route_manager.repository.save(route, enqueue=False, update_review=True)
+    for method in ('upsert', 'delete', 'set_payload'):
+        monkeypatch.setattr(manager.qdrant_client.client, method, Mock(side_effect=AssertionError('unexpected write')))
+    assert service.sync_route(1)['changed'] is False
+    manager.encoder.encode.assert_not_called()
+
+
 def test_metadata_hash_wins_over_legacy_sample_hashes(system):
     manager, service = system
     q = manager.qdrant_client

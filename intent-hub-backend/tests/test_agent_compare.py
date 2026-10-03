@@ -39,17 +39,14 @@ def test_equal_override_is_reported_as_locked_not_modified():
     assert summary["diff_fields"] == []
 
 
-def test_detail_reports_actual_corpus_additions_and_removals():
+def test_local_corpora_are_not_upstream_differences():
     agent = upstream_agent(
         utterances=["北京天气", "广州天气"],
         manual_overrides=["utterances"],
     )
     detail = comparison_detail(agent, "2026-07-21T00:00:00+00:00")
-    diff = detail["fields"]["utterances"]
-    assert detail["comparison"]["status"] == "local_modified"
-    assert diff["added"] == ["广州天气"]
-    assert diff["removed"] == ["上海天气"]
-    assert diff["unchanged_count"] == 1
+    assert detail["comparison"]["status"] == "same"
+    assert set(detail["fields"]) == {"title", "text"}
 
 
 def test_source_state_statuses_take_priority():

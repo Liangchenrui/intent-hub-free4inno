@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
 
-from intent_hub.models import RouteConfig
+from intent_hub.models import RouteConfig, RouteReview
 
 
 class Repository:
@@ -57,12 +57,16 @@ class Repository:
             row = db.execute('SELECT body FROM entities WHERE id=?', (entity_id,)).fetchone()
         return RouteConfig.model_validate_json(row[0]) if row else None
 
-    def save(self, route, db=None, enqueue=True):
+    def save(self, route, db=None, enqueue=True, *, update_review=False):
         if db is None:
             with self.transaction() as connection:
-                return self.save(route, connection, enqueue)
+                return self.save(route, connection, enqueue, update_review=update_review)
         row = db.execute('SELECT body FROM entities WHERE id=?', (route.id,)).fetchone()
         previous = RouteConfig.model_validate_json(row[0]) if row else None
+        # Generic edits/imports/index recovery must never acknowledge a newer alert.
+        # Only the transactional upstream merge and review endpoint own this state.
+        if not update_review:
+            route.review = previous.review.model_copy(deep=True) if previous else RouteReview()
         # Preserve provenance for older clients, but remove it with deleted samples.
         provenance = dict(previous.fallback_utterances) if previous else {}
         provenance.update(route.fallback_utterances)

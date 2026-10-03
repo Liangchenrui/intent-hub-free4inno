@@ -13,7 +13,8 @@
 - `GET /routes/{route_id}/upstream-diff`
 - `POST /routes/{route_id}/restore-upstream-fields`
 - `PUT|DELETE /routes/{route_id}`
-- `POST /routes/generate-utterances`
+- `PATCH /routes/{route_id}/review`（管理员共享待处理状态，带版本校验）
+- `POST /routes/generate-utterances`：根据当前表单生成语料草稿，不持久化。`polarity` 为 `positive`（默认）或 `negative`；`count` 为新增数量上限（1–50），`utterances` 为当前正向语料，`negative_samples` 为当前负向语料。结果分别回填 `utterances` 或 `negative_samples`，保留对应已有语料；模型去重后可能少于请求数量。支持 `id=0` 的未保存条目。
 - `POST /routes/import` and `/routes/import-skill`
 - `POST|DELETE /routes/{route_id}/negative-samples`
 - `POST|DELETE /routes/{route_id}/feedback/positive`
@@ -35,6 +36,28 @@
 
 普通手工同步请求体为 `{"force_full": false}`（也可省略字段），接口立即返回可通过 `/sync-tasks` 查询的任务。任务的 `result` 包含 `new_routes`、`updated_routes`、`deleted_routes`、`skipped_routes` 和 `total_points`。全量重建是恢复或迁移操作，不是管理台普通同步按钮的默认路径。
 
+## 管理员待处理状态
+
+`GET /routes`、`GET /routes/search` 的每条实体包含 `review`：
+
+```json
+{"needs_review": true, "version": 3, "changed_at": "2026-09-30T12:00:00+00:00", "reason": "updated", "changed_fields": ["description", "details.parameters"]}
+```
+
+上游新增／业务信息变化会标记待处理；人工覆盖阻止字段覆盖时仍提醒。提醒字段为名称、描述及详情中的 `attachments`、`author`、`labelsByCategory`、`parameters`、`source`，其他原始扩展字段可随详情更新保存但不触发提醒。上游正、负例句不导入，也不触发提醒。连续未处理更新累计变化字段，不提供历史前后值。旧记录默认 `needs_review=false, version=0`。
+
+`PATCH /compat/master/routes/{route_id}/review`（根路径 `/routes/{route_id}/review` 同样提供）使用管理鉴权：
+
+```json
+{"needs_review": false, "expected_version": 3}
+```
+
+- 成功返回 `200` 和当前实体。状态改变时递增独立 `review.version`，同版本同状态请求不重复写入；重新标记记录 `reason=manual`。
+- 参数错误返回 `400`，未认证 `401`，实体不存在 `404`；版本冲突返回 `409`，并携带最新 `review`，客户端须重新加载详情后确认。
+- 状态为管理员共享；只改管理元数据，不改变路由生命周期、同步版本，不触发 outbox、embedding 或 Qdrant 更新。
+- 普通编辑、导入、后台同步及索引恢复保留数据库中已有的最新状态；不能通过提交实体中的 `review` 绕过专用接口。新导入实体的外来状态不直接采信。
+- 保存例句和打开详情不清除提醒。仅手动新建、导入、下架、恢复和自动学习不自动触发本类提醒。
+
 ## 未命中时的大模型兜底
 
 `POST /route` 使用 query 请求字段及统一对象响应。现有例句匹配有结果时直接返回；结果为空（包括负例排除后为空）且开启兜底时，从当前 Collection 的名称与描述向量召回 Top-K 个意图，再调用现有 LLM 配置进行选择或拒绝。
@@ -47,7 +70,7 @@
 | `fallback_status` | 未调用兜底为 `null`；其余为 `matched`、`no_match`、`ambiguous`、`no_candidates` 或 `unavailable` |
 | `score` | 保持原有例句相似度口径；模型选择与默认兜底均为 `null`，不返回模型自评置信度 |
 
-`/route` 接受可选布尔字段 `learn_from_fallback`（默认 `true`）。测试界面固定传 `false`，仅使用点赞/点踩反馈；外部 API 默认自动积累。启用自动积累且兜底成功匹配后，请求原文去除首尾空白，自动追加到对应实体的 `utterances`，后台同步索引后参与普通检索。同一实体相同文本去重；入库或调度失败不会撤销路由结果。路由和 Agent 管理读取接口的 `fallback_utterances` 字典记录自动语料及 UTC 添加时间；删除对应语料会清除来源记录。上游更新及恢复上游语料字段时会合并保留自动语料。详见[兜底自动积累语料](changes/fallback-learning/README.md)。
+`/route` 接受可选布尔字段 `learn_from_fallback`（默认 `true`）。测试界面固定传 `false`，仅使用点赞/点踩反馈；外部 API 默认自动积累。启用自动积累且兜底成功匹配后，请求原文去除首尾空白，自动追加到对应实体的 `utterances`，后台同步索引后参与普通检索。同一实体相同文本去重；入库或调度失败不会撤销路由结果。路由和 Agent 管理读取接口的 `fallback_utterances` 字典记录自动语料及 UTC 添加时间；删除对应语料会清除来源记录。上游拉取不再导入正、负例句，保留所有现有本地语料；恢复上游字段仅支持名称和描述。详见[兜底自动积累语料](changes/fallback-learning/README.md)。
 
 模型只能选择候选中的一个 ID。歧义、均不适用、缺少已同步候选、超时或无效输出均返回原有默认路由，通过 `fallback_status` 区分原因；`ambiguous` 供调用方提示用户澄清，不会自动发起多轮对话。被负例排除、非 active、已删除及内容 hash 过期的实体不能进入兜底结果。基础 Embedding/例句检索故障仍按现有接口错误机制处理；这里的降级只覆盖新增兜底阶段。
 

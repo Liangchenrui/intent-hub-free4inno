@@ -19,6 +19,16 @@ DATA_DIR = Path(os.environ.get("INTENT_HUB_DATA_DIR", str(PROJECT_ROOT / "data")
 # 新创建 settings.json 时写入的默认提示词
 DEFAULT_UTTERANCE_GENERATION_PROMPT = """你是一个资深的用户意图分析专家。你的任务是为特定的 AI Agent 生成高质量的测试数据集（Utterances），用于后续的意图识别和路由分发系统训练。 ### Agent 背景信息 - **Agent 名称**: {name} - **功能描述**: {description} - **参考示例（请参照这些示例的风格和范围，生成新的句子，但绝对不能重复这些示例）**: {reference_utterances} ### 生成要求 你需要生成 {count} 条**全新的**用户提问（必须与参考示例不同），请严格遵守以下准则： 1. **分布控制**：    - **关键词/短语 (50%)**: 极其简短，如"查天气"、"翻译一下"、"写代码"。这类词对路由最关键。    - **简单指令 (50%)**: 直接的命令句，如"帮我写个请假条"、"帮我分析这行代码"。 2. **多样性与覆盖面**：    - 提取描述中的"核心动词" and "核心名词"，进行交叉组合。    - 包含同义词替换（例如：从"预定"扩展到"帮我订一个"、"我想约一个"）。    - 必须沿用参考示例的语气和专业深度，但不要重复原话。 3. **路由判别性**：    - 生成的提问必须与该 Agent 的核心功能高度相关，避免产生可能导致路由误判到其他通用 Agent 的极其模糊的句子。 4. **格式要求**：    - 仅输出生成的问题列表，不要包含任何解释性文字。 {format_instructions}"""
 
+DEFAULT_NEGATIVE_UTTERANCE_GENERATION_PROMPT = """为意图生成 {count} 条负向语料，即明确不应由该意图处理的用户请求。
+意图名称：{name}
+职责描述：{description}
+正向语料（用于确定职责边界，不能生成与其同义的负例）：
+{positive_examples}
+优先生成措辞相关但目的或职责明确不同的请求，不要仅添加“不”字来否定正例。
+避免边界不明、可能属于当前意图的请求，不得重复已有正负语料。
+{reference_utterances}
+{format_instructions}"""
+
 DEFAULT_AGENT_REPAIR_PROMPT = """## 角色设定 你是一个**资深的 NLU / 用户意图分析专家**。 ## 任务背景 当前系统中 {name_a} 与 {name_b} 在语义空间中存在显著重叠，导致路由模型出现误判。 你的任务是通过生成**高质量、强判别性的语料**，对 {name_a} 进行**语义修复**，强化其可识别特征，并主动规避 {name_b} 的语义边界。 --- ## 意图背景信息 ### {name_a} - **名称**: {name_a} - **描述**: {desc_a} - **参考示例（仅用于风格与范围参考，禁止复用或改写）**: {utterances_a} ### {name_b} - **名称**: {name_b} - **描述**: {desc_b} ### 高频冲突例句（真实误判样本） {conflicts} --- ## 生成要求（必须严格遵守） ### 1. 语料生成数量与分布（仅适用于 new_utterances） 为 {name_a} 生成 **5 条全新的用户提问**，并严格控制以下比例： - **关键词 / 短语（≈50%）** - 极简、去语境、偏触发式 - 明确体现 {name_a} 的**核心动词 / 核心名词** - **简单指令（≈50%）** - 清晰、直接的命令式表达 - 明确指向 {name_a} 的**能力边界** --- ### 2. 判别性与修复导向（核心要求） - 明确**强化 {name_a} 的专属特征词、操作对象或约束条件** - **显式避开**： - {name_b} 的核心动词 - {name_b} 的典型对象 - 容易引发歧义的抽象或泛化表达 - 所有新例句必须落在 {name_a} 的**安全语义区**内 --- ### 3. 负面约束样本（negative_samples） 生成 **3 条负面约束例句**，要求： - 表面上与 {name_a} **高度相似** - 但由于**关键动词 / 对象 / 目标发生偏移** - **语义上明确不属于 {name_a}** - 用于训练模型：**不要将这些输入路由到 {name_a}** --- ### 4. 多样性要求 - 对 {name_a} 的**核心动词、核心名词**进行同义替换 - 覆盖不同句式与指令粒度 - 保持与参考示例一致的**语气与专业深度** - **禁止**复用、拼接或轻微改写任何已有示例 --- ## 输出格式（必须严格一致） 请**仅**按以下 JSON 格式输出，不要包含任何解释性文字或多余字段：
 json
 {{
@@ -172,6 +182,7 @@ class Config:
 
     # 提示词配置
     UTTERANCE_GENERATION_PROMPT: str = ""
+    NEGATIVE_UTTERANCE_GENERATION_PROMPT: str = ""
     AGENT_REPAIR_PROMPT: str = ""
     SKILL_ROUTE_IMPORT_PROMPT: str = ""
 
@@ -204,6 +215,7 @@ class Config:
             default_settings["UTTERANCE_GENERATION_PROMPT"] = (
                 DEFAULT_UTTERANCE_GENERATION_PROMPT
             )
+            default_settings["NEGATIVE_UTTERANCE_GENERATION_PROMPT"] = DEFAULT_NEGATIVE_UTTERANCE_GENERATION_PROMPT
             default_settings["AGENT_REPAIR_PROMPT"] = DEFAULT_AGENT_REPAIR_PROMPT
             default_settings["SKILL_ROUTE_IMPORT_PROMPT"] = DEFAULT_SKILL_ROUTE_IMPORT_PROMPT
             try:
@@ -270,6 +282,8 @@ class Config:
         """为缺失的提示词应用默认值，兼容旧版 settings.json"""
         if not cls.UTTERANCE_GENERATION_PROMPT:
             cls.UTTERANCE_GENERATION_PROMPT = DEFAULT_UTTERANCE_GENERATION_PROMPT
+        if not cls.NEGATIVE_UTTERANCE_GENERATION_PROMPT:
+            cls.NEGATIVE_UTTERANCE_GENERATION_PROMPT = DEFAULT_NEGATIVE_UTTERANCE_GENERATION_PROMPT
         if not cls.AGENT_REPAIR_PROMPT:
             cls.AGENT_REPAIR_PROMPT = DEFAULT_AGENT_REPAIR_PROMPT
         if not cls.SKILL_ROUTE_IMPORT_PROMPT:
@@ -289,6 +303,22 @@ class Config:
         if unknown:
             raise ValueError("Unsupported settings: " + ", ".join(sorted(unknown)))
         cls.validate_fallback_settings(settings_dict)
+        if 'NEGATIVE_UTTERANCE_GENERATION_PROMPT' in settings_dict:
+            template = settings_dict['NEGATIVE_UTTERANCE_GENERATION_PROMPT']
+            if not isinstance(template, str):
+                raise ValueError('Negative example prompt must be a string')
+            if template.strip():
+                from langchain_core.prompts import PromptTemplate
+                allowed = {'name', 'description', 'count', 'positive_examples', 'reference_utterances', 'format_instructions'}
+                try:
+                    variables = set(PromptTemplate.from_template(template).input_variables)
+                except ValueError as exc:
+                    raise ValueError('Invalid negative example prompt template') from exc
+                if variables - allowed or 'format_instructions' not in variables:
+                    raise ValueError('Negative example prompt requires {format_instructions} and only supports: ' + ', '.join(sorted(allowed)))
+            else:
+                settings_dict = {**settings_dict, 'NEGATIVE_UTTERANCE_GENERATION_PROMPT': DEFAULT_NEGATIVE_UTTERANCE_GENERATION_PROMPT}
+
         merged = {**cls.to_dict(), **settings_dict}
         if not isinstance(merged['ROUTE_API_KEY'], str):
             raise ValueError('ROUTE_API_KEY must be a string')
@@ -393,6 +423,7 @@ class Config:
             "DEEPSEEK_MODEL": cls.DEEPSEEK_MODEL,
             # 提示词配置
             "UTTERANCE_GENERATION_PROMPT": cls.UTTERANCE_GENERATION_PROMPT,
+            "NEGATIVE_UTTERANCE_GENERATION_PROMPT": cls.NEGATIVE_UTTERANCE_GENERATION_PROMPT,
             "AGENT_REPAIR_PROMPT": cls.AGENT_REPAIR_PROMPT,
             "SKILL_ROUTE_IMPORT_PROMPT": cls.SKILL_ROUTE_IMPORT_PROMPT,
             # 认证配置

@@ -3,6 +3,38 @@ import json
 
 import pytest
 
+
+def test_negative_prompt_persists_reloads_and_defaults(monkeypatch, tmp_path):
+    from intent_hub.config import DEFAULT_NEGATIVE_UTTERANCE_GENERATION_PROMPT
+    for key in Config.to_dict():
+        monkeypatch.setattr(Config, key, getattr(Config, key))
+    path = tmp_path / 'settings.json'
+    monkeypatch.setattr(Config, 'SETTINGS_FILE_PATH', str(path))
+    monkeypatch.setattr(Config, 'NEGATIVE_UTTERANCE_GENERATION_PROMPT', '')
+    path.write_text('{}', encoding='utf-8')
+    Config.load()
+    assert Config.to_dict()['NEGATIVE_UTTERANCE_GENERATION_PROMPT'] == DEFAULT_NEGATIVE_UTTERANCE_GENERATION_PROMPT
+    custom = 'Custom {name} {positive_examples} {count} {format_instructions}'
+    Config.save({'NEGATIVE_UTTERANCE_GENERATION_PROMPT': custom})
+    assert json.loads(path.read_text(encoding='utf-8'))['NEGATIVE_UTTERANCE_GENERATION_PROMPT'] == custom
+    Config.NEGATIVE_UTTERANCE_GENERATION_PROMPT = ''
+    Config.load()
+    assert Config.NEGATIVE_UTTERANCE_GENERATION_PROMPT == custom
+    Config.save({'NEGATIVE_UTTERANCE_GENERATION_PROMPT': ' '})
+    assert Config.NEGATIVE_UTTERANCE_GENERATION_PROMPT == DEFAULT_NEGATIVE_UTTERANCE_GENERATION_PROMPT
+
+
+@pytest.mark.parametrize('template', [None, 42, '{unknown} {format_instructions}', 'missing format', 'broken {'])
+def test_negative_prompt_invalid_input_does_not_write(monkeypatch, tmp_path, template):
+    path = tmp_path / 'settings.json'
+    path.write_text('{}', encoding='utf-8')
+    monkeypatch.setattr(Config, 'SETTINGS_FILE_PATH', str(path))
+    before = Config.NEGATIVE_UTTERANCE_GENERATION_PROMPT
+    with pytest.raises(ValueError):
+        Config.save({'NEGATIVE_UTTERANCE_GENERATION_PROMPT': template})
+    assert path.read_text(encoding='utf-8') == '{}'
+    assert Config.NEGATIVE_UTTERANCE_GENERATION_PROMPT == before
+
 from intent_hub.config import Config
 from intent_hub.auth import AuthManager
 

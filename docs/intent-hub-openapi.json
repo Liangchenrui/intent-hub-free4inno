@@ -421,6 +421,56 @@
         ]
       }
     },
+    "/routes/{route_id}/review": {
+      "patch": {
+        "operationId": "update_route_review_patch",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "RouteConfig with current shared review state; no indexing is queued."
+          },
+          "400": {
+            "description": "Invalid review state or expected_version"
+          },
+          "401": {
+            "description": "Management authentication required"
+          },
+          "404": {
+            "description": "Route does not exist"
+          },
+          "409": {
+            "description": "Review version changed; reload details before acknowledging"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          }
+        }
+      }
+    },
     "/routes/generate-utterances": {
       "post": {
         "operationId": "generate_utterances_post",
@@ -436,7 +486,17 @@
           {
             "BearerAuth": []
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateUtterancesRequest"
+              }
+            }
+          }
+        }
       }
     },
     "/routes/import-skill": {
@@ -1348,6 +1408,56 @@
         ]
       }
     },
+    "/compat/master/routes/{route_id}/review": {
+      "patch": {
+        "operationId": "master_update_route_review_patch",
+        "tags": [
+          "master"
+        ],
+        "responses": {
+          "200": {
+            "description": "RouteConfig with current shared review state; no indexing is queued."
+          },
+          "400": {
+            "description": "Invalid review state or expected_version"
+          },
+          "401": {
+            "description": "Management authentication required"
+          },
+          "404": {
+            "description": "Route does not exist"
+          },
+          "409": {
+            "description": "Review version changed; reload details before acknowledging"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          }
+        }
+      }
+    },
     "/compat/master/routes/generate-utterances": {
       "post": {
         "operationId": "master_generate_utterances_post",
@@ -1363,7 +1473,17 @@
           {
             "BearerAuth": []
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateUtterancesRequest"
+              }
+            }
+          }
+        }
       }
     },
     "/compat/master/routes/import-skill": {
@@ -2923,6 +3043,59 @@
         "title": "PredictResponse",
         "type": "object"
       },
+      "RouteReview": {
+        "properties": {
+          "needs_review": {
+            "default": false,
+            "title": "Needs Review",
+            "type": "boolean"
+          },
+          "version": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Version",
+            "type": "integer"
+          },
+          "changed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Changed At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "created",
+                  "updated",
+                  "manual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          }
+        },
+        "title": "RouteReview",
+        "type": "object"
+      },
       "RouteSource": {
         "properties": {
           "type": {
@@ -3184,6 +3357,10 @@
             "default": null,
             "title": "Updated At"
           },
+          "review": {
+            "$ref": "#/components/schemas/RouteReview",
+            "description": "管理员共享处理状态；仅专用接口及上游合并可修改"
+          },
           "details": {
             "additionalProperties": true,
             "title": "Details",
@@ -3236,6 +3413,26 @@
         "title": "RouteConfig",
         "type": "object"
       },
+      "ReviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "needs_review": {
+            "title": "Needs Review",
+            "type": "boolean"
+          },
+          "expected_version": {
+            "minimum": 0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "needs_review",
+          "expected_version"
+        ],
+        "title": "ReviewRequest",
+        "type": "object"
+      },
       "LoginRequest": {
         "description": "登录请求模型",
         "properties": {
@@ -3257,6 +3454,90 @@
           "password"
         ],
         "title": "LoginRequest",
+        "type": "object"
+      },
+      "GenerateUtterancesRequest": {
+        "description": "生成提问请求模型",
+        "properties": {
+          "id": {
+            "description": "Agent ID",
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "description": "Agent 名称",
+            "title": "Name",
+            "type": "string"
+          },
+          "route_key": {
+            "description": "业务路由标识",
+            "minLength": 1,
+            "title": "Route Key",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "description": "Agent 描述",
+            "title": "Description",
+            "type": "string"
+          },
+          "count": {
+            "default": 5,
+            "description": "生成的提问数量",
+            "exclusiveMinimum": 0,
+            "maximum": 50,
+            "title": "Count",
+            "type": "integer"
+          },
+          "polarity": {
+            "default": "positive",
+            "description": "生成正向或负向语料",
+            "enum": [
+              "positive",
+              "negative"
+            ],
+            "title": "Polarity",
+            "type": "string"
+          },
+          "negative_samples": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "现有负向语料",
+            "title": "Negative Samples"
+          },
+          "utterances": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "参考的utterances列表（可选）",
+            "title": "Utterances"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "route_key"
+        ],
+        "title": "GenerateUtterancesRequest",
         "type": "object"
       },
       "Agent": {

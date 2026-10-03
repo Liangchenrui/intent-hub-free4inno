@@ -62,3 +62,46 @@ def test_generate_route_from_skill_returns_standard_import_draft(monkeypatch):
     assert draft.routes[0].source is not None
     assert draft.routes[0].source.type == "json_import"
     assert draft.routes[0].source.import_origin == "skill_import"
+
+
+@pytest.mark.parametrize("polarity", ["positive", "negative"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_generate_examples_respects_polarity_and_does_not_save(monkeypatch, polarity, existing):
+    import json
+    from langchain_core.runnables import RunnableLambda
+    from intent_hub.models import GenerateUtterancesRequest, RouteConfig
+    from intent_hub.services.llm_factory import LLMFactory
+
+    components = DummyComponentManager()
+    service = RouteService(components)
+    if existing:
+        components.route_manager.add_route(RouteConfig(id=1, name="Weather", route_key="weather", utterances=["weather"], negative_samples=["old negative"]))
+    before = [r.model_dump() for r in components.route_manager.get_all_routes()]
+    prompts = []
+    from intent_hub.config import Config
+    monkeypatch.setattr(Config, 'NEGATIVE_UTTERANCE_GENERATION_PROMPT', 'CUSTOM_NEGATIVE_TEMPLATE\n' + Config.NEGATIVE_UTTERANCE_GENERATION_PROMPT)
+
+    def generate(prompt):
+        prompts.append(prompt.to_string())
+        return json.dumps({"utterances": ["weather", "old negative", " fresh one ", "fresh one", "", "fresh two", "extra"]})
+
+    monkeypatch.setattr(LLMFactory, "create_llm", lambda: RunnableLambda(generate))
+    req = GenerateUtterancesRequest(id=1 if existing else 0, name="Weather draft", route_key="weather", description="Current draft description", polarity=polarity, count=2, utterances=["weather"], negative_samples=["old negative"])
+    result = service.generate_utterances(req)
+    if polarity == "negative":
+        assert result.negative_samples == ["old negative", "fresh one", "fresh two"]
+        assert result.utterances == ["weather"]
+        assert "明确不应" in prompts[0]
+        assert 'CUSTOM_NEGATIVE_TEMPLATE' in prompts[0]
+    else:
+        assert result.utterances == ["weather", "old negative", "fresh one"]
+    assert "Current draft description" in prompts[0]
+    assert [r.model_dump() for r in components.route_manager.get_all_routes()] == before
+
+
+def test_generation_defaults_to_positive_and_rejects_invalid_polarity():
+    from pydantic import ValidationError
+    from intent_hub.models import GenerateUtterancesRequest
+    assert GenerateUtterancesRequest(id=0, name="test", route_key="test").polarity == "positive"
+    with pytest.raises(ValidationError):
+        GenerateUtterancesRequest(id=0, name="test", route_key="test", polarity="invalid")

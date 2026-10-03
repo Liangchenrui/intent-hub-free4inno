@@ -14,6 +14,20 @@ class RoutePayload(BaseModel):
     score_threshold: float = Field(..., description="相似度阈值")
 
 
+class RouteReview(BaseModel):
+    needs_review: bool = False
+    version: int = Field(default=0, ge=0)
+    changed_at: Optional[str] = None
+    reason: Literal["created", "updated", "manual"] | None = None
+    changed_fields: List[str] = Field(default_factory=list)
+
+
+class ReviewRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+    needs_review: bool = Field(strict=True)
+    expected_version: int = Field(ge=0, strict=True)
+
+
 class RouteConfig(BaseModel):
     """路由配置模型（用于CRUD操作）"""
 
@@ -59,6 +73,7 @@ class RouteConfig(BaseModel):
         le=1.0,
     )
     updated_at: Optional[str] = None
+    review: RouteReview = Field(default_factory=RouteReview, description="管理员共享处理状态；仅专用接口及上游合并可修改")
     details: Dict[str, Any] = Field(default_factory=dict)
     source: Optional[RouteSource] = Field(default=None, description="来源元数据")
     sync: Optional[RouteSync] = Field(default=None, description="同步元数据")
@@ -153,6 +168,8 @@ class GenerateUtterancesRequest(BaseModel):
     route_key: str = Field(..., description="业务路由标识", min_length=1)
     description: str = Field(default="", description="Agent 描述")
     count: int = Field(default=5, description="生成的提问数量", gt=0, le=50)
+    polarity: Literal["positive", "negative"] = Field(default="positive", description="生成正向或负向语料")
+    negative_samples: Optional[List[str]] = Field(default=None, description="现有负向语料")
     utterances: Optional[List[str]] = Field(
         default=None, description="参考的utterances列表（可选）"
     )

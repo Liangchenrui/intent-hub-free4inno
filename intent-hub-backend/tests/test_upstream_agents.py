@@ -34,7 +34,7 @@ def upstream_route(route_id, source_id, name, snapshot, overrides=None):
     )
 
 
-def test_agent_source_deduplicates_labels_and_parses_corpora(monkeypatch):
+def test_agent_source_deduplicates_labels_and_ignores_corpora(monkeypatch):
     monkeypatch.setattr(Config, "AGENT_API_URL", "https://agents.example/api/")
     monkeypatch.setattr(Config, "AGENT_API_LABEL_IDS", "87,88")
     calls = []
@@ -67,8 +67,8 @@ def test_agent_source_deduplicates_labels_and_parses_corpora(monkeypatch):
     agents = AgentSource(Session()).fetch_all()
 
     assert len(agents) == 1
-    assert agents[0]["utterances"] == ["today", "tomorrow"]
-    assert agents[0]["negative_samples"] == ["sports"]
+    assert agents[0]["utterances"] == []
+    assert agents[0]["negative_samples"] == []
     assert len([call for call in calls if call[0].endswith("/detail")]) == 1
     assert all("headers" not in call[1] for call in calls)
 
@@ -130,7 +130,9 @@ def test_pull_preserves_overrides_allocates_local_ids_and_disables_missing(tmp_p
     assert result["upstream_missing"] == 1
     assert updated_a.name == "New A"
     assert updated_a.description == "manual description"
-    assert updated_a.utterances == ["new"]
+    assert updated_a.utterances == ["old"]
+    assert updated_a.negative_samples == []
+    assert created_c.utterances == []
     assert missing_b.lifecycle_status == "disabled"
     assert missing_b.source.upstream_present is False
     assert created_c.id == 12
@@ -191,7 +193,7 @@ def test_routes_api_exposes_upstream_summary_and_detail(tmp_path, monkeypatch):
     assert routes_response.status_code == 200
     assert routes_response.get_json()[0]["comparison"]["status"] == "same"
     assert diff_response.status_code == 200
-    assert diff_response.get_json()["fields"]["utterances"]["unchanged_count"] == 1
+    assert set(diff_response.get_json()["fields"]) == {"name", "description"}
 
 
 # Pulls compare after fetching, inside the write transaction; all fixtures are isolated.

@@ -1,5 +1,7 @@
 # Docs
 
+- [融合智能体流程对齐与管理员更新提醒](changes/2026-09-30-fusion-agent-requirements.md)：已选规则、上游语料本地维护、共享待处理闭环与验收记录
+
 - [2026-09-28 收尾与后续工作](changes/2026-09-28-closeout.md)：当前功能、调用示例、验证和 Git 交付范围
 
 - [页面配置统一路由密钥](changes/route-api-key/README.md)：设置、持久化、鉴权范围和验证

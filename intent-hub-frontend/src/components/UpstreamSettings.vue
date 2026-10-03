@@ -3,7 +3,7 @@
     <div class="upstream-heading">
       <div>
         <strong>上游数据源</strong>
-        <p class="hint">路由标识为「上游名称.原始 ID」。名称不区分大小写，不能包含点号或空白，拉取后锁定。</p>
+        <p class="hint">配置应用数据来源，保存后可拉取。</p>
       </div>
       <el-button @click="addSource">新增上游</el-button>
     </div>
@@ -22,6 +22,7 @@
       <div class="source-fields">
         <el-form-item label="上游名称">
           <el-input v-model="source.name" :disabled="source.name_locked || isRunning(source.id)" placeholder="例如 bupt" />
+          <div class="hint">用于路由标识；不含点号或空白，拉取后锁定。</div>
         </el-form-item>
         <el-form-item label="接口 URL">
           <el-input v-model="source.url" placeholder="https://example.com/ac/api" />
@@ -122,12 +123,12 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
 </script>
 
 <style scoped>
-.upstreams { margin: 24px 0; }
+.upstreams { margin: 0; }
 .upstream-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .hint { color: #737985; font-size: 12px; margin: 8px 0; }
-.upstream-card { border: 1px solid #dcdfe6; border-radius: 6px; padding: 18px; margin: 16px 0; }
+.upstream-card { border: 1px solid #dcdfe6; border-radius: 8px; padding: 16px; margin: 16px 0; }
 .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.source-fields { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 16px; margin-top: 16px; }
+.source-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
 .pull-result { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: #606266; margin-bottom: 8px; }
 @media (max-width: 760px) { .source-fields { grid-template-columns: 1fr; gap: 0; } }
 </style>
